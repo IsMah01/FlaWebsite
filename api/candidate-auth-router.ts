@@ -1,12 +1,13 @@
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { createRouter, publicQuery } from "./middleware";
-import { getDb } from "./queries/connection";
-import { candidates } from "@db/schema";
 import { eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { createRouter, publicQuery } from "./middleware";
+import { getDb } from "./queries/connection";
+import { candidates, newUsers } from "@db/schema";
 import { sendConfirmationEmail } from "./lib/email";
+import { upsertUser } from "./queries/users";
 
 const JWT_SECRET = process.env.APP_SECRET;
 
@@ -14,34 +15,63 @@ if (!JWT_SECRET) {
   throw new Error("APP_SECRET is required");
 }
 
+function readCandidateToken(cookieHeader: string) {
+  return cookieHeader
+    .split(";")
+    .find((c) => c.trim().startsWith("candidate_token="))
+    ?.split("=")[1];
+}
+
+const newUserBaseSelection = {
+  id: newUsers.id,
+  firstName: newUsers.firstName,
+  lastName: newUsers.lastName,
+  studyStatus: newUsers.studyStatus,
+  attestationUrl: newUsers.attestationUrl,
+  phoneNumber: newUsers.phoneNumber,
+  email: newUsers.email,
+  isAmbassador: newUsers.isAmbassador,
+  password: newUsers.password,
+  emailConfirmed: newUsers.emailConfirmed,
+  confirmationToken: newUsers.confirmationToken,
+  newsletterConsent: newUsers.newsletterConsent,
+  createdAt: newUsers.createdAt,
+  updatedAt: newUsers.updatedAt,
+  lastLoginAt: newUsers.lastLoginAt,
+};
+
 export const candidateAuthRouter = createRouter({
   register: publicQuery
     .input(
-      z.object({
-        firstName: z.string().min(1, "الاسم مطلوب"),
-        lastName: z.string().min(1, "اسم العائلة مطلوب"),
-        studyStatus: z.enum(["student", "graduated", "master_student", "phd_student", "other"]),
-        attestationUrl: z.string().regex(/^private:\/\/(attestation)-[a-f0-9-]+\.(pdf|jpg|jpeg|png)$/i).optional(),
-        idCardUrl: z.string().regex(/^private:\/\/(idCard)-[a-f0-9-]+\.(pdf|jpg|jpeg|png)$/i).optional(),
-        phoneNumber: z.string().min(1, "رقم الهاتف مطلوب"),
-        email: z.string().email("بريد إلكتروني غير صالح"),
-        isAmbassador: z.boolean().default(false),
-        password: z.string().min(6, "كلمة المرور يجب أن تكون 6 أحرف على الأقل"),
-        confirmPassword: z.string(),
-        newsletterConsent: z.boolean().default(false),
-      }).refine((data) => data.password === data.confirmPassword, {
-        message: "كلمتا المرور غير متطابقتين",
-        path: ["confirmPassword"],
-      })
+      z
+        .object({
+          firstName: z.string().min(1, "الاسم مطلوب"),
+          lastName: z.string().min(1, "اسم العائلة مطلوب"),
+          studyStatus: z.enum(["student", "graduated", "master_student", "phd_student", "other"]),
+          attestationUrl: z
+            .string()
+            .regex(/^private:\/\/(attestation)-[a-f0-9-]+\.(pdf|jpg|jpeg|png)$/i)
+            .optional(),
+          phoneNumber: z.string().min(1, "رقم الهاتف مطلوب"),
+          email: z.string().email("بريد إلكتروني غير صالح"),
+          isAmbassador: z.boolean().default(false),
+          password: z.string().min(6, "كلمة المرور يجب أن تتكون من 6 أحرف على الأقل"),
+          confirmPassword: z.string(),
+          newsletterConsent: z.boolean().default(false),
+        })
+        .refine((data) => data.password === data.confirmPassword, {
+          message: "كلمتا المرور غير متطابقتين",
+          path: ["confirmPassword"],
+        }),
     )
     .mutation(async ({ input }) => {
       const db = getDb();
+      const normalizedEmail = input.email.trim().toLowerCase();
 
-      // Check if email already exists
       const existing = await db
-        .select()
-        .from(candidates)
-        .where(eq(candidates.email, input.email))
+        .select({ id: newUsers.id })
+        .from(newUsers)
+        .where(eq(newUsers.email, normalizedEmail))
         .limit(1);
 
       if (existing.length > 0) {
@@ -52,20 +82,15 @@ export const candidateAuthRouter = createRouter({
       }
 
       const hashedPassword = await bcrypt.hash(input.password, 12);
-      const confirmationToken = jwt.sign(
-        { email: input.email },
-        JWT_SECRET,
-        { expiresIn: "24h" }
-      );
+      const confirmationToken = jwt.sign({ email: normalizedEmail }, JWT_SECRET, { expiresIn: "24h" });
 
-      const [candidate] = await db.insert(candidates).values({
+      const [newUser] = await db.insert(newUsers).values({
         firstName: input.firstName,
         lastName: input.lastName,
         studyStatus: input.studyStatus,
         attestationUrl: input.attestationUrl || null,
-        idCardUrl: input.idCardUrl || null,
         phoneNumber: input.phoneNumber,
-        email: input.email,
+        email: normalizedEmail,
         isAmbassador: input.isAmbassador,
         password: hashedPassword,
         emailConfirmed: false,
@@ -73,16 +98,11 @@ export const candidateAuthRouter = createRouter({
         newsletterConsent: input.newsletterConsent,
       });
 
-      // Send confirmation email
-      const emailResult = await sendConfirmationEmail(
-        input.email,
-        input.firstName,
-        confirmationToken
-      );
+      const emailResult = await sendConfirmationEmail(normalizedEmail, input.firstName, confirmationToken);
 
       return {
         success: true,
-        candidateId: candidate.insertId,
+        newUserId: newUser.insertId,
         emailSent: emailResult.success,
         message: emailResult.success
           ? "تم التسجيل بنجاح! يرجى التحقق من بريدك الإلكتروني لتأكيد حسابك."
@@ -96,23 +116,20 @@ export const candidateAuthRouter = createRouter({
       const db = getDb();
       try {
         const decoded = jwt.verify(input.token, JWT_SECRET) as { email: string };
-        const candidate = await db
-          .select()
-          .from(candidates)
-          .where(eq(candidates.email, decoded.email))
+        const account = await db
+          .select({ id: newUsers.id })
+          .from(newUsers)
+          .where(eq(newUsers.email, decoded.email))
           .limit(1);
 
-        if (candidate.length === 0) {
+        if (account.length === 0) {
           throw new TRPCError({
             code: "NOT_FOUND",
             message: "المستخدم غير موجود",
           });
         }
 
-        await db
-          .update(candidates)
-          .set({ emailConfirmed: true, confirmationToken: null })
-          .where(eq(candidates.email, decoded.email));
+        await db.update(newUsers).set({ emailConfirmed: true, confirmationToken: null }).where(eq(newUsers.email, decoded.email));
 
         return { success: true, message: "تم تأكيد البريد الإلكتروني بنجاح" };
       } catch {
@@ -127,42 +144,36 @@ export const candidateAuthRouter = createRouter({
     .input(z.object({ email: z.string().email() }))
     .mutation(async ({ input }) => {
       const db = getDb();
-      const [candidate] = await db
-        .select()
-        .from(candidates)
-        .where(eq(candidates.email, input.email))
+      const normalizedEmail = input.email.trim().toLowerCase();
+      const [account] = await db
+        .select({
+          id: newUsers.id,
+          firstName: newUsers.firstName,
+          emailConfirmed: newUsers.emailConfirmed,
+        })
+        .from(newUsers)
+        .where(eq(newUsers.email, normalizedEmail))
         .limit(1);
 
-      if (!candidate) {
+      if (!account) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "المستخدم غير موجود",
         });
       }
 
-      if (candidate.emailConfirmed) {
+      if (account.emailConfirmed) {
         throw new TRPCError({
           code: "CONFLICT",
           message: "البريد الإلكتروني مؤكد بالفعل",
         });
       }
 
-      const confirmationToken = jwt.sign(
-        { email: input.email },
-        JWT_SECRET,
-        { expiresIn: "24h" }
-      );
+      const confirmationToken = jwt.sign({ email: normalizedEmail }, JWT_SECRET, { expiresIn: "24h" });
 
-      await db
-        .update(candidates)
-        .set({ confirmationToken })
-        .where(eq(candidates.email, input.email));
+      await db.update(newUsers).set({ confirmationToken }).where(eq(newUsers.email, normalizedEmail));
 
-      const emailResult = await sendConfirmationEmail(
-        input.email,
-        candidate.firstName,
-        confirmationToken
-      );
+      const emailResult = await sendConfirmationEmail(normalizedEmail, account.firstName, confirmationToken);
 
       return {
         success: true,
@@ -178,24 +189,31 @@ export const candidateAuthRouter = createRouter({
       z.object({
         email: z.string().email(),
         password: z.string(),
-      })
+      }),
     )
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
-      const [candidate] = await db
-        .select()
-        .from(candidates)
-        .where(eq(candidates.email, input.email))
+      const normalizedEmail = input.email.trim().toLowerCase();
+      const [account] = await db
+        .select(newUserBaseSelection)
+        .from(newUsers)
+        .where(eq(newUsers.email, normalizedEmail))
         .limit(1);
 
-      if (!candidate) {
+      if (!account) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "البريد الإلكتروني أو كلمة المرور غير صحيحة",
         });
       }
 
-      const valid = await bcrypt.compare(input.password, candidate.password);
+      const [candidateRecord] = await db
+        .select({ id: candidates.id })
+        .from(candidates)
+        .where(eq(candidates.newUserId, account.id))
+        .limit(1);
+
+      const valid = await bcrypt.compare(input.password, account.password);
       if (!valid) {
         throw new TRPCError({
           code: "UNAUTHORIZED",
@@ -203,79 +221,170 @@ export const candidateAuthRouter = createRouter({
         });
       }
 
-      if (!candidate.emailConfirmed) {
+      if (!account.emailConfirmed) {
         throw new TRPCError({
           code: "FORBIDDEN",
-          message: "يرجى تأكيد بريدك الإلكتروني أولاً",
+          message: "يرجى تأكيد بريدك الإلكتروني أولا",
         });
       }
 
-      const token = jwt.sign(
-        { candidateId: candidate.id, email: candidate.email },
-        JWT_SECRET,
-        { expiresIn: "7d" }
-      );
-
+      const token = jwt.sign({ newUserId: account.id, email: account.email }, JWT_SECRET, { expiresIn: "7d" });
       const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
 
       ctx.resHeaders.append(
         "set-cookie",
-        `candidate_token=${token}; HttpOnly; Path=/; Max-Age=604800; SameSite=Lax${secure}`
+        `candidate_token=${token}; HttpOnly; Path=/; Max-Age=604800; SameSite=Lax${secure}`,
       );
+
+      await db.update(newUsers).set({ lastLoginAt: new Date() }).where(eq(newUsers.id, account.id));
+
+      await upsertUser({
+        unionId: `newuser:${account.id}`,
+        name: `${account.firstName} ${account.lastName}`.trim(),
+        email: account.email,
+        role: "user",
+        status: account.isAmbassador ? "ambassador" : candidateRecord ? "candidate" : "user",
+        lastSignInAt: new Date(),
+        date: new Date(),
+      });
 
       return {
         success: true,
         candidate: {
-          id: candidate.id,
-          firstName: candidate.firstName,
-          lastName: candidate.lastName,
-          email: candidate.email,
-          isAmbassador: candidate.isAmbassador,
+          id: account.id,
+          firstName: account.firstName,
+          lastName: account.lastName,
+          email: account.email,
+          isAmbassador: account.isAmbassador,
         },
       };
     }),
 
   me: publicQuery.query(async ({ ctx }) => {
-    const cookieHeader = ctx.req.headers.get("cookie") || "";
-    const token = cookieHeader
-      .split(";")
-      .find((c) => c.trim().startsWith("candidate_token="))
-      ?.split("=")[1];
-
+    const token = readCandidateToken(ctx.req.headers.get("cookie") || "");
     if (!token) return null;
 
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as {
-        candidateId: number;
+        newUserId: number;
         email: string;
       };
       const db = getDb();
-      const [candidate] = await db
-        .select()
+      const [account] = await db
+        .select({
+          id: newUsers.id,
+          firstName: newUsers.firstName,
+          lastName: newUsers.lastName,
+          email: newUsers.email,
+          isAmbassador: newUsers.isAmbassador,
+          studyStatus: newUsers.studyStatus,
+        })
+        .from(newUsers)
+        .where(eq(newUsers.id, decoded.newUserId))
+        .limit(1);
+      const [candidateRecord] = await db
+        .select({ id: candidates.id })
         .from(candidates)
-        .where(eq(candidates.id, decoded.candidateId))
+        .where(eq(candidates.newUserId, decoded.newUserId))
         .limit(1);
 
-      if (!candidate) return null;
+      if (!account) return null;
 
       return {
-        id: candidate.id,
-        firstName: candidate.firstName,
-        lastName: candidate.lastName,
-        email: candidate.email,
-        isAmbassador: candidate.isAmbassador,
-        studyStatus: candidate.studyStatus,
+        id: account.id,
+        firstName: account.firstName,
+        lastName: account.lastName,
+        email: account.email,
+        isAmbassador: account.isAmbassador,
+        studyStatus: account.studyStatus,
+        hasSubmittedQuestionnaire: !!candidateRecord,
       };
     } catch {
       return null;
     }
   }),
 
+  submitQuestionnaire: publicQuery
+    .input(
+      z.object({
+        answers: z.record(z.string(), z.string()),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const token = readCandidateToken(ctx.req.headers.get("cookie") || "");
+      if (!token) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "يجب تسجيل الدخول أولا.",
+        });
+      }
+
+      let decoded: { newUserId: number; email: string };
+      try {
+        decoded = jwt.verify(token, JWT_SECRET) as { newUserId: number; email: string };
+      } catch {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "جلسة غير صالحة.",
+        });
+      }
+
+      const db = getDb();
+      const [account] = await db
+        .select(newUserBaseSelection)
+        .from(newUsers)
+        .where(eq(newUsers.id, decoded.newUserId))
+        .limit(1);
+
+      if (!account) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "الحساب غير موجود.",
+        });
+      }
+
+      await db
+        .insert(candidates)
+        .values({
+          newUserId: account.id,
+          firstName: account.firstName,
+          lastName: account.lastName,
+          studyStatus: account.studyStatus,
+          attestationUrl: account.attestationUrl,
+          idCardUrl: null,
+          phoneNumber: account.phoneNumber,
+          email: account.email,
+          isAmbassador: account.isAmbassador,
+          password: account.password,
+          emailConfirmed: account.emailConfirmed,
+          confirmationToken: account.confirmationToken,
+          newsletterConsent: account.newsletterConsent,
+          questionnaireAnswers: JSON.stringify(input.answers),
+          submittedAt: new Date(),
+        })
+        .onDuplicateKeyUpdate({
+          set: {
+            firstName: account.firstName,
+            lastName: account.lastName,
+            studyStatus: account.studyStatus,
+            attestationUrl: account.attestationUrl,
+            phoneNumber: account.phoneNumber,
+            email: account.email,
+            isAmbassador: account.isAmbassador,
+            password: account.password,
+            emailConfirmed: account.emailConfirmed,
+            confirmationToken: account.confirmationToken,
+            newsletterConsent: account.newsletterConsent,
+            questionnaireAnswers: JSON.stringify(input.answers),
+            submittedAt: new Date(),
+          },
+        });
+
+      return { success: true, message: "تم حفظ الاستمارة بنجاح." };
+    }),
+
   logout: publicQuery.mutation(async ({ ctx }) => {
-    ctx.resHeaders.append(
-      "set-cookie",
-      `candidate_token=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax`
-    );
+    ctx.resHeaders.append("set-cookie", "candidate_token=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax");
     return { success: true };
   }),
 });

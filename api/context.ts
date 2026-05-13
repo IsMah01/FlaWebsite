@@ -75,9 +75,11 @@ async function getInternalAdminFromRequest(req: Request) {
       email: admin.email,
       avatar: null,
       role: "admin" as const,
+      status: "admin" as const,
       createdAt: admin.createdAt,
       updatedAt: admin.updatedAt,
       lastSignInAt: new Date(),
+      date: new Date(),
     };
   } catch {
     return null;

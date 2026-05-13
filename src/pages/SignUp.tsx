@@ -93,7 +93,7 @@ export default function SignUp() {
       studyStatus: formData.studyStatus as any,
       attestationUrl: formData.attestationUrl || undefined,
       phoneNumber: formData.phoneNumber,
-      email: formData.email,
+      email: formData.email.trim().toLowerCase(),
       isAmbassador: formData.isAmbassador,
       password: formData.password,
       confirmPassword: formData.confirmPassword,

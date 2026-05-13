@@ -17,9 +17,10 @@ const REOPEN_INTERVAL_MS = 8 * 60 * 1000;
 
 export default function CountdownFloatingPopup() {
   const navigate = useNavigate();
-  const { isCandidate } = useViewerSession();
+  const { isCandidate, hasAmbassadorView } = useViewerSession();
   const [isOpen, setIsOpen] = useState(true);
   const daysLeft = useMemo(() => getCountdownDays("2026-05-28"), []);
+  const isAmbassadorNotice = hasAmbassadorView && !isCandidate;
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -55,23 +56,35 @@ export default function CountdownFloatingPopup() {
               <div className="p-6 pt-8">
                 <div className="inline-flex items-center gap-2 rounded-full bg-[#EAF7F3] px-3 py-1 text-xs font-semibold text-[#1f5148]">
                   <Bell className="w-3.5 h-3.5" />
-                  باب الانضمام للأكاديمية
+                  {isAmbassadorNotice ? "إعلان داخلي" : "باب الانضمام للأكاديمية"}
                 </div>
                 <div className="mt-4 flex items-end gap-3">
                   <div className="text-5xl font-black text-[#1f5148]">J-{daysLeft}</div>
                   <div className="pb-2 text-sm text-gray-500">قبل يوم 28/05/2026</div>
                 </div>
                 <p className="mt-4 text-gray-600 leading-7">
-                  إذا كنت تريد أن تكون جزءا من الأكاديمية، فاستمارة التسجيل لم يتبق لها سوى
-                  <span className="font-bold text-[#1f5148]"> {daysLeft} يوم</span>.
+                  {isAmbassadorNotice ? (
+                    <>
+                      تذكير : بقي
+                      <span className="font-bold text-[#1f5148]"> {daysLeft} يوما</span>
+                      {" "}على تاريخ الاستمارة.
+                    </>
+                  ) : (
+                    <>
+                      إذا كنت تريد أن تكون جزءا من الأكاديمية، فاستمارة التسجيل لم يتبق لها سوى
+                      <span className="font-bold text-[#1f5148]"> {daysLeft} يوما</span>.
+                    </>
+                  )}
                 </p>
-                <Button
-                  onClick={() => navigate(isCandidate ? "/candidate-questionnaire" : "/signup")}
-                  className="mt-5 w-full h-11 bg-[#4A9B8E] hover:bg-[#3D7A6F]"
-                >
-                  املأ الاستمارة الآن
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                </Button>
+                {!isAmbassadorNotice ? (
+                  <Button
+                    onClick={() => navigate(isCandidate ? "/candidate-questionnaire" : "/signup")}
+                    className="mt-5 w-full h-11 bg-[#4A9B8E] hover:bg-[#3D7A6F]"
+                  >
+                    املأ الاستمارة الآن
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                  </Button>
+                ) : null}
               </div>
             </div>
           </motion.div>

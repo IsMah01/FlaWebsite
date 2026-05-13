@@ -105,6 +105,7 @@ export function createOAuthCallbackHandler() {
         unionId: userId,
         name: userProfile.name,
         avatar: userProfile.avatar_url,
+        status: "user",
         lastSignInAt: new Date(),
       });
 

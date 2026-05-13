@@ -19,8 +19,9 @@ type CountdownCTAProps = {
 
 export default function CountdownCTA({ compact = false, className = "" }: CountdownCTAProps) {
   const navigate = useNavigate();
-  const { isCandidate } = useViewerSession();
+  const { isCandidate, hasAmbassadorView } = useViewerSession();
   const daysLeft = getCountdownDays("2026-05-28");
+  const isAmbassadorNotice = hasAmbassadorView && !isCandidate;
 
   return (
     <motion.section
@@ -34,25 +35,40 @@ export default function CountdownCTA({ compact = false, className = "" }: Countd
       <div className="absolute -bottom-10 -right-10 h-48 w-48 rounded-full bg-[#1f5148]/10 blur-3xl" />
       <div className={`relative ${compact ? "p-6 md:p-7" : "p-7 md:p-10"}`}>
         <div className="inline-flex rounded-full bg-[#1f5148] px-4 py-1.5 text-xs font-semibold text-white">
-          باب الترشح لأكاديمية أطر الغد
+          {isAmbassadorNotice ? "إعلان داخلي للأكاديمية" : "باب الترشح لأكاديمية أطر الغد"}
         </div>
-        <div className={`mt-5 flex ${compact ? "flex-col md:flex-row md:items-end" : "flex-col lg:flex-row lg:items-end"} gap-4`}>
-          <div className={`${compact ? "text-5xl md:text-6xl" : "text-6xl md:text-7xl"} font-black tracking-tight text-[#1f5148]`}>
+        <div
+          className={`mt-5 flex ${compact ? "flex-col md:flex-row md:items-end" : "flex-col lg:flex-row lg:items-end"} gap-4`}
+        >
+          <div
+            className={`${compact ? "text-5xl md:text-6xl" : "text-6xl md:text-7xl"} font-black tracking-tight text-[#1f5148]`}
+          >
             J-{daysLeft}
           </div>
           <div className="pb-2 text-sm md:text-base text-gray-500">قبل يوم 28/05/2026</div>
         </div>
         <p className={`mt-5 max-w-3xl text-gray-700 ${compact ? "text-base leading-7" : "text-lg leading-8"}`}>
-          إذا كنت تريد أن تكون جزءا من الأكاديمية، فاستمارة التسجيل لم يتبق لها سوى
-          <span className="font-bold text-[#1f5148]"> {daysLeft} يوم</span>.
+          {isAmbassadorNotice ? (
+            <>
+              تذكير : بقي
+              <span className="font-bold text-[#1f5148]"> {daysLeft} يوما</span>.
+            </>
+          ) : (
+            <>
+              إذا كنت تريد أن تكون جزءا من الأكاديمية، فاستمارة التسجيل لم يتبق لها سوى
+              <span className="font-bold text-[#1f5148]"> {daysLeft} يوما</span>.
+            </>
+          )}
         </p>
-        <Button
-          onClick={() => navigate(isCandidate ? "/candidate-questionnaire" : "/signup")}
-          className={`mt-6 ${compact ? "h-11" : "h-12"} bg-[#4A9B8E] hover:bg-[#3D7A6F]`}
-        >
-          املأ الاستمارة الآن
-          <ArrowLeft className="w-4 h-4 mr-2" />
-        </Button>
+        {!isAmbassadorNotice ? (
+          <Button
+            onClick={() => navigate(isCandidate ? "/candidate-questionnaire" : "/signup")}
+            className={`mt-6 ${compact ? "h-11" : "h-12"} bg-[#4A9B8E] hover:bg-[#3D7A6F]`}
+          >
+            املأ الاستمارة الآن
+            <ArrowLeft className="w-4 h-4 mr-2" />
+          </Button>
+        ) : null}
       </div>
     </motion.section>
   );

@@ -17,6 +17,7 @@ export async function upsertUser(data: InsertUser) {
   const values = { ...data };
   const updateSet: Partial<InsertUser> = {
     lastSignInAt: new Date(),
+    date: new Date(),
     ...data,
   };
 
@@ -29,8 +30,21 @@ export async function upsertUser(data: InsertUser) {
     updateSet.role = "admin";
   }
 
+  if (values.status === undefined) {
+    const resolvedStatus =
+      values.role === "admin" || values.unionId?.startsWith("internal-admin-")
+        ? "admin"
+        : "user";
+    values.status = resolvedStatus;
+    updateSet.status = resolvedStatus;
+  }
+
   await getDb()
     .insert(schema.users)
-    .values(values)
+    .values({
+      ...values,
+      date: values.date ?? new Date(),
+      lastSignInAt: values.lastSignInAt ?? new Date(),
+    })
     .onDuplicateKeyUpdate({ set: updateSet });
 }

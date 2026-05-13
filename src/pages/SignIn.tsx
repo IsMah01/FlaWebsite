@@ -2,22 +2,25 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, LogIn } from "lucide-react";
+import { toast } from "sonner";
+import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { trpc } from "@/providers/trpc";
-import { toast } from "sonner";
-import Navbar from "@/components/Navbar";
 
 export default function SignIn() {
   const navigate = useNavigate();
+  const utils = trpc.useUtils();
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({ email: "", password: "" });
 
   const loginMutation = trpc.candidateAuth.login.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
+      await utils.candidateAuth.me.invalidate();
+      await utils.auth.me.invalidate();
       toast.success("تم تسجيل الدخول بنجاح!");
-      setTimeout(() => navigate("/"), 1000);
+      navigate("/");
     },
     onError: (err) => {
       toast.error(err.message || "حدث خطأ أثناء تسجيل الدخول");
@@ -26,26 +29,29 @@ export default function SignIn() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    loginMutation.mutate(formData);
+    loginMutation.mutate({
+      email: formData.email.trim().toLowerCase(),
+      password: formData.password,
+    });
   };
 
   return (
     <div className="min-h-screen bg-[#F8FAF9]">
       <Navbar />
-      <div className="pt-24 pb-12 px-4 flex items-center justify-center min-h-[calc(100vh-80px)]">
+      <div className="flex min-h-[calc(100vh-80px)] items-center justify-center px-4 pt-24 pb-12">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="max-w-md w-full"
+          className="w-full max-w-md"
         >
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8">
-            <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-[#4A9B8E]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <LogIn className="w-8 h-8 text-[#4A9B8E]" />
+          <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm md:p-8">
+            <div className="mb-8 text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#4A9B8E]/10">
+                <LogIn className="h-8 w-8 text-[#4A9B8E]" />
               </div>
               <h1 className="text-2xl font-bold text-gray-900">تسجيل الدخول</h1>
-              <p className="text-gray-500 text-sm mt-2">أدخل بياناتك للوصول إلى حسابك</p>
+              <p className="mt-2 text-sm text-gray-500">أدخل بياناتك للوصول إلى حسابك</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -58,7 +64,7 @@ export default function SignIn() {
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   placeholder="email@example.com"
                   required
-                  className="text-right mt-1"
+                  className="mt-1 text-right"
                 />
               </div>
 
@@ -71,41 +77,41 @@ export default function SignIn() {
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   placeholder="******"
                   required
-                  className="text-right mt-1 pr-10"
+                  className="mt-1 pr-10 text-right"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute left-3 top-[34px] text-gray-400 hover:text-gray-600"
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
 
               <Button
                 type="submit"
-                className="w-full bg-[#4A9B8E] hover:bg-[#3D7A6F] text-white h-11"
+                className="h-11 w-full bg-[#4A9B8E] text-white hover:bg-[#3D7A6F]"
                 disabled={loginMutation.isPending}
               >
                 {loginMutation.isPending ? (
                   "جاري تسجيل الدخول..."
                 ) : (
                   <>
-                    <LogIn className="w-4 h-4 mr-2" />
+                    <LogIn className="mr-2 h-4 w-4" />
                     تسجيل الدخول
                   </>
                 )}
               </Button>
             </form>
 
-            <p className="text-center text-sm text-gray-500 mt-6">
+            <p className="mt-6 text-center text-sm text-gray-500">
               ليس لديك حساب؟{" "}
-              <Link to="/signup" className="text-[#4A9B8E] hover:text-[#3D7A6F] font-medium">
+              <Link to="/signup" className="font-medium text-[#4A9B8E] hover:text-[#3D7A6F]">
                 سجل الآن
               </Link>
             </p>
 
-            <div className="mt-6 pt-6 border-t border-gray-100 text-center">
+            <div className="mt-6 border-t border-gray-100 pt-6 text-center">
               <p className="text-xs text-gray-400">
                 بتسجيل الدخول، فإنك توافق على شروط الاستخدام وسياسة الخصوصية
               </p>

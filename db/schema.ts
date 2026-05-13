@@ -9,6 +9,37 @@ import {
 
 } from "drizzle-orm/mysql-core";
 
+export const newUsers = mysqlTable("new_users", {
+  id: int("id").autoincrement().primaryKey(),
+  firstName: varchar("firstName", { length: 255 }).notNull(),
+  lastName: varchar("lastName", { length: 255 }).notNull(),
+  studyStatus: mysqlEnum("studyStatus", [
+    "student",
+    "graduated",
+    "master_student",
+    "phd_student",
+    "other",
+  ]).notNull(),
+  attestationUrl: text("attestationUrl"),
+  documents: text("الوثائق"),
+  phoneNumber: varchar("phoneNumber", { length: 50 }).notNull(),
+  email: varchar("email", { length: 320 }).notNull().unique(),
+  isAmbassador: boolean("isAmbassador").default(false).notNull(),
+  password: varchar("password", { length: 255 }).notNull(),
+  emailConfirmed: boolean("emailConfirmed").default(false).notNull(),
+  confirmationToken: varchar("confirmationToken", { length: 255 }),
+  newsletterConsent: boolean("newsletterConsent").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt")
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
+  lastLoginAt: timestamp("lastLoginAt"),
+});
+
+export type NewUser = typeof newUsers.$inferSelect;
+export type InsertNewUser = typeof newUsers.$inferInsert;
+
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
   unionId: varchar("unionId", { length: 255 }).notNull().unique(),
@@ -16,12 +47,14 @@ export const users = mysqlTable("users", {
   email: varchar("email", { length: 320 }),
   avatar: text("avatar"),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  status: mysqlEnum("status", ["candidate", "ambassador", "user", "admin"]).default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt")
     .defaultNow()
     .notNull()
     .$onUpdate(() => new Date()),
   lastSignInAt: timestamp("lastSignInAt").defaultNow().notNull(),
+  date: timestamp("date").defaultNow().notNull(),
 });
 
 export type User = typeof users.$inferSelect;
@@ -29,6 +62,7 @@ export type InsertUser = typeof users.$inferInsert;
 
 export const candidates = mysqlTable("candidates", {
   id: int("id").autoincrement().primaryKey(),
+  newUserId: int("newUserId").notNull().unique(),
   firstName: varchar("firstName", { length: 255 }).notNull(),
   lastName: varchar("lastName", { length: 255 }).notNull(),
   studyStatus: mysqlEnum("studyStatus", [
@@ -54,6 +88,8 @@ export const candidates = mysqlTable("candidates", {
   ])
     .default("pending")
     .notNull(),
+  questionnaireAnswers: text("questionnaireAnswers"),
+  submittedAt: timestamp("submittedAt").defaultNow().notNull(),
   adminNote: text("adminNote"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt")

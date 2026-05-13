@@ -12,7 +12,9 @@ import AmbassadorDiscussionZone from "@/components/AmbassadorDiscussionZone";
 import { useViewerSession } from "@/hooks/useViewerSession";
 
 export default function Home() {
-  const { viewer, hasAmbassadorView } = useViewerSession();
+  const { viewer, hasAmbassadorView, isAmbassador, hasSubmittedQuestionnaire } = useViewerSession();
+  const isAdmin = viewer?.kind === "site-user" && viewer.role === "admin";
+  const showAcademyReminder = isAdmin || (!hasSubmittedQuestionnaire && !isAmbassador);
 
   return (
     <div className="min-h-screen">
@@ -22,16 +24,18 @@ export default function Home() {
         {hasAmbassadorView && viewer ? <AmbassadorDiscussionZone author={viewer.name} /> : null}
         {!hasAmbassadorView ? <AboutSection /> : null}
         {!hasAmbassadorView ? <GoalsSection /> : null}
-        <section className="py-10 bg-white">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6">
-            <CountdownCTA />
-          </div>
-        </section>
+        {showAcademyReminder ? (
+          <section className="py-10 bg-white">
+            <div className="max-w-6xl mx-auto px-4 sm:px-6">
+              <CountdownCTA />
+            </div>
+          </section>
+        ) : null}
         <ActivitiesSection />
         {!hasAmbassadorView ? <NumbersSection /> : null}
         {!hasAmbassadorView ? <ContactSection /> : null}
       </main>
-      <CountdownFloatingPopup />
+      {showAcademyReminder ? <CountdownFloatingPopup /> : null}
       <Footer />
     </div>
   );

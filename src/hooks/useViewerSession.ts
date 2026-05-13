@@ -1,6 +1,5 @@
 import { trpc } from "@/providers/trpc";
 import { useCallback, useMemo } from "react";
-import { useNavigate } from "react-router";
 
 type ViewerSession =
   | {
@@ -10,6 +9,7 @@ type ViewerSession =
       email: string;
       isAmbassador: boolean;
       studyStatus?: string;
+      hasSubmittedQuestionnaire: boolean;
     }
   | {
       kind: "site-user";
@@ -22,7 +22,6 @@ type ViewerSession =
 
 export function useViewerSession() {
   const utils = trpc.useUtils();
-  const navigate = useNavigate();
 
   const candidateQuery = trpc.candidateAuth.me.useQuery(undefined, {
     staleTime: 1000 * 60 * 5,
@@ -61,6 +60,7 @@ export function useViewerSession() {
         email: candidateQuery.data.email,
         isAmbassador: candidateQuery.data.isAmbassador,
         studyStatus: candidateQuery.data.studyStatus,
+        hasSubmittedQuestionnaire: candidateQuery.data.hasSubmittedQuestionnaire,
       };
     }
 
@@ -80,22 +80,30 @@ export function useViewerSession() {
 
   const logout = useCallback(() => {
     void (async () => {
-      await Promise.allSettled([
-        candidateLogout.mutateAsync(),
-        authLogout.mutateAsync(),
-        adminLogout.mutateAsync(),
-      ]);
+      try {
+        if (viewer?.kind === "candidate") {
+          await candidateLogout.mutateAsync();
+        } else if (viewer?.kind === "site-user" && viewer.role === "admin") {
+          await adminLogout.mutateAsync();
+        } else if (viewer?.kind === "site-user") {
+          await authLogout.mutateAsync();
+        }
+      } catch {
+        // Clear local session state even if the server-side cookie clear fails.
+      }
 
       utils.candidateAuth.me.setData(undefined, undefined);
       utils.auth.me.setData(undefined, undefined);
       await utils.invalidate();
-      navigate("/");
+      window.location.assign("/");
     })();
-  }, [candidateLogout, authLogout, adminLogout, utils, navigate]);
+  }, [viewer, candidateLogout, authLogout, adminLogout, utils]);
 
   return {
     viewer,
     isAmbassador: viewer?.kind === "candidate" && viewer.isAmbassador,
+    hasSubmittedQuestionnaire:
+      viewer?.kind === "candidate" ? viewer.hasSubmittedQuestionnaire : false,
     hasAmbassadorView:
       (viewer?.kind === "candidate" && viewer.isAmbassador) ||
       (viewer?.kind === "site-user" && viewer.role === "admin"),

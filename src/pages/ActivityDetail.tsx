@@ -102,7 +102,7 @@ export default function ActivityDetail() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const activity = getActivityBySlug(slug);
-  const { hasAmbassadorView } = useViewerSession();
+  const { viewer, hasAmbassadorView, isAmbassador, hasSubmittedQuestionnaire } = useViewerSession();
 
   if (!activity) {
     return (
@@ -122,6 +122,8 @@ export default function ActivityDetail() {
   }
 
   const isAcademy = activity.slug === "future-leaders-academy";
+  const isAdmin = viewer?.kind === "site-user" && viewer.role === "admin";
+  const showAcademyReminder = isAdmin || (!hasSubmittedQuestionnaire && !isAmbassador);
   const showAmbassadorLayer =
     hasAmbassadorView &&
     (activity.slug === "trustees-program" || activity.slug === "ambassadors-forum") &&
@@ -243,7 +245,7 @@ export default function ActivityDetail() {
           </section>
         ) : null}
 
-        {isAcademy ? <CountdownCTA compact /> : null}
+        {isAcademy && showAcademyReminder ? <CountdownCTA compact /> : null}
 
         {isAcademy && activity.videoUrl ? (
           <section className="bg-white rounded-3xl border border-gray-100 shadow-sm p-8">
@@ -326,7 +328,7 @@ export default function ActivityDetail() {
           </HorizontalScroller>
         ) : null}
       </main>
-      {isAcademy ? <CountdownFloatingPopup /> : null}
+      {isAcademy && showAcademyReminder ? <CountdownFloatingPopup /> : null}
       <Footer />
     </div>
   );
