@@ -24,8 +24,20 @@ dist-ssr
 *.sw?
 # Environment variables
 .env
+.env.*
+!.env.example
 .env.local
 .env.*.local
+# Secrets and credentials
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa
+id_ed25519
 # Database
 *.db
 *.sqlite
@@ -39,6 +51,12 @@ build/
 # Test coverage
 coverage/
 .nyc_output/
+# Local caches and deployment metadata
+.cache/
+.tmp/
+.turbo/
+.vercel/
+.netlify/
 
 # Private uploads: never commit sensitive candidate documents
 /storage/private/uploads/
