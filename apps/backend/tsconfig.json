@@ -3,11 +3,17 @@
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "baseUrl": ".",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "../..",
+    "paths": {
+      "@contracts/*": ["../../contracts/*"],
+      "@db/*": ["../../db/*"],
+      "db/*": ["../../db/*"]
+    }
   },
-  "include": ["src"]
+  "include": ["src", "../../api", "../../contracts", "../../db"]
 }

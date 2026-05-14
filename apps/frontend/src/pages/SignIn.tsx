@@ -1,0 +1,124 @@
+import { useState } from "react";
+import { Link, useNavigate } from "react-router";
+import { motion } from "framer-motion";
+import { Eye, EyeOff, LogIn } from "lucide-react";
+import { toast } from "sonner";
+import Navbar from "@/components/Navbar";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { trpc } from "@/providers/trpc";
+
+export default function SignIn() {
+  const navigate = useNavigate();
+  const utils = trpc.useUtils();
+  const [showPassword, setShowPassword] = useState(false);
+  const [formData, setFormData] = useState({ email: "", password: "" });
+
+  const loginMutation = trpc.candidateAuth.login.useMutation({
+    onSuccess: async () => {
+      await utils.candidateAuth.me.invalidate();
+      await utils.auth.me.invalidate();
+      toast.success("تم تسجيل الدخول بنجاح!");
+      navigate("/");
+    },
+    onError: (err) => {
+      toast.error(err.message || "حدث خطأ أثناء تسجيل الدخول");
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    loginMutation.mutate({
+      email: formData.email.trim().toLowerCase(),
+      password: formData.password,
+    });
+  };
+
+  return (
+    <div className="min-h-screen bg-[#F8FAF9]">
+      <Navbar />
+      <div className="flex min-h-[calc(100vh-80px)] items-center justify-center px-4 pt-24 pb-12">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="w-full max-w-md"
+        >
+          <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm md:p-8">
+            <div className="mb-8 text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#4A9B8E]/10">
+                <LogIn className="h-8 w-8 text-[#4A9B8E]" />
+              </div>
+              <h1 className="text-2xl font-bold text-gray-900">تسجيل الدخول</h1>
+              <p className="mt-2 text-sm text-gray-500">أدخل بياناتك للوصول إلى حسابك</p>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <Label htmlFor="email">البريد الإلكتروني *</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="email@example.com"
+                  required
+                  className="mt-1 text-right"
+                />
+              </div>
+
+              <div className="relative">
+                <Label htmlFor="password">كلمة المرور *</Label>
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  placeholder="******"
+                  required
+                  className="mt-1 pr-10 text-right"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute left-3 top-[34px] text-gray-400 hover:text-gray-600"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+
+              <Button
+                type="submit"
+                className="h-11 w-full bg-[#4A9B8E] text-white hover:bg-[#3D7A6F]"
+                disabled={loginMutation.isPending}
+              >
+                {loginMutation.isPending ? (
+                  "جاري تسجيل الدخول..."
+                ) : (
+                  <>
+                    <LogIn className="mr-2 h-4 w-4" />
+                    تسجيل الدخول
+                  </>
+                )}
+              </Button>
+            </form>
+
+            <p className="mt-6 text-center text-sm text-gray-500">
+              ليس لديك حساب؟{" "}
+              <Link to="/signup" className="font-medium text-[#4A9B8E] hover:text-[#3D7A6F]">
+                سجل الآن
+              </Link>
+            </p>
+
+            <div className="mt-6 border-t border-gray-100 pt-6 text-center">
+              <p className="text-xs text-gray-400">
+                بتسجيل الدخول، فإنك توافق على شروط الاستخدام وسياسة الخصوصية
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    </div>
+  );
+}

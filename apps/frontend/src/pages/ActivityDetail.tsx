@@ -1,0 +1,335 @@
+import { useRef, type ReactNode } from "react";
+import { Link, useNavigate, useParams } from "react-router";
+import { motion } from "framer-motion";
+import {
+  ArrowLeft,
+  ArrowRight,
+  CalendarRange,
+  ChevronLeft,
+  Newspaper,
+  PlayCircle,
+  Quote,
+  Users,
+} from "lucide-react";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
+import EditionsGrid from "@/components/EditionsGrid";
+import CountdownCTA from "@/components/CountdownCTA";
+import CountdownFloatingPopup from "@/components/CountdownFloatingPopup";
+import { Button } from "@/components/ui/button";
+import { activities, getActivityBySlug } from "@/data/activities";
+import { useViewerSession } from "@/hooks/useViewerSession";
+
+function HorizontalScroller({
+  title,
+  hint,
+  icon,
+  children,
+}: {
+  title: string;
+  hint: string;
+  icon: ReactNode;
+  children: ReactNode;
+}) {
+  const trackRef = useRef<HTMLDivElement>(null);
+
+  const scrollByAmount = (direction: "prev" | "next") => {
+    const node = trackRef.current;
+    if (!node) return;
+    const amount = Math.max(280, Math.floor(node.clientWidth * 0.82));
+    node.scrollBy({
+      left: direction === "next" ? amount : -amount,
+      behavior: "smooth",
+    });
+  };
+
+  return (
+    <section className="bg-white rounded-3xl border border-gray-100 shadow-sm p-8">
+      <div className="flex items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-3">
+          {icon}
+          <h2 className="text-2xl font-bold text-gray-900">{title}</h2>
+        </div>
+        <div className="hidden md:flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => scrollByAmount("prev")}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#4A9B8E]/20 bg-white text-[#1f5148] transition-colors hover:bg-[#F3F8F6]"
+            aria-label="Previous"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => scrollByAmount("next")}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#4A9B8E]/20 bg-white text-[#1f5148] transition-colors hover:bg-[#F3F8F6]"
+            aria-label="Next"
+          >
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+      <p className="text-sm text-gray-500 mb-5">{hint}</p>
+      <div
+        ref={trackRef}
+        className="flex gap-5 overflow-x-auto scroll-smooth pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {children}
+      </div>
+      <div className="mt-5 flex md:hidden justify-center gap-3">
+        <button
+          type="button"
+          onClick={() => scrollByAmount("prev")}
+          className="inline-flex h-10 items-center gap-2 rounded-full border border-[#4A9B8E]/20 bg-white px-4 text-sm font-medium text-[#1f5148]"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          السابق
+        </button>
+        <button
+          type="button"
+          onClick={() => scrollByAmount("next")}
+          className="inline-flex h-10 items-center gap-2 rounded-full border border-[#4A9B8E]/20 bg-white px-4 text-sm font-medium text-[#1f5148]"
+        >
+          التالي
+          <ArrowRight className="w-4 h-4" />
+        </button>
+      </div>
+    </section>
+  );
+}
+
+export default function ActivityDetail() {
+  const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
+  const activity = getActivityBySlug(slug);
+  const { viewer, hasAmbassadorView, isAmbassador, hasSubmittedQuestionnaire } = useViewerSession();
+
+  if (!activity) {
+    return (
+      <div className="min-h-screen bg-[#F8FAF9]">
+        <Navbar />
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-28 pb-20 text-center">
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">النشاط غير موجود</h1>
+          <p className="text-gray-600 mb-8">تعذر العثور على صفحة النشاط المطلوبة.</p>
+          <Button onClick={() => navigate("/")} className="bg-[#4A9B8E] hover:bg-[#3D7A6F]">
+            <ArrowRight className="w-4 h-4 mr-2" />
+            العودة إلى الرئيسية
+          </Button>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  const isAcademy = activity.slug === "future-leaders-academy";
+  const isAdmin = viewer?.kind === "site-user" && viewer.role === "admin";
+  const showAcademyReminder = isAdmin || (!hasSubmittedQuestionnaire && !isAmbassador);
+  const showAmbassadorLayer =
+    hasAmbassadorView &&
+    (activity.slug === "trustees-program" || activity.slug === "ambassadors-forum") &&
+    !!activity.ambassadorContent;
+
+  return (
+    <div className="min-h-screen bg-[#F8FAF9]">
+      <Navbar />
+
+      <section className="pt-20">
+        <div className="relative overflow-hidden bg-[linear-gradient(135deg,#1f5148_0%,#4A9B8E_55%,#9ad7cb_100%)]">
+          <div className="absolute inset-0 opacity-30">
+            <div className="absolute top-0 left-10 h-72 w-72 rounded-full bg-white blur-3xl" />
+            <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-[#1f5148] blur-3xl" />
+          </div>
+          <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-16 md:py-20 text-white">
+            <button
+              onClick={() => navigate("/")}
+              className="inline-flex items-center gap-2 text-sm bg-white/10 hover:bg-white/15 px-3 py-2 rounded-lg transition-colors"
+            >
+              <ArrowRight className="w-4 h-4" />
+              العودة إلى الرئيسية
+            </button>
+            <div className="mt-8 max-w-3xl">
+              <div
+                className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium"
+                style={{ backgroundColor: `${activity.color}55` }}
+              >
+                <activity.icon className="w-4 h-4" />
+                نشاط المؤسسة
+              </div>
+              <h1 className="mt-5 text-4xl md:text-6xl font-bold leading-tight">{activity.title}</h1>
+              <p className="mt-5 text-white/85 text-lg leading-8">{activity.description}</p>
+              {isAcademy ? (
+                <div className="mt-8 inline-flex items-center gap-4 rounded-2xl bg-white/10 px-5 py-4 backdrop-blur-sm border border-white/15">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/12">
+                    <activity.icon className="w-7 h-7 text-white" />
+                  </div>
+                  <div>
+                    <div className="text-3xl font-black leading-none">18</div>
+                    <div className="text-sm text-white/80 mt-1">دورة أكاديمية</div>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-12 space-y-12">
+        <section className="grid lg:grid-cols-[1.3fr_0.7fr] gap-8">
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-3xl border border-gray-100 shadow-sm p-8"
+          >
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">تقديم النشاط</h2>
+            <p className="text-gray-600 leading-8">{activity.intro}</p>
+
+            {activity.highlights && activity.highlights.length > 0 && (
+              <div className="mt-8 grid sm:grid-cols-2 gap-4">
+                {activity.highlights.map((item) => (
+                  <div
+                    key={item}
+                    className="rounded-2xl border border-[#4A9B8E]/10 bg-[#F6FBF9] p-4 text-gray-700 leading-7"
+                  >
+                    {item}
+                  </div>
+                ))}
+              </div>
+            )}
+          </motion.div>
+
+          <motion.aside
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.08 }}
+            className="bg-[#1f5148] rounded-3xl p-8 text-white"
+          >
+            <h3 className="text-xl font-bold mb-6">روابط الأنشطة</h3>
+            <div className="space-y-3">
+              {activities.map((item) => (
+                <Link
+                  key={item.slug}
+                  to={`/activities/${item.slug}`}
+                  className={`flex items-center justify-between rounded-2xl px-4 py-3 transition-colors ${
+                    item.slug === activity.slug ? "bg-white text-[#1f5148]" : "bg-white/10 hover:bg-white/15"
+                  }`}
+                >
+                  <span className="font-medium">{item.title}</span>
+                  <ChevronLeft className="w-4 h-4" />
+                </Link>
+              ))}
+            </div>
+          </motion.aside>
+        </section>
+
+        {showAmbassadorLayer && activity.ambassadorContent ? (
+          <section className="bg-white rounded-3xl border border-[#4A9B8E]/15 shadow-sm p-8">
+            <div className="flex items-center gap-3 mb-6">
+              <Newspaper className="w-6 h-6 text-[#4A9B8E]" />
+              <h2 className="text-2xl font-bold text-gray-900">مساحة خاصة بالسفراء</h2>
+            </div>
+            <p className="text-gray-600 leading-8 mb-8">{activity.ambassadorContent.intro}</p>
+            <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5">
+              {activity.ambassadorContent.updates.map((update) => (
+                <article
+                  key={`${update.title}-${update.date}`}
+                  className="rounded-3xl border border-[#4A9B8E]/10 bg-[linear-gradient(180deg,#ffffff_0%,#f4fbf8_100%)] p-5"
+                >
+                  <div className="inline-flex rounded-full bg-[#EAF7F3] px-3 py-1 text-xs font-semibold text-[#1f5148]">
+                    {update.date}
+                  </div>
+                  <h3 className="mt-4 text-lg font-bold text-gray-900 leading-8">{update.title}</h3>
+                  <p className="mt-3 text-gray-600 leading-8">{update.body}</p>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {isAcademy && showAcademyReminder ? <CountdownCTA compact /> : null}
+
+        {isAcademy && activity.videoUrl ? (
+          <section className="bg-white rounded-3xl border border-gray-100 shadow-sm p-8">
+            <div className="flex items-center gap-3 mb-6">
+              <PlayCircle className="w-6 h-6 text-[#4A9B8E]" />
+              <h2 className="text-2xl font-bold text-gray-900">فيديو تمثيلي</h2>
+            </div>
+            <div className="aspect-video overflow-hidden rounded-2xl bg-gray-100">
+              <iframe
+                src={activity.videoUrl}
+                title={activity.title}
+                className="w-full h-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
+          </section>
+        ) : null}
+
+        {isAcademy && activity.board ? (
+          <HorizontalScroller
+            title="المكتب التنفيذي"
+            hint="يمكنك السحب أفقيا أو استعمال الأسهم لعرض جميع المناصب."
+            icon={<Users className="w-6 h-6 text-[#4A9B8E]" />}
+          >
+            {activity.board.map((member, index) => (
+              <div
+                key={member.role}
+                className="min-w-[290px] sm:min-w-[340px] lg:min-w-[360px] overflow-hidden rounded-3xl border border-[#4A9B8E]/10 bg-[linear-gradient(180deg,#ffffff_0%,#f4fbf8_100%)]"
+              >
+                <img src={member.image} alt={member.role} className="h-56 w-full object-cover" />
+                <div className="p-5">
+                  <div className="text-xs font-semibold text-[#4A9B8E] mb-2">المنصب {index + 1}</div>
+                  <div className="text-gray-900 font-bold text-lg leading-7">{member.role}</div>
+                </div>
+              </div>
+            ))}
+          </HorizontalScroller>
+        ) : null}
+
+        {isAcademy ? (
+          <section className="bg-white rounded-3xl border border-gray-100 shadow-sm p-8">
+            <div className="flex items-center gap-3 mb-6">
+              <CalendarRange className="w-6 h-6 text-[#4A9B8E]" />
+              <h2 className="text-2xl font-bold text-gray-900">الدورات الست عشرة</h2>
+            </div>
+            <EditionsGrid
+              badge="أكاديمية أطر الغد"
+              title="الدورات السابقة لأكاديمية أطر الغد"
+              description="تم نقل جميع الدورات السابقة من الصفحة الرئيسية إلى هذه الصفحة حتى تبقى تجربة التصفح أكثر تركيزا على الأنشطة."
+            />
+          </section>
+        ) : null}
+
+        {isAcademy && activity.feedback ? (
+          <HorizontalScroller
+            title="آراء الضيوف والسفراء"
+            hint="يمكنك السحب يمينا ويسارا أو استعمال الأسهم لقراءة كل الآراء."
+            icon={<Quote className="w-6 h-6 text-[#4A9B8E]" />}
+          >
+            {activity.feedback.map((item) => (
+              <div
+                key={`${item.name}-${item.role}`}
+                className="min-w-[310px] sm:min-w-[420px] lg:min-w-[520px] rounded-3xl border border-gray-100 bg-[#FBFCFC] p-6"
+              >
+                <div className="flex items-center gap-4 mb-4">
+                  <img
+                    src={item.image}
+                    alt={item.name}
+                    className="w-16 h-16 rounded-full object-cover border border-[#4A9B8E]/20"
+                  />
+                  <div>
+                    <div className="font-bold text-gray-900">{item.name}</div>
+                    <div className="text-sm text-[#4A9B8E]">{item.role}</div>
+                  </div>
+                </div>
+                <p className="text-gray-600 leading-8">{item.comment}</p>
+              </div>
+            ))}
+          </HorizontalScroller>
+        ) : null}
+      </main>
+      {isAcademy && showAcademyReminder ? <CountdownFloatingPopup /> : null}
+      <Footer />
+    </div>
+  );
+}

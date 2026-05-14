@@ -1,0 +1,90 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 180 30% 15%;
+    --card: 0 0% 100%;
+    --card-foreground: 180 30% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 180 30% 15%;
+    --primary: 168 55% 38%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 168 30% 92%;
+    --secondary-foreground: 168 55% 25%;
+    --muted: 168 20% 95%;
+    --muted-foreground: 168 10% 45%;
+    --accent: 168 55% 42%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 168 20% 88%;
+    --input: 168 20% 88%;
+    --ring: 168 55% 38%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 180 30% 8%;
+    --foreground: 168 20% 95%;
+    --card: 180 25% 12%;
+    --card-foreground: 168 20% 95%;
+    --popover: 180 25% 12%;
+    --popover-foreground: 168 20% 95%;
+    --primary: 168 55% 45%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 180 20% 18%;
+    --secondary-foreground: 168 20% 90%;
+    --muted: 180 20% 16%;
+    --muted-foreground: 168 10% 55%;
+    --accent: 168 55% 45%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 180 20% 20%;
+    --input: 180 20% 20%;
+    --ring: 168 55% 45%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Noto Sans Arabic', sans-serif;
+    direction: rtl;
+  }
+}
+
+@layer utilities {
+  .gradient-primary {
+    background: linear-gradient(135deg, #4A9B8E 0%, #5FB3A3 50%, #6BC4B2 100%);
+  }
+  .gradient-dark {
+    background: linear-gradient(135deg, #2D5F56 0%, #3D7A6F 100%);
+  }
+  .text-shadow {
+    text-shadow: 0 2px 10px rgba(0,0,0,0.15);
+  }
+  .glass {
+    background: rgba(255,255,255,0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.2);
+  }
+  .card-hover {
+    transition: all 0.3s ease;
+  }
+  .card-hover:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 20px 40px rgba(74, 155, 142, 0.15);
+  }
+}
