@@ -109,7 +109,7 @@ export const candidateAuthRouter = createRouter({
         success: true,
         newUserId: newUser.insertId,
         emailSent: emailResult.success,
-        confirmationUrl: emailResult.success ? null : confirmationUrl,
+        confirmationUrl,
         message: emailResult.success
           ? "تم التسجيل بنجاح! يرجى التحقق من بريدك الإلكتروني لتأكيد حسابك."
           : "تم التسجيل بنجاح! (لم يتم إرسال البريد - يرجى التحقق من إعدادات SMTP)",

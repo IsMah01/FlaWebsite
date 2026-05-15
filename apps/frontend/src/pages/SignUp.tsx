@@ -215,7 +215,7 @@ export default function SignUp() {
                 <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-right">
                   <p className="text-sm font-medium text-amber-900">رابط التفعيل للاختبار</p>
                   <p className="mt-1 text-xs text-amber-800">
-                    لم يتم إرسال البريد الإلكتروني. استعمل هذا الرابط لتفعيل الحساب مؤقتا أثناء الاختبار.
+                    استعمل هذا الرابط لتفعيل الحساب مؤقتا أثناء الاختبار. احذف هذا العرض قبل الانتقال إلى VPS.
                   </p>
                   <a
                     href={confirmationUrl}
