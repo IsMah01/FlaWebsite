@@ -27,6 +27,7 @@ export default function SignUp() {
     newsletterConsent: false,
     attestationUrl: "",
   });
+  const [confirmationUrl, setConfirmationUrl] = useState("");
   const [uploadingAttestation, setUploadingAttestation] = useState(false);
   const attestationRef = useRef<HTMLInputElement>(null);
 
@@ -34,6 +35,10 @@ export default function SignUp() {
   const registerMutation = trpc.candidateAuth.register.useMutation({
     onSuccess: (data) => {
       toast.success(data.message);
+      if (data.confirmationUrl) {
+        setConfirmationUrl(data.confirmationUrl);
+        return;
+      }
       setTimeout(() => navigate("/signin"), 3000);
     },
     onError: (err) => {
@@ -86,6 +91,7 @@ export default function SignUp() {
       toast.error("يرجى اختيار الوضعية الدراسية");
       return;
     }
+    setConfirmationUrl("");
 
     registerMutation.mutate({
       firstName: formData.firstName,
@@ -204,6 +210,28 @@ export default function SignUp() {
               <Button type="submit" className="w-full bg-[#4A9B8E] hover:bg-[#3D7A6F] text-white h-11" disabled={registerMutation.isPending}>
                 {registerMutation.isPending ? "جاري التسجيل..." : <><CheckCircle className="w-4 h-4 mr-2" />إنشاء الحساب</>}
               </Button>
+
+              {confirmationUrl && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-right">
+                  <p className="text-sm font-medium text-amber-900">رابط التفعيل للاختبار</p>
+                  <p className="mt-1 text-xs text-amber-800">
+                    لم يتم إرسال البريد الإلكتروني. استعمل هذا الرابط لتفعيل الحساب مؤقتا أثناء الاختبار.
+                  </p>
+                  <a
+                    href={confirmationUrl}
+                    className="mt-3 block break-all rounded-lg bg-white px-3 py-2 text-left text-xs text-[#2f6f65] underline"
+                  >
+                    {confirmationUrl}
+                  </a>
+                  <Button
+                    type="button"
+                    className="mt-3 w-full bg-[#4A9B8E] hover:bg-[#3D7A6F] text-white"
+                    onClick={() => window.location.assign(confirmationUrl)}
+                  >
+                    تفعيل الحساب الآن
+                  </Button>
+                </div>
+              )}
             </form>
 
             <p className="text-center text-sm text-gray-500 mt-6">

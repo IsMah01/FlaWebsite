@@ -103,11 +103,13 @@ export const candidateAuthRouter = createRouter({
       });
 
       const emailResult = await sendConfirmationEmail(normalizedEmail, input.firstName, confirmationToken);
+      const confirmationUrl = `${process.env.APP_URL || "http://localhost:3000"}/confirm-email?token=${confirmationToken}`;
 
       return {
         success: true,
         newUserId: newUser.insertId,
         emailSent: emailResult.success,
+        confirmationUrl: emailResult.success ? null : confirmationUrl,
         message: emailResult.success
           ? "تم التسجيل بنجاح! يرجى التحقق من بريدك الإلكتروني لتأكيد حسابك."
           : "تم التسجيل بنجاح! (لم يتم إرسال البريد - يرجى التحقق من إعدادات SMTP)",
