@@ -3,28 +3,28 @@ import { School, Users, Building2, Award } from "lucide-react";
 
 const stats = [
   {
-    icon: School,
-    value: "18",
-    label: "دورة أكاديمية",
-    sublabel: "أكاديمية أطر الغد",
+    icon: Award,
+    value: "5",
+    label: "مشاريع مختلفة",
+    sublabel: "أنشطة المؤسسة",
   },
   {
     icon: Users,
-    value: "2K+",
+    value: "+2K",
     label: "سفير",
-    sublabel: "في الأكاديمية",
+    sublabel: "أكاديمية أطر الغد",
   },
   {
     icon: Building2,
-    value: "40+",
+    value: "+40",
     label: "مؤسسة جامعية",
-    sublabel: "شريكة",
+    sublabel: "بمختلف التخصصات",
   },
   {
-    icon: Award,
-    value: "5",
-    label: "برنامج رئيسي",
-    sublabel: "أنشطة متنوعة",
+    icon: School,
+    value: "17",
+    label: "دورة",
+    sublabel: "أكاديمية أطر الغد",
   },
 ];
 

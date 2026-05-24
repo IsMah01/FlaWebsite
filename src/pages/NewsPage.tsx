@@ -50,9 +50,7 @@ export default function NewsPage() {
               </div>
               <h1 className="mt-5 text-4xl md:text-6xl font-bold leading-tight">صفحة الأخبار والفعاليات</h1>
               <p className="mt-5 text-white/85 text-lg leading-8">
-                هذه الصفحة تعرض المواعيد القادمة للمؤسسة، والفعاليات التي مرت بالفعل، مع عداد
-                <span className="font-bold"> J-... </span>
-                للأحداث المنتظرة.
+                لأن حضورك يصنع الفارق.. تابع أحدث أخبارنا وكن أول المشاركين في فعالياتنا
               </p>
             </div>
           </div>
@@ -169,9 +167,9 @@ export default function NewsPage() {
           {newsItems.length === 0 ? (
             <div className="rounded-[30px] border border-dashed border-[#4A9B8E]/25 bg-white p-10 text-center shadow-sm">
               <Clock3 className="w-10 h-10 mx-auto text-[#4A9B8E] mb-4" />
-              <p className="text-lg font-semibold text-gray-900 mb-2">لا نملك أخبارا منشورة في الوقت الحالي</p>
+              <p className="text-lg font-semibold text-gray-900 mb-2">القصص الملهمة تحتاج وقتاً لتكتمل!</p>
               <p className="text-gray-600 leading-8 max-w-2xl mx-auto">
-                سيتم تحديث هذه الصفحة لاحقا عند توفر مستجدات أو بلاغات أو تغطيات رسمية لأنشطة المؤسسة.
+                قريباً نبض جديد، وأفكار متجددة.. تابعونا لتكونوا أول من يكتشف مفاجآتنا القادمة
               </p>
             </div>
           ) : null}

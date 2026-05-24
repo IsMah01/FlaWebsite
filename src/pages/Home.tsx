@@ -4,7 +4,7 @@ import HeroSection from "@/sections/HeroSection";
 import AboutSection from "@/sections/AboutSection";
 import GoalsSection from "@/sections/GoalsSection";
 import ActivitiesSection from "@/sections/ActivitiesSection";
-import NumbersSection from "@/sections/NumbersSection";
+import EditionsSection from "@/sections/EditionsSection";
 import ContactSection from "@/sections/ContactSection";
 import CountdownCTA from "@/components/CountdownCTA";
 import CountdownFloatingPopup from "@/components/CountdownFloatingPopup";
@@ -32,7 +32,7 @@ export default function Home() {
           </section>
         ) : null}
         <ActivitiesSection />
-        {!hasAmbassadorView ? <NumbersSection /> : null}
+        {!hasAmbassadorView ? <EditionsSection /> : null}
         {!hasAmbassadorView ? <ContactSection /> : null}
       </main>
       {showAcademyReminder ? <CountdownFloatingPopup /> : null}

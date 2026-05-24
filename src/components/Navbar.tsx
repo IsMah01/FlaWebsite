@@ -36,7 +36,7 @@ export default function Navbar() {
     { label: "أنشطتنا", action: () => scrollToSection("activities") },
     ...(!hasAmbassadorView
       ? [
-          { label: "الأكاديمية في أرقام", action: () => scrollToSection("numbers") },
+          { label: "الدورات", action: () => scrollToSection("editions") },
           { label: "اتصل بنا", action: () => scrollToSection("contact") },
         ]
       : []),

@@ -20,7 +20,7 @@ export default function AboutSection() {
           <span className="inline-block px-4 py-1 bg-[#4A9B8E]/10 text-[#4A9B8E] rounded-full text-sm font-medium mb-4">
             من نحن
           </span>
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900">تعرف على مؤسسة أطر الغد</h2>
+          <h2 className="text-3xl md:text-4xl font-bold text-gray-900">لأن نهضة الأوطان تبدأ ببناء الإنسان</h2>
         </motion.div>
 
         <div className="grid md:grid-cols-2 gap-10 items-center">
@@ -31,17 +31,20 @@ export default function AboutSection() {
             variants={fadeInUp}
           >
             <p className="text-gray-600 leading-loose text-lg mb-6">
-              مؤسسة أطر الغد هي مؤسسة مغربية تُوجّه أنشطتها أساساً إلى طلبة وخريجي المعاهد العليا،
-              من مهندسين ومسيرين وأطر، إضافة إلى طلبة وخريجي كليات الطب والصيدلة.
+              مؤسسة أطر الغد مؤسسة مغربية تُوجّه برامجها وأنشطتها إلى طلبة وخريجي المعاهد والمدارس العليا،
+              إضافة إلى طلبة وخريجي كليات الطب والصيدلة.
             </p>
             <p className="text-gray-600 leading-loose text-lg mb-6">
-              ترمي المؤسسة إلى تأهيل شباب مغربي معتز بهويته، حامل لقيم الصدق والأمانة،
-              وحب الوطن، قوي في تخصصه العلمي وممتلك للمعارف الضرورية لخوض غمار
-              الحياة الشخصية والمهنية والاجتماعية.
+              تعمل المؤسسة على إعداد شباب مغربي متوازن، يجمع بين الكفاءة العلمية والنضج الفكري
+              والمسؤولية المجتمعية، ويعتز بهويته الوطنية وقيمه الأصيلة.
+            </p>
+            <p className="text-gray-600 leading-loose text-lg mb-6">
+              كما تسعى إلى تمكين أعضائها من المعارف والمهارات الضرورية التي تؤهلهم للنجاح الأكاديمي
+              والمهني والاجتماعي، ضمن رؤية تجعل من الإنسان محوراً أساسياً في مشروع النهضة.
             </p>
             <p className="text-gray-600 leading-loose text-lg">
-              تركّز المؤسسة على إعداد الإنسان القوي والأمين، من أجل بناء جيل قادر على تحقيق
-              حلم النهضة، والارتقاء بالوطن إلى أعلى المراتب الحضارية.
+              نؤمن بأن بناء جيل قوي في فكره، راسخ في قيمه، ومؤمن برسالته، هو السبيل الحقيقي
+              لبناء وطن متقدم ومجتمع أكثر وعياً وتأثيراً.
             </p>
           </motion.div>
 
@@ -60,7 +63,7 @@ export default function AboutSection() {
                 <div>
                   <h3 className="font-bold text-gray-900 mb-2">رسالتنا</h3>
                   <p className="text-gray-600 text-sm leading-relaxed">
-                    تأهيل أطر مغربية كفؤة قادرة على المساهمة الفعالة في نهضة الوطن
+                    تأهيل كفاءات مغربية قادرة على الإسهام الفعّال في تنمية الوطن ونهضة الأمة، عبر التكوين الفكري والمهاري.
                   </p>
                 </div>
               </div>
@@ -74,7 +77,10 @@ export default function AboutSection() {
                 <div>
                   <h3 className="font-bold text-gray-900 mb-2">رؤيتنا</h3>
                   <p className="text-gray-600 text-sm leading-relaxed">
-                    بناء جيل قادر على تحقيق حلم النهضة والارتقاء بالوطن
+                    بناء جيل رائد، يجمع بين الكفاءة العلمية والالتزام القيمي، ويساهم في تحقيق نهضة حضارية شاملة.
+                  </p>
+                  <p className="text-gray-600 text-sm leading-relaxed mt-2">
+                    تأهيل إطار قوي أمين، قادر على الإسهام في تحقيق حلم النهضة والارتقاء بالوطن وخدمة المجتمع.
                   </p>
                 </div>
               </div>
@@ -87,9 +93,12 @@ export default function AboutSection() {
                 </div>
                 <div>
                   <h3 className="font-bold text-gray-900 mb-2">قيمنا</h3>
-                  <p className="text-gray-600 text-sm leading-relaxed">
-                    الصدق، الأمانة، حب الوطن، الاعتزاز بالهوية، التميز العلمي
-                  </p>
+                  <ul className="text-gray-600 text-sm leading-relaxed space-y-1">
+                    <li>الصدق والأمانة</li>
+                    <li>حب الوطن والاعتزاز بالهوية</li>
+                    <li>التميز العلمي</li>
+                    <li>المسؤولية والانضباط</li>
+                  </ul>
                 </div>
               </div>
             </div>

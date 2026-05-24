@@ -18,6 +18,9 @@ export default function ActivitiesSection() {
             أنشطتنا
           </span>
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900">أنشطة المؤسسة</h2>
+          <p className="mt-4 max-w-3xl mx-auto text-gray-600 leading-relaxed">
+            مبادرات تُلهم الفكر، وتبني الإنسان، وتؤهل جيلاً قادراً على صناعة الأثر.
+          </p>
         </motion.div>
 
         <div className="space-y-6">

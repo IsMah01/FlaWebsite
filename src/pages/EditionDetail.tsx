@@ -13,6 +13,7 @@ import {
   Sparkles,
   Activity,
   ChevronRight,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -64,6 +65,7 @@ export default function EditionDetail() {
   const conferencesList = edition.conferences ? edition.conferences.split(",").filter(Boolean) : [];
   const activitiesList = edition.activities ? edition.activities.split(",").filter(Boolean) : [];
   const guestsList = edition.guests ? edition.guests.split(",").filter(Boolean) : [];
+  const linksList = edition.links ?? [];
 
   return (
     <div className="min-h-screen bg-[#F8FAF9]">
@@ -260,6 +262,34 @@ export default function EditionDetail() {
                       allowFullScreen
                       title={`فيديو ${edition.title}`}
                     />
+                  </div>
+                </motion.div>
+              )}
+
+              {linksList.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.3 }}
+                  className="bg-white rounded-2xl p-6 md:p-8 border border-gray-100 shadow-sm"
+                >
+                  <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-5 flex items-center gap-2">
+                    <ExternalLink className="w-6 h-6 text-[#4A9B8E]" />
+                    روابط الدورة
+                  </h2>
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    {linksList.map((link, i) => (
+                      <a
+                        key={link}
+                        href={link}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center justify-between gap-3 p-4 bg-[#F8FAF9] rounded-xl border border-[#4A9B8E]/10 text-[#1f5148] font-medium hover:border-[#4A9B8E]/30 hover:bg-[#F3F8F6] transition-colors"
+                      >
+                        <span>رابط {i + 1}</span>
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                    ))}
                   </div>
                 </motion.div>
               )}

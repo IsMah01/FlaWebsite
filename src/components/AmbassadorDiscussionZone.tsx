@@ -37,7 +37,7 @@ export default function AmbassadorDiscussionZone({ author }: { author: string })
             </div>
             <div>
               <h2 className="text-2xl font-bold text-gray-900">فضاء السفراء للنقاش</h2>
-              <p className="text-sm text-gray-500">كل رسالة تكتب هنا ستظهر لباقي السفراء مع اسم صاحبها.</p>
+              <p className="text-sm text-gray-500">حوارٌ يُثري، وفكرٌ يَبني. شارك السفراء فكرتك!</p>
             </div>
           </div>
 

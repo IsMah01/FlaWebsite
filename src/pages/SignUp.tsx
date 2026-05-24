@@ -111,8 +111,8 @@ export default function SignUp() {
               <div className="w-16 h-16 bg-[#4A9B8E]/10 rounded-full flex items-center justify-center mx-auto mb-4">
                 <UserPlus className="w-8 h-8 text-[#4A9B8E]" />
               </div>
-              <h1 className="text-2xl font-bold text-gray-900">التسجيل</h1>
-              <p className="text-gray-500 text-sm mt-2">أنشئ حسابك للانضمام إلى المؤسسة</p>
+              <h1 className="text-2xl font-bold text-gray-900">انضم إلى مؤسسة أطر الغد</h1>
+              <p className="text-gray-500 text-sm mt-2">أنشئ حسابك وكن جزءًا من فضاء مؤسسة أطر الغد</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -131,7 +131,7 @@ export default function SignUp() {
                 <Label htmlFor="studyStatus">الوضعية الدراسية *</Label>
                 <Select value={formData.studyStatus} onValueChange={(v) => setFormData({ ...formData, studyStatus: v })}>
                   <SelectTrigger className="text-right mt-1">
-                    <SelectValue placeholder="اختر" />
+                    <SelectValue placeholder="اختر وضعيتك الدراسية" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="student">طالب</SelectItem>
@@ -148,23 +148,23 @@ export default function SignUp() {
                 <input ref={attestationRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])} />
                 <Button type="button" variant="outline" onClick={() => attestationRef.current?.click()} disabled={uploadingAttestation} className={`w-full mt-1 ${formData.attestationUrl ? "border-green-500 text-green-600" : ""}`}>
                   <FileText className="w-4 h-4 mr-2" />
-                  {uploadingAttestation ? "جاري الرفع..." : formData.attestationUrl ? "تم رفع الملف" : "إضافة الشهادة"}
+                  {uploadingAttestation ? "جاري الرفع..." : formData.attestationUrl ? "تم رفع الملف" : "رفع شهادة التمدرس"}
                 </Button>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="phoneNumber">رقم الهاتف *</Label>
-                  <Input id="phoneNumber" value={formData.phoneNumber} onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })} placeholder="+212..." required className="text-right mt-1" />
+                  <Input id="phoneNumber" value={formData.phoneNumber} onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })} placeholder="+212..." dir="ltr" required className="text-left mt-1" />
                 </div>
                 <div>
                   <Label htmlFor="email">البريد الإلكتروني *</Label>
-                  <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="email@example.com" required className="text-right mt-1" />
+                  <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="example@email.com" required className="text-right mt-1" />
                 </div>
               </div>
 
               <div className="p-4 bg-[#F8FAF9] rounded-xl">
-                <Label className="mb-3 block">هل أنت سفير سابق؟</Label>
+                <Label className="mb-3 block">هل أنت سفير إحدى دورات أكاديمية أطر الغد؟</Label>
                 <div className="flex gap-6">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input type="radio" name="ambassador" checked={formData.isAmbassador} onChange={() => setFormData({ ...formData, isAmbassador: true })} className="w-4 h-4 text-[#4A9B8E]" />

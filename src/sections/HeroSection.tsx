@@ -1,12 +1,39 @@
 ﻿import { Link } from "react-router";
 import { motion } from "framer-motion";
-import { Award, BookOpen, ChevronDown, LayoutDashboard, Target, Users } from "lucide-react";
+import { BookOpen, Briefcase, Building2, ChevronDown, LayoutDashboard, School, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useViewerSession } from "@/hooks/useViewerSession";
 
+const heroStats = [
+  { icon: Briefcase, value: "5", label: "مشاريع مختلفة", sublabel: "أنشطة المؤسسة" },
+  { icon: Users, value: "+2K", label: "سفير", sublabel: "أكاديمية أطر الغد" },
+  { icon: Building2, value: "+40", label: "مؤسسة جامعية", sublabel: "بمختلف التخصصات" },
+  { icon: School, value: "17", label: "دورة", sublabel: "أكاديمية أطر الغد" },
+];
+
+const internalHighlights = [
+  {
+    title: "مسارك داخل المؤسسة",
+    description: "تابع تقدمك، وكن على اطلاع بالبرامج التكوينية التي تشارك فيها.",
+  },
+  {
+    title: "الأنشطة والفعاليات",
+    description: "اكتشف اللقاءات، الورشات، والدورات التي تساعدك على تطوير مهاراتك العلمية والشخصية.",
+  },
+  {
+    title: "الأخبار والمستجدات",
+    description: "كن أول من يعلم جديد المؤسسة ومواعيد الأنشطة القادمة.",
+  },
+  {
+    title: "فضاء التفاعل",
+    description: "تواصل مع السفراء، وكن جزءًا من شبكة الأقوياء الأمناء.",
+  },
+];
+
 export default function HeroSection() {
-  const { isAuthenticated, viewer } = useViewerSession();
+  const { isAuthenticated, viewer, hasAmbassadorView } = useViewerSession();
   const isAdmin = viewer?.kind === "site-user" && viewer.role === "admin";
+  const isInternalView = hasAmbassadorView || isAdmin;
 
   return (
     <section id="hero" className="relative min-h-screen flex items-center justify-center overflow-hidden gradient-primary">
@@ -20,16 +47,38 @@ export default function HeroSection() {
           <img src="/images/logo.png" alt="Fondation" className="h-24 md:h-32 w-auto mx-auto mb-6 drop-shadow-lg" />
         </motion.div>
 
-        <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.2 }} className="text-3xl md:text-5xl font-bold text-white mb-4 text-shadow">
-          مؤسسة أطر الغد
-        </motion.h1>
+        {isInternalView ? (
+          <>
+            <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.2 }} className="text-3xl md:text-5xl font-bold text-white mb-5 text-shadow">
+              مرحبًا بك داخل مؤسسة أطر الغد
+            </motion.h1>
 
-        <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.4 }} className="text-lg md:text-xl text-white/90 mb-8 max-w-2xl mx-auto leading-relaxed">
-          مؤسسة موجهة للطلبة وخريجي المدارس والمعاهد العليا، تقدم مواكبة أكاديمية وإنسانية.
-        </motion.p>
+            <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.35 }} className="text-base md:text-lg text-white/90 mb-4 max-w-4xl mx-auto leading-loose">
+              يسعدنا أن تكون جزءًا من فضاءٍ يؤمن بأن الإنسان هو أساس النهضة، وأن التغيير الحقيقي يبدأ من بناء الوعي، وصناعة الكفاءة، وترسيخ القيم.
+            </motion.p>
+
+            <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.5 }} className="text-base md:text-lg text-white/95 mb-8 max-w-3xl mx-auto leading-relaxed font-bold">
+              هنا لا نكتفي بالانتماء، بل نشرع في العمل.
+            </motion.p>
+          </>
+        ) : (
+          <>
+            <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.2 }} className="text-3xl md:text-5xl font-bold text-white mb-4 text-shadow">
+              مؤسسة أطر الغد
+            </motion.h1>
+
+            <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.35 }} className="text-sm md:text-lg text-white/90 mb-5 max-w-3xl mx-auto leading-relaxed font-bold">
+              لأن بناء الإنسان هو أول خطوة نحو بناء الوطن ونهضة الأمة
+            </motion.p>
+
+            <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.5 }} className="text-base md:text-lg text-white/90 mb-8 max-w-4xl mx-auto leading-loose">
+              مؤسسة مغربية تُوجّه أنشطتها أساسًا إلى طلبة وخريجي المعاهد العليا، من مهندسين ومسيرين وأطباء، ترمي إلى تأهيل شباب مغربي معتز بهويته، حامل لقيم الصدق والأمانة وحب الوطن، قوي في تخصصه العلمي، وممتلك للمعارف الضرورية، من أجل بناء جيل قادر على تحقيق حلم النهضة، والارتقاء بالوطن إلى أعلى المراتب الحضارية
+            </motion.p>
+          </>
+        )}
 
         {!isAuthenticated ? (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.6 }} className="flex flex-col sm:flex-row gap-3 justify-center">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.65 }} className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link to="/signup">
               <Button size="lg" className="bg-white text-[#4A9B8E] hover:bg-white/90 font-semibold px-8">
                 <Users className="w-5 h-5 mr-2" />
@@ -52,19 +101,30 @@ export default function HeroSection() {
           </motion.div>
         ) : null}
 
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.2, duration: 0.8 }} className="mt-16 flex justify-center gap-8 md:gap-16">
-          {[
-            { icon: Users, label: "السفراء", value: "2K+" },
-            { icon: Award, label: "الدورات", value: "18" },
-            { icon: Target, label: "الشركاء", value: "40+" },
-          ].map((stat, i) => (
-            <div key={i} className="text-center">
-              <stat.icon className="w-6 h-6 text-white/70 mx-auto mb-2" />
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.2, duration: 0.8 }} className="mt-14 grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+          {heroStats.map((stat, i) => (
+            <div key={i} className="rounded-2xl border border-white/20 bg-white/10 px-3 py-4 text-center backdrop-blur-sm">
+              <stat.icon className="w-6 h-6 text-white/75 mx-auto mb-2" />
               <div className="text-2xl md:text-3xl font-bold text-white">{stat.value}</div>
-              <div className="text-xs md:text-sm text-white/70">{stat.label}</div>
+              <div className="text-xs md:text-sm text-white/90 font-semibold">{stat.label}</div>
+              <div className="text-[11px] md:text-xs text-white/65 mt-1">{stat.sublabel}</div>
             </div>
           ))}
         </motion.div>
+
+        {isInternalView ? (
+          <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.35, duration: 0.8 }} className="mt-10 text-right">
+            <h2 className="text-xl md:text-2xl font-bold text-white mb-5 text-center">ماذا ينتظرك داخل فضاءك؟</h2>
+            <div className="grid md:grid-cols-2 gap-3">
+              {internalHighlights.map((item) => (
+                <div key={item.title} className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm">
+                  <h3 className="text-white font-bold mb-2">▪ {item.title}</h3>
+                  <p className="text-sm text-white/80 leading-7">{item.description}</p>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        ) : null}
       </div>
 
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.5 }} className="absolute bottom-6 left-1/2 -translate-x-1/2">

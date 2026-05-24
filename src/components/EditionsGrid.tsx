@@ -14,7 +14,7 @@ type EditionsGridProps = {
 export default function EditionsGrid({
   title = "الدورات السابقة للأكاديمية",
   badge = "الدورات السابقة",
-  description = "استعرض الدورات السابقة لأكاديمية أطر الغد منذ البداية، واكتشف المحاضرات والمؤطرين والصور.",
+  description = "استعرض الدورات 14 و15 و16 و17 لأكاديمية أطر الغد، واكتشف تفاصيل كل دورة ومحاضراتها وأنشطتها.",
   className = "",
 }: EditionsGridProps) {
   const navigate = useNavigate();
@@ -32,7 +32,7 @@ export default function EditionsGrid({
 
       {isLoading ? (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {Array.from({ length: 8 }).map((_, i) => (
+          {Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} className="h-40 rounded-2xl" />
           ))}
         </div>

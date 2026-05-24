@@ -1,34 +1,21 @@
 import { z } from "zod";
 import { createRouter, publicQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { editions, editionImages } from "@db/schema";
+import { editions } from "@db/schema";
 import { eq } from "drizzle-orm";
+import { getPublicEditionByNumber, publicEditions } from "./edition-content";
 
 export const editionsRouter = createRouter({
   list: publicQuery.query(async () => {
-    const db = getDb();
-    const allEditions = await db.select().from(editions).orderBy(editions.editionNumber);
-    return allEditions;
+    return publicEditions;
   }),
 
   getByNumber: publicQuery
     .input(z.object({ editionNumber: z.number() }))
     .query(async ({ input }) => {
-      const db = getDb();
-      const [edition] = await db
-        .select()
-        .from(editions)
-        .where(eq(editions.editionNumber, input.editionNumber))
-        .limit(1);
-
+      const edition = getPublicEditionByNumber(input.editionNumber);
       if (!edition) return null;
-
-      const images = await db
-        .select()
-        .from(editionImages)
-        .where(eq(editionImages.editionId, edition.id));
-
-      return { ...edition, images };
+      return { ...edition, images: [] };
     }),
 
   create: adminQuery
@@ -80,4 +67,3 @@ export const editionsRouter = createRouter({
       return { success: true };
     }),
 });
-
