@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
-import { Download, FileText, LogOut, Mail, RefreshCw, ShieldCheck, Users } from "lucide-react";
+import { Download, FileText, LogOut, Mail, RefreshCw, ShieldCheck, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -259,6 +259,44 @@ export default function AdminDashboard() {
     onError: (err) => toast.error(err.message || "فشل تحديث حالة المترشح"),
   });
 
+  const deleteNewUser = trpc.admin.deleteNewUser.useMutation({
+    onSuccess: async () => {
+      toast.success("Utilisateur supprime");
+      await Promise.all([
+        utils.admin.listNewUsers.invalidate(),
+        utils.admin.listUsers.invalidate(),
+        utils.admin.listCandidates.invalidate(),
+        utils.admin.listNewsletterSubscribers.invalidate(),
+        utils.admin.stats.invalidate(),
+      ]);
+    },
+    onError: (err) => toast.error(err.message || "Impossible de supprimer l'utilisateur"),
+  });
+
+  const deleteUser = trpc.admin.deleteUser.useMutation({
+    onSuccess: async () => {
+      toast.success("Utilisateur supprime");
+      await Promise.all([
+        utils.admin.listUsers.invalidate(),
+        utils.admin.listNewUsers.invalidate(),
+        utils.admin.listCandidates.invalidate(),
+        utils.admin.listNewsletterSubscribers.invalidate(),
+        utils.admin.stats.invalidate(),
+      ]);
+    },
+    onError: (err) => toast.error(err.message || "Impossible de supprimer l'utilisateur"),
+  });
+
+  function handleDeleteNewUser(id: number, label: string) {
+    if (!window.confirm(`Supprimer le compte ${label || id} ? Cette action est definitive.`)) return;
+    deleteNewUser.mutate({ id });
+  }
+
+  function handleDeleteUser(id: number, label: string) {
+    if (!window.confirm(`Supprimer l'utilisateur ${label || id} ? Cette action est definitive.`)) return;
+    deleteUser.mutate({ id });
+  }
+
   const filteredCandidates = useMemo(() => {
     const q = search.trim().toLowerCase();
     const list = candidates.data ?? [];
@@ -451,7 +489,7 @@ export default function AdminDashboard() {
                 <Download className="ml-2 h-4 w-4" /> csv تصدير new_user
               </Button>
             </div>
-            <table className="w-full min-w-[1100px] text-sm">
+            <table className="w-full min-w-[1200px] text-sm">
               <thead className="bg-slate-100">
                 <tr>
                   <th className="p-3 text-right">الاسم</th>
@@ -462,6 +500,7 @@ export default function AdminDashboard() {
                   <th className="p-3 text-right">الدور (user/ambassador)</th>
                   <th className="p-3 text-right">الوثائق</th>
                   <th className="p-3 text-right">دخول التاريخ</th>
+                  <th className="p-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -485,6 +524,16 @@ export default function AdminDashboard() {
                         )}
                       </td>
                       <td className="p-3">{formatDateYMDH(account.loginDate)}</td>
+                      <td className="p-3">
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          disabled={deleteNewUser.isPending}
+                          onClick={() => handleDeleteNewUser(account.id, account.email)}
+                        >
+                          <Trash2 className="ml-2 h-4 w-4" /> Supprimer
+                        </Button>
+                      </td>
                     </tr>
                   );
                 })}
@@ -500,13 +549,14 @@ export default function AdminDashboard() {
                 <Download className="ml-2 h-4 w-4" /> csv تصدير user
               </Button>
             </div>
-            <table className="w-full min-w-[900px] text-sm">
+            <table className="w-full min-w-[1000px] text-sm">
               <thead className="bg-slate-100">
                 <tr>
                   <th className="p-3 text-right">الاسم</th>
                   <th className="p-3 text-right">البريد الإلكتروني</th>
                   <th className="p-3 text-right">الهاتف</th>
                   <th className="p-3 text-right">آخر دخول</th>
+                  <th className="p-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -516,6 +566,16 @@ export default function AdminDashboard() {
                     <td className="p-3">{entry.email || "-"}</td>
                     <td className="p-3">{entry.phone || "-"}</td>
                     <td className="p-3">{formatDateYMDH(entry.lastLoginAt)}</td>
+                    <td className="p-3">
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        disabled={deleteUser.isPending || entry.role === "admin" || entry.status === "admin"}
+                        onClick={() => handleDeleteUser(entry.id, entry.email || entry.name || String(entry.id))}
+                      >
+                        <Trash2 className="ml-2 h-4 w-4" /> Supprimer
+                      </Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -1,11 +1,11 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { trpc } from "@/providers/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { ShieldCheck } from "lucide-react";
+import { Home, ShieldCheck } from "lucide-react";
 
 export default function AdminLogin() {
   const navigate = useNavigate();
@@ -65,6 +65,12 @@ export default function AdminLogin() {
         <Button type="submit" className="w-full" disabled={login.isPending}>
           {login.isPending ? "جاري الاتصال..." : "تسجيل الدخول"}
         </Button>
+
+        <Link to="/" className="block">
+          <Button type="button" variant="outline" className="w-full">
+            <Home className="ml-2 h-4 w-4" /> Retour a la page principale
+          </Button>
+        </Link>
       </form>
     </div>
   );

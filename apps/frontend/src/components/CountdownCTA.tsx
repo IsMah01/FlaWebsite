@@ -35,7 +35,7 @@ export default function CountdownCTA({ compact = false, className = "" }: Countd
       <div className="absolute -bottom-10 -right-10 h-48 w-48 rounded-full bg-[#1f5148]/10 blur-3xl" />
       <div className={`relative ${compact ? "p-6 md:p-7" : "p-7 md:p-10"}`}>
         <div className="inline-flex rounded-full bg-[#1f5148] px-4 py-1.5 text-xs font-semibold text-white">
-          {isAmbassadorNotice ? "إعلان داخلي للأكاديمية" : "باب الترشح لأكاديمية أطر الغد"}
+          {isAmbassadorNotice ? "إعلان داخلي للأكاديمية" : "فتح باب التسجيل في الأكاديمية 18"}
         </div>
         <div
           className={`mt-5 flex ${compact ? "flex-col md:flex-row md:items-end" : "flex-col lg:flex-row lg:items-end"} gap-4`}
@@ -45,7 +45,7 @@ export default function CountdownCTA({ compact = false, className = "" }: Countd
           >
             J-{daysLeft}
           </div>
-          <div className="pb-2 text-sm md:text-base text-gray-500">قبل يوم 28/05/2026</div>
+          <div className="pb-2 text-sm md:text-base text-gray-500">آخر أجل للتسجيل: 28/05/2026</div>
         </div>
         <p className={`mt-5 max-w-3xl text-gray-700 ${compact ? "text-base leading-7" : "text-lg leading-8"}`}>
           {isAmbassadorNotice ? (
@@ -55,8 +55,9 @@ export default function CountdownCTA({ compact = false, className = "" }: Countd
             </>
           ) : (
             <>
-              إذا كنت تريد أن تكون جزءا من الأكاديمية، فاستمارة التسجيل لم يتبق لها سوى
-              <span className="font-bold text-[#1f5148]"> {daysLeft} يوما</span>.
+              إذا كنت تطمح لأن تكون جزءًا من تجربة تُعاش ولا تُحكى، فلا تؤخر خطوتك.
+              <br />
+              تبقّى على إغلاق استمارة التسجيل {daysLeft} أيام فقط.
             </>
           )}
         </p>
@@ -65,7 +66,7 @@ export default function CountdownCTA({ compact = false, className = "" }: Countd
             onClick={() => navigate(isCandidate ? "/candidate-questionnaire" : "/signup")}
             className={`mt-6 ${compact ? "h-11" : "h-12"} bg-[#4A9B8E] hover:bg-[#3D7A6F]`}
           >
-            املأ الاستمارة الآن
+            سجّل الآن
             <ArrowLeft className="w-4 h-4 mr-2" />
           </Button>
         ) : null}

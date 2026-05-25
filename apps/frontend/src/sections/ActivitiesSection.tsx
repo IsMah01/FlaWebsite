@@ -31,8 +31,19 @@ export default function ActivitiesSection() {
             >
               <Link
                 to={`/activities/${activity.slug}`}
-                className="group flex flex-col md:flex-row gap-6 bg-[#F8FAF9] rounded-2xl p-6 border border-gray-100 hover:border-[#4A9B8E]/20 hover:bg-[#F3F8F6] transition-colors"
+                className="group flex flex-col overflow-hidden rounded-2xl border border-gray-100 bg-[#F8FAF9] transition-colors hover:border-[#4A9B8E]/20 hover:bg-[#F3F8F6] md:flex-row"
               >
+                {activity.coverImage ? (
+                  <div className="h-56 shrink-0 overflow-hidden bg-gray-100 md:h-auto md:w-72">
+                    <img
+                      src={activity.coverImage}
+                      alt={activity.title}
+                      loading="lazy"
+                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                  </div>
+                ) : null}
+                <div className="flex gap-5 p-6">
                 <div
                   className="p-4 rounded-xl h-fit w-fit"
                   style={{ backgroundColor: `${activity.color}15` }}
@@ -46,6 +57,7 @@ export default function ActivitiesSection() {
                     <span>اكتشف تفاصيل النشاط</span>
                     <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
                   </div>
+                </div>
                 </div>
               </Link>
             </motion.div>

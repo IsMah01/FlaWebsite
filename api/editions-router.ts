@@ -3,12 +3,20 @@ import { createRouter, publicQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { editions, editionImages } from "@db/schema";
 import { eq } from "drizzle-orm";
+import { getPublicEditionByNumber, publicEditions } from "./edition-content";
 
 export const editionsRouter = createRouter({
   list: publicQuery.query(async () => {
     const db = getDb();
     const allEditions = await db.select().from(editions).orderBy(editions.editionNumber);
-    return allEditions;
+    const dbEditionNumbers = new Set(allEditions.map((edition) => edition.editionNumber));
+    const fallbackEditions = publicEditions.filter(
+      (edition) => !dbEditionNumbers.has(edition.editionNumber)
+    );
+    return [
+      ...allEditions.map((edition) => ({ ...edition, links: [] as string[] })),
+      ...fallbackEditions,
+    ].sort((a, b) => a.editionNumber - b.editionNumber);
   }),
 
   getByNumber: publicQuery
@@ -21,14 +29,18 @@ export const editionsRouter = createRouter({
         .where(eq(editions.editionNumber, input.editionNumber))
         .limit(1);
 
-      if (!edition) return null;
+      if (!edition) {
+        const fallbackEdition = getPublicEditionByNumber(input.editionNumber);
+        return fallbackEdition ? { ...fallbackEdition, images: [] } : null;
+      }
 
       const images = await db
         .select()
         .from(editionImages)
         .where(eq(editionImages.editionId, edition.id));
 
-      return { ...edition, images };
+      const fallbackEdition = getPublicEditionByNumber(input.editionNumber);
+      return { ...edition, images, links: fallbackEdition?.links ?? [] };
     }),
 
   create: adminQuery

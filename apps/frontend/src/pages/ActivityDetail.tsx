@@ -1,11 +1,12 @@
-import { useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowLeft,
   ArrowRight,
   CalendarRange,
   ChevronLeft,
+  Images,
   Newspaper,
   PlayCircle,
   Quote,
@@ -98,6 +99,84 @@ function HorizontalScroller({
   );
 }
 
+function ActivityGallery({ images, title }: { images: string[]; title: string }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [direction, setDirection] = useState<"prev" | "next">("next");
+
+  const move = (direction: "prev" | "next") => {
+    setDirection(direction);
+    setActiveIndex((current) => {
+      if (direction === "next") return (current + 1) % images.length;
+      return (current - 1 + images.length) % images.length;
+    });
+  };
+
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [images]);
+
+  useEffect(() => {
+    if (images.length <= 1) return;
+    const interval = window.setInterval(() => move("next"), 20000);
+    return () => window.clearInterval(interval);
+  }, [images.length]);
+
+  if (images.length === 0) return null;
+
+  return (
+    <section className="bg-white rounded-3xl border border-gray-100 shadow-sm p-8">
+      <div className="flex items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-3">
+          <Images className="w-6 h-6 text-[#4A9B8E]" />
+          <h2 className="text-2xl font-bold text-gray-900">معرض الصور</h2>
+        </div>
+        <div className="text-sm font-medium text-gray-500">
+          {activeIndex + 1} / {images.length}
+        </div>
+      </div>
+
+      <div className="relative overflow-hidden rounded-3xl bg-[#101817]">
+        <div className="relative h-[28rem] md:h-[34rem]">
+          <AnimatePresence initial={false} custom={direction} mode="popLayout">
+            <motion.img
+              key={images[activeIndex]}
+              src={images[activeIndex]}
+              alt={`${title} ${activeIndex + 1}`}
+              custom={direction}
+              initial={{ x: direction === "next" ? "100%" : "-100%", opacity: 0.9 }}
+              animate={{ x: "0%", opacity: 1 }}
+              exit={{ x: direction === "next" ? "-100%" : "100%", opacity: 0.9 }}
+              transition={{ duration: 0.55, ease: "easeInOut" }}
+              className="absolute inset-0 h-full w-full object-contain"
+            />
+          </AnimatePresence>
+        </div>
+
+        {images.length > 1 ? (
+          <>
+            <button
+              type="button"
+              onClick={() => move("prev")}
+              className="absolute left-4 top-1/2 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-[#1f5148] shadow-lg transition-colors hover:bg-white"
+              aria-label="Image précédente"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => move("next")}
+              className="absolute right-4 top-1/2 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-[#1f5148] shadow-lg transition-colors hover:bg-white"
+              aria-label="Image suivante"
+            >
+              <ArrowRight className="w-5 h-5" />
+            </button>
+          </>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
 export default function ActivityDetail() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
@@ -147,7 +226,8 @@ export default function ActivityDetail() {
               <ArrowRight className="w-4 h-4" />
               العودة إلى الرئيسية
             </button>
-            <div className="mt-8 max-w-3xl">
+            <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_360px] lg:items-end">
+              <div className="max-w-3xl">
               <div
                 className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium"
                 style={{ backgroundColor: `${activity.color}55` }}
@@ -166,6 +246,16 @@ export default function ActivityDetail() {
                     <div className="text-3xl font-black leading-none">18</div>
                     <div className="text-sm text-white/80 mt-1">دورة أكاديمية</div>
                   </div>
+                </div>
+              ) : null}
+              </div>
+              {activity.coverImage ? (
+                <div className="hidden overflow-hidden rounded-3xl border border-white/20 bg-white/10 shadow-2xl lg:block">
+                  <img
+                    src={activity.coverImage}
+                    alt={activity.title}
+                    className="h-72 w-full object-cover"
+                  />
                 </div>
               ) : null}
             </div>
@@ -246,6 +336,31 @@ export default function ActivityDetail() {
         ) : null}
 
         {isAcademy && showAcademyReminder ? <CountdownCTA compact /> : null}
+
+        {activity.gallery && activity.gallery.length > 0 ? (
+          <ActivityGallery images={activity.gallery} title={activity.title} />
+        ) : null}
+
+        {activity.videos && activity.videos.length > 0 ? (
+          <section className="bg-white rounded-3xl border border-gray-100 shadow-sm p-8">
+            <div className="flex items-center gap-3 mb-6">
+              <PlayCircle className="w-6 h-6 text-[#4A9B8E]" />
+              <h2 className="text-2xl font-bold text-gray-900">فيديوهات النشاط</h2>
+            </div>
+            <div className="grid gap-5 lg:grid-cols-2">
+              {activity.videos.map((video, index) => (
+                <video
+                  key={video}
+                  src={video}
+                  controls
+                  preload="metadata"
+                  className="aspect-video w-full rounded-2xl bg-black object-cover"
+                  aria-label={`${activity.title} video ${index + 1}`}
+                />
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         {isAcademy && activity.videoUrl ? (
           <section className="bg-white rounded-3xl border border-gray-100 shadow-sm p-8">

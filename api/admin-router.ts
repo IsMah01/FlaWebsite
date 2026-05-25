@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { desc, eq } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
 import { createRouter, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import {
@@ -108,12 +109,82 @@ export const adminRouter = createRouter({
 
     return platformUsers.map((entry) => ({
       id: entry.id,
+      unionId: entry.unionId,
       name: entry.name,
       email: entry.email,
       phone: phoneByUnionId.get(entry.unionId) ?? null,
+      role: entry.role,
+      status: entry.status,
       lastLoginAt: entry.lastSignInAt,
     }));
   }),
+
+  deleteNewUser: adminQuery
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const [account] = await db
+        .select({ id: newUsers.id })
+        .from(newUsers)
+        .where(eq(newUsers.id, input.id))
+        .limit(1);
+
+      if (!account) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "User not found",
+        });
+      }
+
+      await db.delete(candidates).where(eq(candidates.newUserId, input.id));
+      await db.delete(users).where(eq(users.unionId, `newuser:${input.id}`));
+      await db.delete(newUsers).where(eq(newUsers.id, input.id));
+
+      return { success: true };
+    }),
+
+  deleteUser: adminQuery
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const [account] = await db
+        .select({
+          id: users.id,
+          unionId: users.unionId,
+          role: users.role,
+          status: users.status,
+        })
+        .from(users)
+        .where(eq(users.id, input.id))
+        .limit(1);
+
+      if (!account) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "User not found",
+        });
+      }
+
+      if (account.role === "admin" || account.status === "admin" || account.unionId.startsWith("internal-admin-")) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Admin accounts cannot be deleted from this table",
+        });
+      }
+
+      const linkedNewUserId = account.unionId.startsWith("newuser:")
+        ? Number(account.unionId.replace("newuser:", ""))
+        : null;
+
+      if (linkedNewUserId && Number.isInteger(linkedNewUserId)) {
+        await db.delete(candidates).where(eq(candidates.newUserId, linkedNewUserId));
+        await db.delete(newUsers).where(eq(newUsers.id, linkedNewUserId));
+      }
+
+      await db.delete(users).where(eq(users.id, input.id));
+
+      return { success: true };
+    }),
 
   listCandidates: adminQuery.query(async () => {
     const db = getDb();
