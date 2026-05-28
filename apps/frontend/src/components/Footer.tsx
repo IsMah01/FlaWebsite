@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 import { Facebook, Instagram, Linkedin, Mail, MapPin, Phone, Youtube } from "lucide-react";
+import { contactLinks, homeSectionPath, socialLinks } from "@/lib/site-links";
 
 export default function Footer() {
   return (
@@ -17,8 +18,9 @@ export default function Footer() {
           <div className="space-y-4">
             <h3 className="text-lg font-bold text-white">روابط سريعة</h3>
             <ul className="space-y-2">
-              <li><Link to="/" className="text-sm text-white/80 hover:text-white transition-colors">الرئيسية</Link></li>
+              <li><Link to={homeSectionPath("hero")} className="text-sm text-white/80 hover:text-white transition-colors">الرئيسية</Link></li>
               <li><Link to="/news" className="text-sm text-white/80 hover:text-white transition-colors">الأخبار</Link></li>
+              <li><Link to={homeSectionPath("activities")} className="text-sm text-white/80 hover:text-white transition-colors">أنشطتنا</Link></li>
               <li><Link to="/signup" className="text-sm text-white/80 hover:text-white transition-colors">التسجيل</Link></li>
               <li><Link to="/signin" className="text-sm text-white/80 hover:text-white transition-colors">تسجيل الدخول</Link></li>
             </ul>
@@ -29,28 +31,34 @@ export default function Footer() {
             <ul className="space-y-3">
               <li className="flex items-center gap-2 text-sm text-white/80">
                 <Mail className="w-4 h-4 text-[#6BC4B2]" />
-                contact@atralghad.org
+                <a href={contactLinks.emailHref} className="hover:text-white transition-colors">
+                  {contactLinks.email}
+                </a>
               </li>
               <li className="flex items-center gap-2 text-sm text-white/80">
                 <Phone className="w-4 h-4 text-[#6BC4B2]" />
-                +212 5XX-XXXXXX
+                <a href={contactLinks.phoneHref} className="hover:text-white transition-colors">
+                  {contactLinks.phone}
+                </a>
               </li>
               <li className="flex items-start gap-2 text-sm text-white/80">
                 <MapPin className="w-4 h-4 text-[#6BC4B2] mt-0.5" />
-                المغرب
+                <a href={contactLinks.locationHref} target="_blank" rel="noreferrer" className="hover:text-white transition-colors">
+                  المغرب
+                </a>
               </li>
             </ul>
             <div className="flex items-center gap-3 pt-2">
-              <a href="#" className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors">
+              <a href={socialLinks.facebook} target="_blank" rel="noreferrer" aria-label="Facebook" className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors">
                 <Facebook className="w-4 h-4" />
               </a>
-              <a href="#" className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors">
+              <a href={socialLinks.instagram} target="_blank" rel="noreferrer" aria-label="Instagram" className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors">
                 <Instagram className="w-4 h-4" />
               </a>
-              <a href="#" className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors">
+              <a href={socialLinks.youtube} target="_blank" rel="noreferrer" aria-label="YouTube" className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors">
                 <Youtube className="w-4 h-4" />
               </a>
-              <a href="#" className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors">
+              <a href={socialLinks.linkedin} target="_blank" rel="noreferrer" aria-label="LinkedIn" className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors">
                 <Linkedin className="w-4 h-4" />
               </a>
             </div>

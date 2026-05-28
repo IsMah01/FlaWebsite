@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/providers/trpc";
 import { toast } from "sonner";
+import { contactLinks, socialLinks } from "@/lib/site-links";
 
 export default function ContactSection() {
   const [formData, setFormData] = useState({
@@ -68,7 +69,9 @@ export default function ContactSection() {
                 </div>
                 <div>
                   <h3 className="font-bold text-gray-900 mb-1">البريد الإلكتروني</h3>
-                  <p className="text-gray-600 text-sm">contact@atralghad.org</p>
+                  <a href={contactLinks.emailHref} className="text-gray-600 text-sm hover:text-[#4A9B8E] transition-colors">
+                    {contactLinks.email}
+                  </a>
                 </div>
               </div>
 
@@ -78,7 +81,9 @@ export default function ContactSection() {
                 </div>
                 <div>
                   <h3 className="font-bold text-gray-900 mb-1">رقم الهاتف</h3>
-                  <p className="text-gray-600 text-sm">+212 5XX-XXXXXX</p>
+                  <a href={contactLinks.phoneHref} className="text-gray-600 text-sm hover:text-[#4A9B8E] transition-colors">
+                    {contactLinks.phone}
+                  </a>
                 </div>
               </div>
 
@@ -95,16 +100,16 @@ export default function ContactSection() {
               <div className="pt-4">
                 <h3 className="font-bold text-gray-900 mb-4">تابعنا على</h3>
                 <div className="flex items-center gap-3">
-                  <a href="#" className="p-3 bg-[#4A9B8E]/10 rounded-xl hover:bg-[#4A9B8E]/20 transition-colors">
+                  <a href={socialLinks.facebook} target="_blank" rel="noreferrer" aria-label="Facebook" className="p-3 bg-[#4A9B8E]/10 rounded-xl hover:bg-[#4A9B8E]/20 transition-colors">
                     <Facebook className="w-5 h-5 text-[#4A9B8E]" />
                   </a>
-                  <a href="#" className="p-3 bg-[#4A9B8E]/10 rounded-xl hover:bg-[#4A9B8E]/20 transition-colors">
+                  <a href={socialLinks.instagram} target="_blank" rel="noreferrer" aria-label="Instagram" className="p-3 bg-[#4A9B8E]/10 rounded-xl hover:bg-[#4A9B8E]/20 transition-colors">
                     <Instagram className="w-5 h-5 text-[#4A9B8E]" />
                   </a>
-                  <a href="#" className="p-3 bg-[#4A9B8E]/10 rounded-xl hover:bg-[#4A9B8E]/20 transition-colors">
+                  <a href={socialLinks.youtube} target="_blank" rel="noreferrer" aria-label="YouTube" className="p-3 bg-[#4A9B8E]/10 rounded-xl hover:bg-[#4A9B8E]/20 transition-colors">
                     <Youtube className="w-5 h-5 text-[#4A9B8E]" />
                   </a>
-                  <a href="#" className="p-3 bg-[#4A9B8E]/10 rounded-xl hover:bg-[#4A9B8E]/20 transition-colors">
+                  <a href={socialLinks.linkedin} target="_blank" rel="noreferrer" aria-label="LinkedIn" className="p-3 bg-[#4A9B8E]/10 rounded-xl hover:bg-[#4A9B8E]/20 transition-colors">
                     <Linkedin className="w-5 h-5 text-[#4A9B8E]" />
                   </a>
                 </div>

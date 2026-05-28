@@ -34,6 +34,7 @@ export default function HeroSection() {
   const { isAuthenticated, viewer, hasAmbassadorView } = useViewerSession();
   const isAdmin = viewer?.kind === "site-user" && viewer.role === "admin";
   const isInternalView = hasAmbassadorView || isAdmin;
+  const nextSectionId = isInternalView ? "activities" : "about";
 
   return (
     <section id="hero" className="relative min-h-screen flex items-center justify-center overflow-hidden gradient-primary">
@@ -85,7 +86,7 @@ export default function HeroSection() {
                 انضم إلينا
               </Button>
             </Link>
-            <button onClick={() => document.getElementById("about")?.scrollIntoView({ behavior: "smooth" })} className="inline-flex items-center justify-center gap-2 px-8 py-3 rounded-lg border-2 border-white/50 text-white hover:bg-white/10 transition-colors font-semibold">
+            <button onClick={() => document.getElementById(nextSectionId)?.scrollIntoView({ behavior: "smooth" })} className="inline-flex items-center justify-center gap-2 px-8 py-3 rounded-lg border-2 border-white/50 text-white hover:bg-white/10 transition-colors font-semibold">
               <BookOpen className="w-5 h-5" />
               اكتشف المزيد
             </button>
@@ -128,7 +129,7 @@ export default function HeroSection() {
       </div>
 
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.5 }} className="absolute bottom-6 left-1/2 -translate-x-1/2">
-        <button onClick={() => document.getElementById("about")?.scrollIntoView({ behavior: "smooth" })} className="animate-bounce text-white/70 hover:text-white transition-colors">
+        <button onClick={() => document.getElementById(nextSectionId)?.scrollIntoView({ behavior: "smooth" })} className="animate-bounce text-white/70 hover:text-white transition-colors">
           <ChevronDown className="w-8 h-8" />
         </button>
       </motion.div>

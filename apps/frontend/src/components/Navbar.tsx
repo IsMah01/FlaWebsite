@@ -14,14 +14,15 @@ export default function Navbar() {
 
   const scrollToSection = (id: string) => {
     if (!isHome) {
-      window.location.href = `/#${id}`;
+      navigate({ pathname: "/", hash: `#${id}` });
+      setMenuOpen(false);
       return;
     }
     const el = document.getElementById(id);
     if (el) {
       el.scrollIntoView({ behavior: "smooth" });
-      setMenuOpen(false);
     }
+    setMenuOpen(false);
   };
 
   const navLinks = [
