@@ -17,6 +17,40 @@ import {
 } from "@/data/candidate-questionnaire";
 import { useViewerSession } from "@/hooks/useViewerSession";
 
+type CandidateQuestionnaireDraft = {
+  version: 1;
+  answers: Record<string, string>;
+  currentStepIndex: number;
+  savedAt: string;
+};
+
+function clampStepIndex(stepIndex: number) {
+  return Math.max(0, Math.min(stepIndex, candidateQuestionnaireSteps.length - 1));
+}
+
+function parseSavedDraft(value: string): Pick<CandidateQuestionnaireDraft, "answers" | "currentStepIndex"> {
+  const parsed = JSON.parse(value) as unknown;
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Invalid questionnaire draft");
+  }
+
+  if ("answers" in parsed && parsed.answers && typeof parsed.answers === "object") {
+    const draft = parsed as Partial<CandidateQuestionnaireDraft>;
+    return {
+      answers: draft.answers as Record<string, string>,
+      currentStepIndex: clampStepIndex(
+        typeof draft.currentStepIndex === "number" ? draft.currentStepIndex : 0,
+      ),
+    };
+  }
+
+  return {
+    answers: parsed as Record<string, string>,
+    currentStepIndex: 0,
+  };
+}
+
 function renderField(
   field: CandidateQuestionField,
   value: string,
@@ -105,6 +139,8 @@ export default function CandidateQuestionnaire() {
   const utils = trpc.useUtils();
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [hasLoadedDraft, setHasLoadedDraft] = useState(false);
+  const [loadedStorageKey, setLoadedStorageKey] = useState("");
   const submitMutation = trpc.candidateAuth.submitQuestionnaire.useMutation({
     onSuccess: async () => {
       await utils.candidateAuth.me.invalidate();
@@ -127,17 +163,46 @@ export default function CandidateQuestionnaire() {
       return;
     }
 
+    setHasLoadedDraft(false);
     const savedAnswers = window.localStorage.getItem(storageKey);
     if (!savedAnswers) {
+      setLoadedStorageKey(storageKey);
+      setHasLoadedDraft(true);
       return;
     }
 
     try {
-      setAnswers(JSON.parse(savedAnswers) as Record<string, string>);
+      const draft = parseSavedDraft(savedAnswers);
+      setAnswers(draft.answers);
+      setCurrentStepIndex(draft.currentStepIndex);
     } catch {
       window.localStorage.removeItem(storageKey);
+    } finally {
+      setLoadedStorageKey(storageKey);
+      setHasLoadedDraft(true);
     }
   }, [storageKey, viewer]);
+
+  useEffect(() => {
+    if (!viewer || !hasLoadedDraft || loadedStorageKey !== storageKey) {
+      return;
+    }
+
+    const hasAnyAnswer = Object.values(answers).some((value) => isFieldFilled(value));
+    if (!hasAnyAnswer) {
+      window.localStorage.removeItem(storageKey);
+      return;
+    }
+
+    const draft: CandidateQuestionnaireDraft = {
+      version: 1,
+      answers,
+      currentStepIndex,
+      savedAt: new Date().toISOString(),
+    };
+
+    window.localStorage.setItem(storageKey, JSON.stringify(draft));
+  }, [answers, currentStepIndex, hasLoadedDraft, loadedStorageKey, storageKey, viewer]);
 
   if (!isLoading && !canAccess) {
     return (
@@ -198,7 +263,13 @@ export default function CandidateQuestionnaire() {
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
-    window.localStorage.setItem(storageKey, JSON.stringify(answers));
+    const draft: CandidateQuestionnaireDraft = {
+      version: 1,
+      answers,
+      currentStepIndex,
+      savedAt: new Date().toISOString(),
+    };
+    window.localStorage.setItem(storageKey, JSON.stringify(draft));
     submitMutation.mutate({ answers });
   };
 
@@ -295,7 +366,7 @@ export default function CandidateQuestionnaire() {
                     {answeredCount} / {totalQuestions} إجابة مملوءة
                   </p>
                   <p className="mt-1 text-xs text-gray-500">
-                    يمكنك الرجوع إلى أي مرحلة قبل التأكيد النهائي.
+                    يتم حفظ الأجوبة تلقائيا على هذا الجهاز.
                   </p>
                 </div>
               </div>
