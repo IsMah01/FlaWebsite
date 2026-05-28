@@ -7,10 +7,10 @@ export const contactLinks = {
 };
 
 export const socialLinks = {
-  facebook: "https://www.facebook.com/atralghad",
-  instagram: "https://www.instagram.com/atralghad",
+  facebook: "https://www.facebook.com/fla.morocco",
+  instagram: "https://www.instagram.com/flf_morocco?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==",
   youtube: "https://www.youtube.com/@atralghad",
-  linkedin: "https://www.linkedin.com/company/atralghad",
+  linkedin: "https://www.linkedin.com/company/future-leaders-academy-ma/",
 };
 
 export function homeSectionPath(sectionId: string) {
