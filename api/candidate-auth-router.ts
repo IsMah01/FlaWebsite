@@ -26,6 +26,25 @@ function secureCookieSuffix() {
   return process.env.APP_URL?.startsWith("https://") ? "; Secure" : "";
 }
 
+function requireCandidateSession(cookieHeader: string) {
+  const token = readCandidateToken(cookieHeader);
+  if (!token) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "ÙŠØ¬Ø¨ ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„ Ø£ÙˆÙ„Ø§.",
+    });
+  }
+
+  try {
+    return jwt.verify(token, JWT_SECRET) as { newUserId: number; email: string };
+  } catch {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Ø¬Ù„Ø³Ø© ØºÙŠØ± ØµØ§Ù„Ø­Ø©.",
+    });
+  }
+}
+
 const newUserBaseSelection = {
   id: newUsers.id,
   firstName: newUsers.firstName,
@@ -310,6 +329,42 @@ export const candidateAuthRouter = createRouter({
     }
   }),
 
+  getQuestionnaireDraft: publicQuery.query(async ({ ctx }) => {
+    const decoded = requireCandidateSession(ctx.req.headers.get("cookie") || "");
+    const db = getDb();
+    const [account] = await db
+      .select({ questionnaireDraft: newUsers.questionnaireDraft })
+      .from(newUsers)
+      .where(eq(newUsers.id, decoded.newUserId))
+      .limit(1);
+
+    if (!account) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Ø§Ù„Ø­Ø³Ø§Ø¨ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯.",
+      });
+    }
+
+    return { draft: account.questionnaireDraft };
+  }),
+
+  saveQuestionnaireDraft: publicQuery
+    .input(
+      z.object({
+        draft: z.string().max(65000),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const decoded = requireCandidateSession(ctx.req.headers.get("cookie") || "");
+      const db = getDb();
+      await db
+        .update(newUsers)
+        .set({ questionnaireDraft: input.draft })
+        .where(eq(newUsers.id, decoded.newUserId));
+
+      return { success: true };
+    }),
+
   submitQuestionnaire: publicQuery
     .input(
       z.object({
@@ -385,6 +440,11 @@ export const candidateAuthRouter = createRouter({
             submittedAt: new Date(),
           },
         });
+
+      await db
+        .update(newUsers)
+        .set({ questionnaireDraft: null })
+        .where(eq(newUsers.id, account.id));
 
       return { success: true, message: "تم حفظ الاستمارة بنجاح." };
     }),

@@ -141,6 +141,13 @@ export default function CandidateQuestionnaire() {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [hasLoadedDraft, setHasLoadedDraft] = useState(false);
   const [loadedStorageKey, setLoadedStorageKey] = useState("");
+  const canAccess = useMemo(() => isCandidate && !!viewer, [isCandidate, viewer]);
+  const storageKey = `candidate-questionnaire-${viewer?.id ?? "guest"}`;
+  const serverDraftQuery = trpc.candidateAuth.getQuestionnaireDraft.useQuery(undefined, {
+    enabled: canAccess,
+    retry: false,
+  });
+  const saveDraftMutation = trpc.candidateAuth.saveQuestionnaireDraft.useMutation();
   const submitMutation = trpc.candidateAuth.submitQuestionnaire.useMutation({
     onSuccess: async () => {
       await utils.candidateAuth.me.invalidate();
@@ -155,16 +162,13 @@ export default function CandidateQuestionnaire() {
     },
   });
 
-  const canAccess = useMemo(() => isCandidate && !!viewer, [isCandidate, viewer]);
-  const storageKey = `candidate-questionnaire-${viewer?.id ?? "guest"}`;
-
   useEffect(() => {
-    if (!viewer) {
+    if (!viewer || !serverDraftQuery.isFetched) {
       return;
     }
 
     setHasLoadedDraft(false);
-    const savedAnswers = window.localStorage.getItem(storageKey);
+    const savedAnswers = serverDraftQuery.data?.draft || window.localStorage.getItem(storageKey);
     if (!savedAnswers) {
       setLoadedStorageKey(storageKey);
       setHasLoadedDraft(true);
@@ -181,7 +185,7 @@ export default function CandidateQuestionnaire() {
       setLoadedStorageKey(storageKey);
       setHasLoadedDraft(true);
     }
-  }, [storageKey, viewer]);
+  }, [serverDraftQuery.data?.draft, serverDraftQuery.isFetched, storageKey, viewer]);
 
   useEffect(() => {
     if (!viewer || !hasLoadedDraft || loadedStorageKey !== storageKey) {
@@ -202,6 +206,12 @@ export default function CandidateQuestionnaire() {
     };
 
     window.localStorage.setItem(storageKey, JSON.stringify(draft));
+
+    const timeoutId = window.setTimeout(() => {
+      saveDraftMutation.mutate({ draft: JSON.stringify(draft) });
+    }, 800);
+
+    return () => window.clearTimeout(timeoutId);
   }, [answers, currentStepIndex, hasLoadedDraft, loadedStorageKey, storageKey, viewer]);
 
   if (!isLoading && !canAccess) {

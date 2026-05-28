@@ -28,6 +28,7 @@ export const newUsers = mysqlTable("new_users", {
   emailConfirmed: boolean("emailConfirmed").default(false).notNull(),
   confirmationToken: varchar("confirmationToken", { length: 255 }),
   newsletterConsent: boolean("newsletterConsent").default(false).notNull(),
+  questionnaireDraft: text("questionnaireDraft"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt")
     .defaultNow()

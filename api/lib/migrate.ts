@@ -42,11 +42,14 @@ export async function ensureDatabaseSchema() {
         emailConfirmed BOOLEAN NOT NULL DEFAULT false,
         confirmationToken VARCHAR(255) NULL,
         newsletterConsent BOOLEAN NOT NULL DEFAULT false,
+        questionnaireDraft TEXT NULL,
         createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         lastLoginAt TIMESTAMP NULL
       )
     `);
+
+    await addColumnIfMissing(connection, "new_users", "questionnaireDraft", "questionnaireDraft TEXT NULL");
 
     await connection.query(`
       CREATE TABLE IF NOT EXISTS users (
