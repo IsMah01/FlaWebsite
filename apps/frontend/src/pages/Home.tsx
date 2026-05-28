@@ -21,6 +21,9 @@ export default function Home() {
       <Navbar />
       <main>
         <HeroSection />
+        <section className="bg-emerald-600 px-4 py-3 text-center text-sm font-semibold text-white">
+          Test pipeline DevOps - deploiement automatique actif
+        </section>
         {hasAmbassadorView && viewer ? <AmbassadorDiscussionZone author={viewer.name} /> : null}
         {!hasAmbassadorView ? <AboutSection /> : null}
         {!hasAmbassadorView ? <GoalsSection /> : null}
