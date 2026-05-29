@@ -52,7 +52,12 @@ export default function AdminLogin() {
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium">كلمة المرور</label>
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium">كلمة المرور</label>
+            <Link to="/admin/forgot-password" className="text-sm font-medium text-[#4A9B8E] hover:text-[#3D7A6F]">
+              Mot de passe oublie ?
+            </Link>
+          </div>
           <Input
             value={password}
             onChange={(e) => setPassword(e.target.value)}

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { eq } from "drizzle-orm";
@@ -6,7 +7,7 @@ import { TRPCError } from "@trpc/server";
 import { createRouter, publicQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { candidates, newUsers } from "@db/schema";
-import { sendConfirmationEmail } from "./lib/email";
+import { sendConfirmationEmail, sendPasswordResetEmail } from "./lib/email";
 import { upsertUser } from "./queries/users";
 
 const JWT_SECRET = process.env.APP_SECRET;
@@ -24,6 +25,19 @@ function readCandidateToken(cookieHeader: string) {
 
 function secureCookieSuffix() {
   return process.env.APP_URL?.startsWith("https://") ? "; Secure" : "";
+}
+
+function createPasswordResetToken() {
+  const token = crypto.randomBytes(32).toString("hex");
+  return {
+    token,
+    tokenHash: crypto.createHash("sha256").update(token).digest("hex"),
+    expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+  };
+}
+
+function hashPasswordResetToken(token: string) {
+  return crypto.createHash("sha256").update(token).digest("hex");
 }
 
 function requireCandidateSession(cookieHeader: string) {
@@ -207,6 +221,102 @@ export const candidateAuthRouter = createRouter({
           ? "تم إرسال رابط التأكيد الجديد إلى بريدك الإلكتروني"
           : "تم إنشاء رابط التأكيد (تعذر إرسال البريد - تحقق من SMTP)",
       };
+    }),
+
+  requestPasswordReset: publicQuery
+    .input(z.object({ email: z.string().email() }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const normalizedEmail = input.email.trim().toLowerCase();
+      const [account] = await db
+        .select({
+          id: newUsers.id,
+          firstName: newUsers.firstName,
+          email: newUsers.email,
+        })
+        .from(newUsers)
+        .where(eq(newUsers.email, normalizedEmail))
+        .limit(1);
+
+      if (!account) {
+        return { success: true, emailSent: false };
+      }
+
+      const reset = createPasswordResetToken();
+      await db
+        .update(newUsers)
+        .set({
+          passwordResetToken: reset.tokenHash,
+          passwordResetExpiresAt: reset.expiresAt,
+        })
+        .where(eq(newUsers.id, account.id));
+
+      await db
+        .update(candidates)
+        .set({
+          passwordResetToken: reset.tokenHash,
+          passwordResetExpiresAt: reset.expiresAt,
+        })
+        .where(eq(candidates.newUserId, account.id));
+
+      const resetUrl = `${process.env.APP_URL || "http://localhost:3000"}/reset-password?token=${reset.token}`;
+      const emailResult = await sendPasswordResetEmail(account.email, account.firstName, resetUrl);
+
+      return { success: true, emailSent: emailResult.success };
+    }),
+
+  resetPassword: publicQuery
+    .input(
+      z
+        .object({
+          token: z.string().min(20),
+          password: z.string().min(6, "ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ± ÙŠØ¬Ø¨ Ø£Ù† ØªØªÙƒÙˆÙ† Ù…Ù† 6 Ø£Ø­Ø±Ù Ø¹Ù„Ù‰ Ø§Ù„Ø£Ù‚Ù„"),
+          confirmPassword: z.string(),
+        })
+        .refine((data) => data.password === data.confirmPassword, {
+          message: "ÙƒÙ„Ù…ØªØ§ Ø§Ù„Ù…Ø±ÙˆØ± ØºÙŠØ± Ù…ØªØ·Ø§Ø¨Ù‚ØªÙŠÙ†",
+          path: ["confirmPassword"],
+        }),
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const tokenHash = hashPasswordResetToken(input.token);
+      const [account] = await db
+        .select({
+          id: newUsers.id,
+          passwordResetExpiresAt: newUsers.passwordResetExpiresAt,
+        })
+        .from(newUsers)
+        .where(eq(newUsers.passwordResetToken, tokenHash))
+        .limit(1);
+
+      if (!account || !account.passwordResetExpiresAt || account.passwordResetExpiresAt.getTime() < Date.now()) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Ø±Ø§Ø¨Ø· Ø¥Ø¹Ø§Ø¯Ø© ØªØ¹ÙŠÙŠÙ† ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ± ØºÙŠØ± ØµØ§Ù„Ø­ Ø£Ùˆ Ù…Ù†ØªÙ‡ÙŠ Ø§Ù„ØµÙ„Ø§Ø­ÙŠØ©",
+        });
+      }
+
+      const hashedPassword = await bcrypt.hash(input.password, 12);
+      await db
+        .update(newUsers)
+        .set({
+          password: hashedPassword,
+          passwordResetToken: null,
+          passwordResetExpiresAt: null,
+        })
+        .where(eq(newUsers.id, account.id));
+
+      await db
+        .update(candidates)
+        .set({
+          password: hashedPassword,
+          passwordResetToken: null,
+          passwordResetExpiresAt: null,
+        })
+        .where(eq(candidates.newUserId, account.id));
+
+      return { success: true };
     }),
 
   login: publicQuery

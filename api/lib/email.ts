@@ -82,6 +82,60 @@ export async function sendConfirmationEmail(
   }
 }
 
+export async function sendPasswordResetEmail(
+  to: string,
+  firstName: string,
+  resetUrl: string,
+) {
+  if (!SMTP_HOST || !SMTP_USER) {
+    console.warn("[Email] SMTP not configured. Skipping password reset email.");
+    console.log(`[Email] Password reset link: ${resetUrl}`);
+    return { success: false, reason: "SMTP_NOT_CONFIGURED" };
+  }
+
+  const html = `
+    <div dir="rtl" style="font-family: 'Noto Sans Arabic', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8faf9; border-radius: 12px;">
+      <div style="text-align: center; padding: 20px 0;">
+        <h1 style="color: #4A9B8E; margin: 0;">Ù…Ø¤Ø³Ø³Ø© Ø£Ø·Ø± Ø§Ù„ØºØ¯</h1>
+        <p style="color: #666; margin: 8px 0 0;">Future Leaders Foundation</p>
+      </div>
+      <div style="background: white; padding: 30px; border-radius: 12px; margin-top: 20px;">
+        <h2 style="color: #2d5f56; margin-bottom: 20px;">Ù…Ø±Ø­Ø¨Ø§Ù‹ ${firstName}!</h2>
+        <p style="color: #444; line-height: 1.8; font-size: 15px;">
+          ØªÙ… Ø·Ù„Ø¨ Ø¥Ø¹Ø§Ø¯Ø© ØªØ¹ÙŠÙŠÙ† ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ± Ù„Ø­Ø³Ø§Ø¨Ùƒ. Ø§Ù„Ø±Ø§Ø¨Ø· ØµØ§Ù„Ø­ Ù„Ù…Ø¯Ø© Ø³Ø§Ø¹Ø© ÙˆØ§Ø­Ø¯Ø© ÙÙ‚Ø·.
+        </p>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${resetUrl}"
+             style="display: inline-block; background: linear-gradient(135deg, #4A9B8E, #6BC4B2); color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
+            Ø¥Ø¹Ø§Ø¯Ø© ØªØ¹ÙŠÙŠÙ† ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ±
+          </a>
+        </div>
+        <p style="color: #888; font-size: 13px; text-align: center; margin-top: 20px;">
+          Ø£Ùˆ Ø§Ù†Ø³Ø® Ù‡Ø°Ø§ Ø§Ù„Ø±Ø§Ø¨Ø· ÙˆØ§Ù„ØµÙ‚Ù‡ ÙÙŠ Ø§Ù„Ù…ØªØµÙØ­:<br>
+          <code style="direction: ltr; display: inline-block; margin-top: 8px; background: #f0f0f0; padding: 6px 12px; border-radius: 4px; font-size: 12px;">${resetUrl}</code>
+        </p>
+        <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
+        <p style="color: #999; font-size: 12px; text-align: center;">
+          Ø¥Ø°Ø§ Ù„Ù… ØªØ·Ù„Ø¨ ØªØºÙŠÙŠØ± ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ±ØŒ ÙŠÙ…ÙƒÙ†Ùƒ ØªØ¬Ø§Ù‡Ù„ Ù‡Ø°Ù‡ Ø§Ù„Ø±Ø³Ø§Ù„Ø©.
+        </p>
+      </div>
+    </div>
+  `;
+
+  try {
+    await transporter.sendMail({
+      from: `"Ù…Ø¤Ø³Ø³Ø© Ø£Ø·Ø± Ø§Ù„ØºØ¯" <${SMTP_FROM}>`,
+      to,
+      subject: "Ø¥Ø¹Ø§Ø¯Ø© ØªØ¹ÙŠÙŠÙ† ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ± - Ù…Ø¤Ø³Ø³Ø© Ø£Ø·Ø± Ø§Ù„ØºØ¯",
+      html,
+    });
+    return { success: true };
+  } catch (error) {
+    console.error("[Email] Failed to send password reset email:", error);
+    return { success: false, reason: "SEND_FAILED" };
+  }
+}
+
 export async function sendNewsletterEmail(
   to: string,
   subject: string,

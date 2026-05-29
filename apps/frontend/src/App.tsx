@@ -12,6 +12,8 @@ import Login from "./pages/Login"
 import NotFound from "./pages/NotFound"
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminLogin from "./pages/AdminLogin";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import ScrollManager from "./components/ScrollManager";
 import { useViewerSession } from "./hooks/useViewerSession";
 
@@ -48,6 +50,8 @@ export default function App() {
           }
         />
         <Route path="/confirm-email" element={<ConfirmEmail />} />
+        <Route path="/forgot-password" element={<ForgotPassword accountType="candidate" />} />
+        <Route path="/reset-password" element={<ResetPassword accountType="candidate" />} />
         <Route path="/edition/:id" element={<EditionDetail />} />
         <Route path="/activities/:slug" element={<ActivityDetail />} />
         <Route path="/news" element={<NewsPage />} />
@@ -55,6 +59,8 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/admin/forgot-password" element={<ForgotPassword accountType="admin" />} />
+        <Route path="/admin/reset-password" element={<ResetPassword accountType="admin" />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </>

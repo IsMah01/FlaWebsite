@@ -41,6 +41,8 @@ export async function ensureDatabaseSchema() {
         password VARCHAR(255) NOT NULL,
         emailConfirmed BOOLEAN NOT NULL DEFAULT false,
         confirmationToken VARCHAR(255) NULL,
+        passwordResetToken VARCHAR(64) NULL,
+        passwordResetExpiresAt TIMESTAMP NULL,
         newsletterConsent BOOLEAN NOT NULL DEFAULT false,
         questionnaireDraft TEXT NULL,
         createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -50,6 +52,8 @@ export async function ensureDatabaseSchema() {
     `);
 
     await addColumnIfMissing(connection, "new_users", "questionnaireDraft", "questionnaireDraft TEXT NULL");
+    await addColumnIfMissing(connection, "new_users", "passwordResetToken", "passwordResetToken VARCHAR(64) NULL");
+    await addColumnIfMissing(connection, "new_users", "passwordResetExpiresAt", "passwordResetExpiresAt TIMESTAMP NULL");
 
     await connection.query(`
       CREATE TABLE IF NOT EXISTS users (
@@ -82,6 +86,8 @@ export async function ensureDatabaseSchema() {
         password VARCHAR(255) NOT NULL,
         emailConfirmed BOOLEAN NOT NULL DEFAULT false,
         confirmationToken VARCHAR(255) NULL,
+        passwordResetToken VARCHAR(64) NULL,
+        passwordResetExpiresAt TIMESTAMP NULL,
         newsletterConsent BOOLEAN NOT NULL DEFAULT false,
         applicationStatus ENUM('pending','accepted','rejected') NOT NULL DEFAULT 'pending',
         questionnaireAnswers TEXT NULL,
@@ -96,6 +102,8 @@ export async function ensureDatabaseSchema() {
     await addColumnIfMissing(connection, "candidates", "attestationUrl", "attestationUrl TEXT NULL");
     await addColumnIfMissing(connection, "candidates", "idCardUrl", "idCardUrl TEXT NULL");
     await addColumnIfMissing(connection, "candidates", "password", "password VARCHAR(255) NULL");
+    await addColumnIfMissing(connection, "candidates", "passwordResetToken", "passwordResetToken VARCHAR(64) NULL");
+    await addColumnIfMissing(connection, "candidates", "passwordResetExpiresAt", "passwordResetExpiresAt TIMESTAMP NULL");
     await addColumnIfMissing(connection, "candidates", "questionnaireAnswers", "questionnaireAnswers TEXT NULL");
     await addColumnIfMissing(connection, "candidates", "submittedAt", "submittedAt TIMESTAMP NULL");
     if (await hasColumn(connection, "candidates", "passwordHash")) {
@@ -184,6 +192,8 @@ export async function ensureDatabaseSchema() {
         name VARCHAR(255) NOT NULL,
         email VARCHAR(320) NOT NULL UNIQUE,
         passwordHash VARCHAR(255) NOT NULL,
+        passwordResetToken VARCHAR(64) NULL,
+        passwordResetExpiresAt TIMESTAMP NULL,
         role ENUM('admin','super_admin') NOT NULL DEFAULT 'admin',
         isActive BOOLEAN NOT NULL DEFAULT true,
         createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -192,6 +202,8 @@ export async function ensureDatabaseSchema() {
     `);
 
     await addColumnIfMissing(connection, "admin_users", "updatedAt", "updatedAt TIMESTAMP NULL");
+    await addColumnIfMissing(connection, "admin_users", "passwordResetToken", "passwordResetToken VARCHAR(64) NULL");
+    await addColumnIfMissing(connection, "admin_users", "passwordResetExpiresAt", "passwordResetExpiresAt TIMESTAMP NULL");
 
     const [adminRows] = await connection.execute<mysql.RowDataPacket[]>(
       "SELECT id FROM admin_users WHERE email = ? LIMIT 1",
