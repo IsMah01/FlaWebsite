@@ -22,17 +22,17 @@ export default function ResetPassword({ accountType }: { accountType: AccountTyp
 
   const resetCandidatePassword = trpc.candidateAuth.resetPassword.useMutation({
     onSuccess: () => {
-      toast.success("Mot de passe mis a jour");
+      toast.success("Mot de passe mis à jour");
       navigate(successPath);
     },
-    onError: (err) => toast.error(err.message || "Lien invalide ou expire"),
+    onError: (err) => toast.error(err.message || "Lien invalide ou expiré"),
   });
   const resetAdminPassword = trpc.adminAuth.resetPassword.useMutation({
     onSuccess: () => {
-      toast.success("Mot de passe mis a jour");
+      toast.success("Mot de passe mis à jour");
       navigate(successPath);
     },
-    onError: (err) => toast.error(err.message || "Lien invalide ou expire"),
+    onError: (err) => toast.error(err.message || "Lien invalide ou expiré"),
   });
   const isPending = resetCandidatePassword.isPending || resetAdminPassword.isPending;
 
@@ -54,19 +54,19 @@ export default function ResetPassword({ accountType }: { accountType: AccountTyp
     <div className="min-h-screen bg-[#F8FAF9]">
       {!isAdmin ? <Navbar /> : null}
       <div className="flex min-h-screen items-center justify-center px-4 py-12">
-        <div className="w-full max-w-md rounded-2xl border border-gray-100 bg-white p-6 shadow-sm md:p-8">
+        <div dir="ltr" lang="fr" className="w-full max-w-md rounded-2xl border border-gray-100 bg-white p-6 text-left shadow-sm md:p-8">
           <div className="mb-8 text-center">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#4A9B8E]/10">
               <KeyRound className="h-8 w-8 text-[#4A9B8E]" />
             </div>
             <h1 className="text-2xl font-bold text-gray-900">Nouveau mot de passe</h1>
-            <p className="mt-2 text-sm text-gray-500">Choisissez un mot de passe securise.</p>
+            <p className="mt-2 text-sm text-gray-500">Choisissez un mot de passe sécurisé.</p>
           </div>
 
           {!token ? (
             <div className="space-y-4">
               <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                Le lien de reinitialisation est incomplet.
+                Le lien de réinitialisation est incomplet.
               </div>
               <Link to={isAdmin ? "/admin/forgot-password" : "/forgot-password"} className="block">
                 <Button className="h-11 w-full bg-[#4A9B8E] text-white hover:bg-[#3D7A6F]">
@@ -115,7 +115,7 @@ export default function ResetPassword({ accountType }: { accountType: AccountTyp
                 className="h-11 w-full bg-[#4A9B8E] text-white hover:bg-[#3D7A6F]"
                 disabled={isPending}
               >
-                {isPending ? "Mise a jour..." : "Mettre a jour"}
+                {isPending ? "Mise à jour..." : "Mettre à jour"}
               </Button>
             </form>
           )}

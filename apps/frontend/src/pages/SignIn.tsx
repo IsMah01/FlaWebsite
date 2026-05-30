@@ -7,6 +7,7 @@ import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { formatBlockedSeconds, useRateLimitBlock } from "@/hooks/useRateLimitBlock";
 import { trpc } from "@/providers/trpc";
 
 export default function SignIn() {
@@ -14,21 +15,25 @@ export default function SignIn() {
   const utils = trpc.useUtils();
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({ email: "", password: "" });
+  const rateLimit = useRateLimitBlock();
 
   const loginMutation = trpc.candidateAuth.login.useMutation({
     onSuccess: async () => {
+      rateLimit.clearBlock();
       await utils.candidateAuth.me.invalidate();
       await utils.auth.me.invalidate();
       toast.success("تم تسجيل الدخول بنجاح!");
       navigate("/");
     },
     onError: (err) => {
-      toast.error(err.message || "حدث خطأ أثناء تسجيل الدخول");
+      toast.error(rateLimit.blockFromError(err) || err.message || "Erreur pendant la connexion");
     },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (rateLimit.blockedSeconds > 0) return;
+
     loginMutation.mutate({
       email: formData.email.trim().toLowerCase(),
       password: formData.password,
@@ -71,8 +76,8 @@ export default function SignIn() {
               <div className="relative">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="password">كلمة المرور *</Label>
-                  <Link to="/forgot-password" className="text-sm font-medium text-[#4A9B8E] hover:text-[#3D7A6F]">
-                    Mot de passe oublie ?
+                  <Link to="/forgot-password" dir="ltr" className="text-sm font-medium text-[#4A9B8E] hover:text-[#3D7A6F]">
+                    Mot de passe oublié ?
                   </Link>
                 </div>
                 <Input
@@ -93,12 +98,20 @@ export default function SignIn() {
                 </button>
               </div>
 
+              {rateLimit.blockedSeconds > 0 ? (
+                <div dir="ltr" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-center text-sm font-medium text-amber-800">
+                  Trop de tentatives. Réessayez dans {formatBlockedSeconds(rateLimit.blockedSeconds)}.
+                </div>
+              ) : null}
+
               <Button
                 type="submit"
                 className="h-11 w-full bg-[#4A9B8E] text-white hover:bg-[#3D7A6F]"
-                disabled={loginMutation.isPending}
+                disabled={loginMutation.isPending || rateLimit.blockedSeconds > 0}
               >
-                {loginMutation.isPending ? (
+                {rateLimit.blockedSeconds > 0 ? (
+                  `Réessayer dans ${formatBlockedSeconds(rateLimit.blockedSeconds)}`
+                ) : loginMutation.isPending ? (
                   "جاري تسجيل الدخول..."
                 ) : (
                   <>

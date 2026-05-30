@@ -8,6 +8,7 @@ import { createRouter, publicQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { adminUsers } from "@db/schema";
 import { sendPasswordResetEmail } from "./lib/email";
+import { getClientIp, rateLimitOrThrow, securityLog } from "./lib/abuse-protection";
 
 const ADMIN_COOKIE_NAME = "admin_token";
 const ADMIN_TOKEN_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
@@ -47,12 +48,44 @@ function hashPasswordResetToken(token: string) {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
+function enforceAuthRateLimit(options: {
+  action: "admin_password_reset" | "admin_login";
+  req: Request;
+  email: string;
+  limit: number;
+  windowMs: number;
+  message: string;
+}) {
+  const ip = getClientIp(options.req);
+  const email = options.email.trim().toLowerCase();
+  rateLimitOrThrow({
+    key: `${options.action}:ip:${ip}`,
+    limit: options.limit,
+    windowMs: options.windowMs,
+    message: options.message,
+  });
+  rateLimitOrThrow({
+    key: `${options.action}:email:${email}`,
+    limit: options.limit,
+    windowMs: options.windowMs,
+    message: options.message,
+  });
+  return { ip, email };
+}
+
 export const adminAuthRouter = createRouter({
   requestPasswordReset: publicQuery
     .input(z.object({ email: z.string().email() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const db = getDb();
-      const normalizedEmail = input.email.trim().toLowerCase();
+      const { ip, email: normalizedEmail } = enforceAuthRateLimit({
+        action: "admin_password_reset",
+        req: ctx.req,
+        email: input.email,
+        limit: 5,
+        windowMs: 7 * 60 * 1000,
+        message: "Trop de demandes de réinitialisation.",
+      });
       const [admin] = await db
         .select({
           id: adminUsers.id,
@@ -65,7 +98,11 @@ export const adminAuthRouter = createRouter({
         .limit(1);
 
       if (!admin || !admin.isActive) {
-        return { success: true, emailSent: false };
+        await securityLog("admin_password_reset_unknown_email", {
+          ip,
+          email: normalizedEmail,
+        });
+        return { success: true, accountExists: false, emailSent: false };
       }
 
       const reset = createPasswordResetToken();
@@ -80,7 +117,7 @@ export const adminAuthRouter = createRouter({
       const resetUrl = `${process.env.APP_URL || "http://localhost:3000"}/admin/reset-password?token=${reset.token}`;
       const emailResult = await sendPasswordResetEmail(admin.email, admin.name, resetUrl);
 
-      return { success: true, emailSent: emailResult.success };
+      return { success: true, accountExists: true, emailSent: emailResult.success };
     }),
 
   resetPassword: publicQuery
@@ -137,18 +174,35 @@ export const adminAuthRouter = createRouter({
     )
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
+      const { ip, email: normalizedEmail } = enforceAuthRateLimit({
+        action: "admin_login",
+        req: ctx.req,
+        email: input.email,
+        limit: 5,
+        windowMs: 5 * 60 * 1000,
+        message: "Trop de tentatives de connexion.",
+      });
       const [admin] = await db
         .select()
         .from(adminUsers)
-        .where(eq(adminUsers.email, input.email.toLowerCase()))
+        .where(eq(adminUsers.email, normalizedEmail))
         .limit(1);
 
       if (!admin || !admin.isActive) {
+        await securityLog("admin_login_unknown_email", {
+          ip,
+          email: normalizedEmail,
+        });
         throw new Error("Email ou mot de passe incorrect");
       }
 
       const ok = await bcrypt.compare(input.password, admin.passwordHash);
       if (!ok) {
+        await securityLog("admin_login_bad_password", {
+          ip,
+          email: normalizedEmail,
+          adminId: admin.id,
+        });
         throw new Error("Email ou mot de passe incorrect");
       }
 

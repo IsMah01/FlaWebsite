@@ -69,11 +69,14 @@ export function rateLimitOrThrow(options: {
   existing.count += 1;
 
   if (existing.count > options.limit) {
+    const retryAfterSeconds = Math.max(1, Math.ceil((existing.resetAt - now) / 1000));
+    const message =
+      options.message ||
+      "Trop de tentatives. Veuillez patienter avant de réessayer.";
+
     throw new TRPCError({
       code: "TOO_MANY_REQUESTS",
-      message:
-        options.message ||
-        "تم إرسال عدد كبير من الطلبات. يرجى الانتظار قليلا ثم إعادة المحاولة.",
+      message: `${message} Réessayez dans ${retryAfterSeconds} secondes. [retry_after=${retryAfterSeconds}]`,
     });
   }
 }

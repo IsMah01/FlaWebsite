@@ -6,22 +6,27 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Home, ShieldCheck } from "lucide-react";
+import { formatBlockedSeconds, useRateLimitBlock } from "@/hooks/useRateLimitBlock";
 
 export default function AdminLogin() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const rateLimit = useRateLimitBlock();
 
   const login = trpc.adminAuth.login.useMutation({
     onSuccess: () => {
+      rateLimit.clearBlock();
       toast.success("تسجيل دخول الإدارة ناجح!");
       navigate("/admin");
     },
-    onError: (err) => toast.error(err.message || "البريد الإلكتروني أو كلمة المرور غير صحيحة."),
+    onError: (err) => toast.error(rateLimit.blockFromError(err) || err.message || "Email ou mot de passe incorrect."),
   });
 
   function submit(event: FormEvent) {
     event.preventDefault();
+    if (rateLimit.blockedSeconds > 0) return;
+
     login.mutate({ email, password });
   }
 
@@ -54,8 +59,8 @@ export default function AdminLogin() {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <label className="text-sm font-medium">كلمة المرور</label>
-            <Link to="/admin/forgot-password" className="text-sm font-medium text-[#4A9B8E] hover:text-[#3D7A6F]">
-              Mot de passe oublie ?
+            <Link to="/admin/forgot-password" dir="ltr" className="text-sm font-medium text-[#4A9B8E] hover:text-[#3D7A6F]">
+              Mot de passe oublié ?
             </Link>
           </div>
           <Input
@@ -67,8 +72,18 @@ export default function AdminLogin() {
           />
         </div>
 
-        <Button type="submit" className="w-full" disabled={login.isPending}>
-          {login.isPending ? "جاري الاتصال..." : "تسجيل الدخول"}
+        {rateLimit.blockedSeconds > 0 ? (
+          <div dir="ltr" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-center text-sm font-medium text-amber-800">
+            Trop de tentatives. Réessayez dans {formatBlockedSeconds(rateLimit.blockedSeconds)}.
+          </div>
+        ) : null}
+
+        <Button type="submit" className="w-full" disabled={login.isPending || rateLimit.blockedSeconds > 0}>
+          {rateLimit.blockedSeconds > 0
+            ? `Réessayer dans ${formatBlockedSeconds(rateLimit.blockedSeconds)}`
+            : login.isPending
+              ? "جاري الاتصال..."
+              : "تسجيل الدخول"}
         </Button>
 
         <Link to="/" className="block">

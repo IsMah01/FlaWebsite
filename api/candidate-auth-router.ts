@@ -9,6 +9,7 @@ import { getDb } from "./queries/connection";
 import { candidates, newUsers } from "@db/schema";
 import { sendConfirmationEmail, sendPasswordResetEmail } from "./lib/email";
 import { upsertUser } from "./queries/users";
+import { getClientIp, rateLimitOrThrow, securityLog } from "./lib/abuse-protection";
 
 const JWT_SECRET = process.env.APP_SECRET;
 
@@ -38,6 +39,31 @@ function createPasswordResetToken() {
 
 function hashPasswordResetToken(token: string) {
   return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+function enforceAuthRateLimit(options: {
+  action: "password_reset" | "candidate_login";
+  req: Request;
+  email: string;
+  limit: number;
+  windowMs: number;
+  message: string;
+}) {
+  const ip = getClientIp(options.req);
+  const email = options.email.trim().toLowerCase();
+  rateLimitOrThrow({
+    key: `${options.action}:ip:${ip}`,
+    limit: options.limit,
+    windowMs: options.windowMs,
+    message: options.message,
+  });
+  rateLimitOrThrow({
+    key: `${options.action}:email:${email}`,
+    limit: options.limit,
+    windowMs: options.windowMs,
+    message: options.message,
+  });
+  return { ip, email };
 }
 
 function requireCandidateSession(cookieHeader: string) {
@@ -225,9 +251,16 @@ export const candidateAuthRouter = createRouter({
 
   requestPasswordReset: publicQuery
     .input(z.object({ email: z.string().email() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const db = getDb();
-      const normalizedEmail = input.email.trim().toLowerCase();
+      const { ip, email: normalizedEmail } = enforceAuthRateLimit({
+        action: "password_reset",
+        req: ctx.req,
+        email: input.email,
+        limit: 5,
+        windowMs: 7 * 60 * 1000,
+        message: "Trop de demandes de réinitialisation.",
+      });
       const [account] = await db
         .select({
           id: newUsers.id,
@@ -239,7 +272,11 @@ export const candidateAuthRouter = createRouter({
         .limit(1);
 
       if (!account) {
-        return { success: true, emailSent: false };
+        await securityLog("password_reset_unknown_email", {
+          ip,
+          email: normalizedEmail,
+        });
+        return { success: true, accountExists: false, emailSent: false };
       }
 
       const reset = createPasswordResetToken();
@@ -262,7 +299,7 @@ export const candidateAuthRouter = createRouter({
       const resetUrl = `${process.env.APP_URL || "http://localhost:3000"}/reset-password?token=${reset.token}`;
       const emailResult = await sendPasswordResetEmail(account.email, account.firstName, resetUrl);
 
-      return { success: true, emailSent: emailResult.success };
+      return { success: true, accountExists: true, emailSent: emailResult.success };
     }),
 
   resetPassword: publicQuery
@@ -328,7 +365,14 @@ export const candidateAuthRouter = createRouter({
     )
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
-      const normalizedEmail = input.email.trim().toLowerCase();
+      const { ip, email: normalizedEmail } = enforceAuthRateLimit({
+        action: "candidate_login",
+        req: ctx.req,
+        email: input.email,
+        limit: 5,
+        windowMs: 5 * 60 * 1000,
+        message: "Trop de tentatives de connexion.",
+      });
       const [account] = await db
         .select(newUserBaseSelection)
         .from(newUsers)
@@ -336,6 +380,10 @@ export const candidateAuthRouter = createRouter({
         .limit(1);
 
       if (!account) {
+        await securityLog("candidate_login_unknown_email", {
+          ip,
+          email: normalizedEmail,
+        });
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "البريد الإلكتروني أو كلمة المرور غير صحيحة",
@@ -350,6 +398,11 @@ export const candidateAuthRouter = createRouter({
 
       const valid = await bcrypt.compare(input.password, account.password);
       if (!valid) {
+        await securityLog("candidate_login_bad_password", {
+          ip,
+          email: normalizedEmail,
+          accountId: account.id,
+        });
         throw new TRPCError({
           code: "UNAUTHORIZED",
           message: "البريد الإلكتروني أو كلمة المرور غير صحيحة",
