@@ -4,10 +4,8 @@ import {
   ArrowRight,
   Calendar,
   MapPin,
-  Users,
   Video,
   Image as ImageIcon,
-  Mic2,
   Clock,
   Star,
   Sparkles,
@@ -61,8 +59,6 @@ export default function EditionDetail() {
     );
   }
 
-  const speakersList = edition.speakers ? edition.speakers.split(",").filter(Boolean) : [];
-  const conferencesList = edition.conferences ? edition.conferences.split(",").filter(Boolean) : [];
   const activitiesList = edition.activities ? edition.activities.split(",").filter(Boolean) : [];
   const guestsList = edition.guests ? edition.guests.split(",").filter(Boolean) : [];
   const linksList = edition.links ?? [];
@@ -132,62 +128,6 @@ export default function EditionDetail() {
                   {edition.description || "لم تتم إضافة وصف لهذه الدورة بعد."}
                 </p>
               </motion.div>
-
-              {/* Conferences */}
-              {conferencesList.length > 0 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: 0.1 }}
-                  className="bg-white rounded-2xl p-6 md:p-8 border border-gray-100 shadow-sm"
-                >
-                  <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-5 flex items-center gap-2">
-                    <Mic2 className="w-6 h-6 text-[#4A9B8E]" />
-                    المحاضرات والندوات
-                  </h2>
-                  <div className="grid sm:grid-cols-2 gap-3">
-                    {conferencesList.map((conf, i) => (
-                      <div
-                        key={i}
-                        className="flex items-start gap-3 p-4 bg-[#F8FAF9] rounded-xl border border-[#4A9B8E]/10"
-                      >
-                        <span className="w-8 h-8 bg-[#4A9B8E] text-white rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">
-                          {i + 1}
-                        </span>
-                        <span className="text-gray-700 font-medium pt-0.5">{conf.trim()}</span>
-                      </div>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-
-              {/* Speakers */}
-              {speakersList.length > 0 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: 0.15 }}
-                  className="bg-white rounded-2xl p-6 md:p-8 border border-gray-100 shadow-sm"
-                >
-                  <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-5 flex items-center gap-2">
-                    <Users className="w-6 h-6 text-[#4A9B8E]" />
-                    المؤطرون والمحاضرون
-                  </h2>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {speakersList.map((speaker, i) => (
-                      <div
-                        key={i}
-                        className="p-4 bg-gradient-to-br from-[#4A9B8E]/5 to-[#6BC4B2]/5 rounded-xl text-center border border-[#4A9B8E]/10"
-                      >
-                        <div className="w-12 h-12 bg-[#4A9B8E]/10 rounded-full flex items-center justify-center mx-auto mb-2">
-                          <Users className="w-5 h-5 text-[#4A9B8E]" />
-                        </div>
-                        <span className="text-sm font-semibold text-gray-800">{speaker.trim()}</span>
-                      </div>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
 
               {/* Guests */}
               {guestsList.length > 0 && (
@@ -325,13 +265,6 @@ export default function EditionDetail() {
                     <div>
                       <span className="block text-white/70 text-xs">المكان</span>
                       <span className="font-semibold">{edition.location || "المغرب"}</span>
-                    </div>
-                  </li>
-                  <li className="flex items-center gap-3">
-                    <Users className="w-5 h-5 opacity-80" />
-                    <div>
-                      <span className="block text-white/70 text-xs">المؤطرون</span>
-                      <span className="font-semibold">{speakersList.length}</span>
                     </div>
                   </li>
                   <li className="flex items-center gap-3">

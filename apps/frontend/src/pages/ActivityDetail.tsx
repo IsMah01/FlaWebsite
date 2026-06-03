@@ -207,6 +207,14 @@ export default function ActivityDetail() {
     hasAmbassadorView &&
     (activity.slug === "trustees-program" || activity.slug === "ambassadors-forum") &&
     !!activity.ambassadorContent;
+  const coverImageBackgroundClass =
+    activity.coverImageBackground === "dark"
+      ? "bg-[#1f5148]"
+      : activity.coverImageBackground === "light"
+        ? "bg-white"
+        : activity.coverImageBackground === "soft"
+          ? "bg-[#EAF7F3]"
+          : "bg-white/10";
 
   return (
     <div className="min-h-screen bg-[#F8FAF9]">
@@ -250,11 +258,17 @@ export default function ActivityDetail() {
               ) : null}
               </div>
               {activity.coverImage ? (
-                <div className="hidden overflow-hidden rounded-3xl border border-white/20 bg-white/10 shadow-2xl lg:block">
+                <div
+                  className={`hidden overflow-hidden rounded-3xl border border-white/20 shadow-2xl lg:block ${coverImageBackgroundClass}`}
+                >
                   <img
                     src={activity.coverImage}
                     alt={activity.title}
-                    className="h-72 w-full object-cover"
+                    className={
+                      activity.coverImageFit === "contain"
+                        ? "h-72 w-full object-contain p-5"
+                        : "h-72 w-full object-cover"
+                    }
                   />
                 </div>
               ) : null}
@@ -274,15 +288,20 @@ export default function ActivityDetail() {
             <p className="text-gray-600 leading-8">{activity.intro}</p>
 
             {activity.highlights && activity.highlights.length > 0 && (
-              <div className="mt-8 grid sm:grid-cols-2 gap-4">
-                {activity.highlights.map((item) => (
-                  <div
-                    key={item}
-                    className="rounded-2xl border border-[#4A9B8E]/10 bg-[#F6FBF9] p-4 text-gray-700 leading-7"
-                  >
-                    {item}
-                  </div>
-                ))}
+              <div className="mt-8">
+                {activity.highlightsTitle ? (
+                  <h3 className="mb-4 text-lg font-bold text-gray-900">{activity.highlightsTitle}</h3>
+                ) : null}
+                <div className="grid sm:grid-cols-2 gap-4">
+                  {activity.highlights.map((item) => (
+                    <div
+                      key={item}
+                      className="rounded-2xl border border-[#4A9B8E]/10 bg-[#F6FBF9] p-4 text-gray-700 leading-7"
+                    >
+                      {item}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </motion.div>

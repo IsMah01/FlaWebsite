@@ -14,7 +14,7 @@ type EditionsGridProps = {
 export default function EditionsGrid({
   title = "الدورات السابقة للأكاديمية",
   badge = "الدورات السابقة",
-  description = "استعرض الدورات السابقة لأكاديمية أطر الغد منذ البداية، واكتشف المحاضرات والمؤطرين والصور.",
+  description = "استعرض الدورات السابقة لأكاديمية أطر الغد منذ البداية، واكتشف أبرز المحطات والأنشطة والصور.",
   className = "",
 }: EditionsGridProps) {
   const navigate = useNavigate();

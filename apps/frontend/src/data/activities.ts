@@ -45,10 +45,13 @@ export type ActivityData = {
   color: string;
   intro: string;
   coverImage?: string;
+  coverImageBackground?: "light" | "dark" | "soft";
+  coverImageFit?: "cover" | "contain";
   gallery?: string[];
   videos?: string[];
   videoUrl?: string;
   board?: ActivityBoardMember[];
+  highlightsTitle?: string;
   highlights?: string[];
   feedback?: ActivityFeedback[];
   ambassadorContent?: AmbassadorActivityContent;
@@ -72,8 +75,9 @@ export const activities: ActivityData[] = [
     color: "#4A9B8E",
     intro:
       "تضم الأكاديمية ندوات فكرية وثقافية، ومحاضرات ولقاءات تكوينية، ومسابقات مهارية وإبداعية، وبرامج للتطوير الذاتي وصناعة القيادات الشابة. الأكاديمية ليست مجرد برنامج تكويني، بل تجربة متكاملة تُعاش بكل تفاصيلها؛ عشرة أيام من التعلّم، والإبداع، والعمل الجماعي، وابتكار مشاريع تحمل أثراً حقيقياً ومستداماً.",
-    coverImage: mediaPath("future-leaders-academy", "01.jpg"),
-    gallery: mediaImages("future-leaders-academy", 30),
+    coverImage: mediaPath("future-leaders-academy", "logo-visible.png"),
+    coverImageBackground: "soft",
+    coverImageFit: "contain",
     videoUrl: "https://www.youtube.com/embed/ScMzIvxBSi4",
     board: [
       { role: "مديرة الدورة", image: mediaPath("future-leaders-academy", "02.jpg") },
@@ -133,9 +137,12 @@ export const activities: ActivityData[] = [
     color: "#5FB3A3",
     intro:
       "ويشكل الملتقى محطة نوعية لصناعة شبكة شبابية واعية ومؤثرة، تؤمن بقيمة التعاون، وتسعى إلى تحويل الأفكار إلى مبادرات ومشاريع ذات أثر مجتمعي ملموس.",
-    coverImage: mediaPath("ambassadors-forum", "01.jpg"),
+    coverImage: mediaPath("ambassadors-forum", "logo.png"),
+    coverImageBackground: "dark",
+    coverImageFit: "contain",
     gallery: mediaImages("ambassadors-forum", 22),
     videos: [mediaPath("ambassadors-forum", "23.mp4")],
+    highlightsTitle: "أبرز اللحظات",
     highlights: [
       "جلسات تقييم وتخطيط بين السفراء.",
       "ورشات لصناعة المبادرات المشتركة.",
@@ -176,7 +183,6 @@ export const activities: ActivityData[] = [
     intro:
       "برنامج قيادي وتأهيلي مستمر موجه لخريجي أكاديمية أطر الغد، يمتد على مدار السنة، ويهدف إلى إعداد قيادات تجمع بين العمق الفكري، والنضج التربوي، والكفاءة العملية.",
     coverImage: mediaPath("trustees-program", "01.jpg"),
-    gallery: mediaImages("trustees-program", 6),
     highlights: [
       "مواكبة سنوية للسفراء والخريجين.",
       "مسارات تطوير شخصية ومهنية متقدمة.",
@@ -217,7 +223,6 @@ export const activities: ActivityData[] = [
     intro:
       "مبادرة إنسانية وتنموية جابت عدداً من الدواوير والمناطق القروية، بهدف ترسيخ قيم التضامن والتكافل الاجتماعي، ومد جسور الدعم والتواصل مع الفئات المحتاجة.",
     coverImage: mediaPath("dignity-caravan", "01.jpg"),
-    gallery: mediaImages("dignity-caravan", 10),
     videos: [mediaPath("dignity-caravan", "11.mp4"), mediaPath("dignity-caravan", "12.mp4")],
     highlights: [
       "تدخلات ميدانية بالمناطق القروية.",

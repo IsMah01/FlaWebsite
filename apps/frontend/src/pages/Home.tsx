@@ -1,6 +1,7 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import HeroSection from "@/sections/HeroSection";
+import HomeGallerySection from "@/sections/HomeGallerySection";
 import AboutSection from "@/sections/AboutSection";
 import GoalsSection from "@/sections/GoalsSection";
 import ActivitiesSection from "@/sections/ActivitiesSection";
@@ -21,6 +22,7 @@ export default function Home() {
       <Navbar />
       <main>
         <HeroSection />
+        {!hasAmbassadorView ? <HomeGallerySection /> : null}
         {hasAmbassadorView && viewer ? <AmbassadorDiscussionZone author={viewer.name} /> : null}
         {!hasAmbassadorView ? <AboutSection /> : null}
         {!hasAmbassadorView ? <GoalsSection /> : null}

@@ -34,12 +34,26 @@ export default function ActivitiesSection() {
                 className="group flex flex-col overflow-hidden rounded-2xl border border-gray-100 bg-[#F8FAF9] transition-colors hover:border-[#4A9B8E]/20 hover:bg-[#F3F8F6] md:flex-row"
               >
                 {activity.coverImage ? (
-                  <div className="h-56 shrink-0 overflow-hidden bg-gray-100 md:h-auto md:w-72">
+                  <div
+                    className={`h-56 shrink-0 overflow-hidden md:h-auto md:w-72 ${
+                      activity.coverImageBackground === "dark"
+                        ? "bg-[#1f5148]"
+                        : activity.coverImageBackground === "light"
+                          ? "bg-white"
+                          : activity.coverImageBackground === "soft"
+                            ? "bg-[#EAF7F3]"
+                            : "bg-gray-100"
+                    }`}
+                  >
                     <img
                       src={activity.coverImage}
                       alt={activity.title}
                       loading="lazy"
-                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      className={
+                        activity.coverImageFit === "contain"
+                          ? "h-full w-full object-contain p-5 transition-transform duration-300 group-hover:scale-105"
+                          : "h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      }
                     />
                   </div>
                 ) : null}
