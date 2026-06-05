@@ -19,6 +19,15 @@ import { ensureDatabaseSchema } from "./lib/migrate";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
+const securityHeaders = {
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
+  "Content-Security-Policy":
+    "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; form-action 'self'",
+};
+
 function readCookie(cookieHeader: string | null | undefined, name: string) {
   if (!cookieHeader) return null;
   const cookies = cookieHeader.split(";").map((cookie) => cookie.trim());
@@ -49,6 +58,15 @@ async function isInternalAdminRequest(req: Request) {
 }
 
 app.use(bodyLimit({ maxSize: 15 * 1024 * 1024 }));
+app.use("*", async (c, next) => {
+  await next();
+  for (const [name, value] of Object.entries(securityHeaders)) {
+    c.header(name, value);
+  }
+  if (c.req.path.startsWith("/api/")) {
+    c.header("Cache-Control", "no-store");
+  }
+});
 app.get(Paths.oauthCallback, createOAuthCallbackHandler());
 
 app.get("/api/private-files/:fileName", async (c) => {

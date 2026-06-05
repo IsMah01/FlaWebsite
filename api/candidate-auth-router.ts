@@ -28,6 +28,14 @@ function secureCookieSuffix() {
   return process.env.APP_URL?.startsWith("https://") ? "; Secure" : "";
 }
 
+function buildCandidateCookie(token: string) {
+  return `candidate_token=${token}; HttpOnly; Path=/; Max-Age=604800; SameSite=Lax${secureCookieSuffix()}`;
+}
+
+function clearCandidateCookie() {
+  return `candidate_token=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax${secureCookieSuffix()}`;
+}
+
 function createPasswordResetToken() {
   const token = crypto.randomBytes(32).toString("hex");
   return {
@@ -417,12 +425,7 @@ export const candidateAuthRouter = createRouter({
       }
 
       const token = jwt.sign({ newUserId: account.id, email: account.email }, JWT_SECRET, { expiresIn: "7d" });
-      const secure = secureCookieSuffix();
-
-      ctx.resHeaders.append(
-        "set-cookie",
-        `candidate_token=${token}; HttpOnly; Path=/; Max-Age=604800; SameSite=Lax${secure}`,
-      );
+      ctx.resHeaders.append("set-cookie", buildCandidateCookie(token));
 
       await db.update(newUsers).set({ lastLoginAt: new Date() }).where(eq(newUsers.id, account.id));
 
@@ -613,7 +616,7 @@ export const candidateAuthRouter = createRouter({
     }),
 
   logout: publicQuery.mutation(async ({ ctx }) => {
-    ctx.resHeaders.append("set-cookie", "candidate_token=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax");
+    ctx.resHeaders.append("set-cookie", clearCandidateCookie());
     return { success: true };
   }),
 });

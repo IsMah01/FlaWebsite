@@ -14,7 +14,15 @@ import { z } from "zod";
 const app = new Hono();
 const databaseUrl = process.env.DATABASE_URL || "";
 const uploadDir = path.resolve(process.cwd(), "storage", "private", "uploads");
-const jwtSecret = process.env.JWT_SECRET || process.env.APP_SECRET || "dev-secret";
+const jwtSecret = process.env.JWT_SECRET || process.env.APP_SECRET;
+
+if (!jwtSecret) {
+  throw new Error("JWT_SECRET or APP_SECRET is required");
+}
+
+if (process.env.NODE_ENV === "production" && (jwtSecret.length < 32 || jwtSecret.startsWith("change_me"))) {
+  throw new Error("JWT_SECRET or APP_SECRET must be a strong production secret of at least 32 characters");
+}
 
 type SessionUser = {
   id: number;

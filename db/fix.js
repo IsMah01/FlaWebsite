@@ -2,8 +2,12 @@ import { drizzle } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
 
 async function fix() {
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL is required");
+  }
+
   const conn = await mysql.createConnection({
-    uri: "mysql://3VCunU74WBNqxvn.root:sIfblZd6iJoR7K6yPfsBUlQhbH5Qq2Nx@ep-t4ni387b5e83b7519dc8.epsrv-t4n281l4mrmemi4zls9a.ap-southeast-1.privatelink.aliyuncs.com:4000/19dd0f14-99c2-83ec-8000-098342856cc7",
+    uri: process.env.DATABASE_URL,
     connectTimeout: 30000,
   });
   

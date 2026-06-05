@@ -8,9 +8,20 @@ function required(name: string): string {
   return value ?? "";
 }
 
+function requiredSecret(name: string): string {
+  const value = required(name);
+  if (
+    process.env.NODE_ENV === "production" &&
+    (value.length < 32 || value.startsWith("change_me") || value === "dev-secret")
+  ) {
+    throw new Error(`${name} must be a strong production secret of at least 32 characters`);
+  }
+  return value;
+}
+
 export const env = {
   appId: required("APP_ID"),
-  appSecret: required("APP_SECRET"),
+  appSecret: requiredSecret("APP_SECRET"),
   isProduction: process.env.NODE_ENV === "production",
   databaseUrl: required("DATABASE_URL"),
   kimiAuthUrl: required("KIMI_AUTH_URL"),
