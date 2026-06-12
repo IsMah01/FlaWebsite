@@ -17,6 +17,7 @@ export default function SignIn() {
   const [formData, setFormData] = useState({ email: "", password: "" });
   const rateLimit = useRateLimitBlock();
 
+  const candidateLogout = trpc.candidateAuth.logout.useMutation();
   const loginMutation = trpc.candidateAuth.login.useMutation({
     onSuccess: async () => {
       rateLimit.clearBlock();
@@ -34,10 +35,23 @@ export default function SignIn() {
     e.preventDefault();
     if (rateLimit.blockedSeconds > 0) return;
 
-    loginMutation.mutate({
-      email: formData.email.trim().toLowerCase(),
-      password: formData.password,
-    });
+    void (async () => {
+      try {
+        await candidateLogout.mutateAsync();
+      } catch {
+        // Continue with candidate login even if there was no previous session.
+      }
+
+      utils.candidateAuth.me.setData(undefined, undefined);
+      try {
+        await loginMutation.mutateAsync({
+          email: formData.email.trim().toLowerCase(),
+          password: formData.password,
+        });
+      } catch {
+        // Error toast is handled by the mutation onError callback.
+      }
+    })();
   };
 
   return (
@@ -107,11 +121,11 @@ export default function SignIn() {
               <Button
                 type="submit"
                 className="h-11 w-full bg-[#4A9B8E] text-white hover:bg-[#3D7A6F]"
-                disabled={loginMutation.isPending || rateLimit.blockedSeconds > 0}
+                disabled={loginMutation.isPending || candidateLogout.isPending || rateLimit.blockedSeconds > 0}
               >
                 {rateLimit.blockedSeconds > 0 ? (
                   `Réessayer dans ${formatBlockedSeconds(rateLimit.blockedSeconds)}`
-                ) : loginMutation.isPending ? (
+                ) : loginMutation.isPending || candidateLogout.isPending ? (
                   "جاري تسجيل الدخول..."
                 ) : (
                   <>

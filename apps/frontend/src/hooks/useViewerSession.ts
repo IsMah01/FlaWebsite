@@ -52,6 +52,17 @@ export function useViewerSession() {
   });
 
   const viewer = useMemo<ViewerSession | null>(() => {
+    if (authQuery.data?.role === "admin") {
+      return {
+        kind: "site-user",
+        id: authQuery.data.id,
+        name: authQuery.data.name || authQuery.data.email || authQuery.data.unionId,
+        email: authQuery.data.email,
+        role: authQuery.data.role,
+        isAmbassador: false,
+      };
+    }
+
     if (candidateQuery.data) {
       return {
         kind: "candidate",

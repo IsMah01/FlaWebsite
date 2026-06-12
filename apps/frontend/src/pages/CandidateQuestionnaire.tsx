@@ -240,9 +240,7 @@ export default function CandidateQuestionnaire() {
     0,
   );
   const answeredCount = Object.values(answers).filter((value) => isFieldFilled(value)).length;
-  const completionRate = Math.round(
-    (currentStepIndex / (candidateQuestionnaireSteps.length - 1)) * 100,
-  );
+  const completionRate = totalQuestions > 0 ? Math.round((answeredCount / totalQuestions) * 100) : 0;
 
   const questionOffset = candidateQuestionnaireSteps
     .slice(0, currentStepIndex)
@@ -252,6 +250,7 @@ export default function CandidateQuestionnaire() {
     step,
     index,
     answered: step.fields.filter((field) => isFieldFilled(answers[field.key])).length,
+    total: step.fields.length,
   }));
 
   const goToStep = (stepIndex: number) => {
@@ -280,6 +279,11 @@ export default function CandidateQuestionnaire() {
       savedAt: new Date().toISOString(),
     };
     window.localStorage.setItem(storageKey, JSON.stringify(draft));
+    if (!isFinalStep) {
+      toast.success("تم حفظ الأجوبة. انتقل إلى المراجعة النهائية لتأكيد الإرسال.");
+      goToStep(candidateQuestionnaireSteps.length - 1);
+      return;
+    }
     submitMutation.mutate({ answers });
   };
 
@@ -417,7 +421,7 @@ export default function CandidateQuestionnaire() {
                   </p>
 
                   <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                    {reviewCards.map(({ step, index, answered }) => (
+                    {reviewCards.map(({ step, index, answered, total }) => (
                       <button
                         key={step.id}
                         type="button"
@@ -429,7 +433,7 @@ export default function CandidateQuestionnaire() {
                         </p>
                         <p className="mt-2 font-bold text-gray-900">{step.title}</p>
                         <p className="mt-2 text-sm text-gray-500">
-                          {answered} / {step.fields.length} إجابات
+                          {answered} / {total} إجابات
                         </p>
                       </button>
                     ))}
@@ -486,7 +490,7 @@ export default function CandidateQuestionnaire() {
                 disabled={submitMutation.isPending}
                 className={isFinalStep ? "bg-[#1C8B63] hover:bg-[#176E4F]" : "bg-[#B12577] hover:bg-[#8E1E61]"}
               >
-                {submitMutation.isPending ? "جاري الحفظ..." : isFinalStep ? "تأكيد الإجابات" : "حفظ الأجوبة"}
+                {submitMutation.isPending ? "جاري الحفظ..." : isFinalStep ? "تأكيد الإرسال" : "حفظ ومراجعة الأجوبة"}
                 <Send className="mr-2 h-4 w-4" />
               </Button>
             </div>

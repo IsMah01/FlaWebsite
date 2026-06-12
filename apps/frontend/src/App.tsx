@@ -33,14 +33,7 @@ export default function App() {
       <ScrollManager />
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route
-          path="/signin"
-          element={
-            <CandidateOnlyPublicRoute>
-              <SignIn />
-            </CandidateOnlyPublicRoute>
-          }
-        />
+        <Route path="/signin" element={<SignIn />} />
         <Route
           path="/signup"
           element={

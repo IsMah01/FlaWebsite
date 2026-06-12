@@ -10,13 +10,17 @@ import { formatBlockedSeconds, useRateLimitBlock } from "@/hooks/useRateLimitBlo
 
 export default function AdminLogin() {
   const navigate = useNavigate();
+  const utils = trpc.useUtils();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const rateLimit = useRateLimitBlock();
 
+  const candidateLogout = trpc.candidateAuth.logout.useMutation();
   const login = trpc.adminAuth.login.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
       rateLimit.clearBlock();
+      utils.candidateAuth.me.setData(undefined, undefined);
+      await utils.auth.me.invalidate();
       toast.success("تسجيل دخول الإدارة ناجح!");
       navigate("/admin");
     },
@@ -27,7 +31,20 @@ export default function AdminLogin() {
     event.preventDefault();
     if (rateLimit.blockedSeconds > 0) return;
 
-    login.mutate({ email, password });
+    void (async () => {
+      try {
+        await candidateLogout.mutateAsync();
+      } catch {
+        // Continue with admin login even if there was no candidate session to clear.
+      }
+
+      utils.candidateAuth.me.setData(undefined, undefined);
+      try {
+        await login.mutateAsync({ email, password });
+      } catch {
+        // Error toast is handled by the mutation onError callback.
+      }
+    })();
   }
 
   return (
@@ -78,10 +95,10 @@ export default function AdminLogin() {
           </div>
         ) : null}
 
-        <Button type="submit" className="w-full" disabled={login.isPending || rateLimit.blockedSeconds > 0}>
+        <Button type="submit" className="w-full" disabled={login.isPending || candidateLogout.isPending || rateLimit.blockedSeconds > 0}>
           {rateLimit.blockedSeconds > 0
             ? `Réessayer dans ${formatBlockedSeconds(rateLimit.blockedSeconds)}`
-            : login.isPending
+            : login.isPending || candidateLogout.isPending
               ? "جاري الاتصال..."
               : "تسجيل الدخول"}
         </Button>
