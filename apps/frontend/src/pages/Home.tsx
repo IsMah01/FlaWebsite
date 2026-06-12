@@ -15,14 +15,14 @@ import { useViewerSession } from "@/hooks/useViewerSession";
 export default function Home() {
   const { viewer, hasAmbassadorView, isAmbassador, hasSubmittedQuestionnaire } = useViewerSession();
   const isAdmin = viewer?.kind === "site-user" && viewer.role === "admin";
+  const isInternalHome = hasAmbassadorView || isAdmin;
   const showAcademyReminder = isAdmin || (!hasSubmittedQuestionnaire && !isAmbassador);
 
   return (
     <div className="min-h-screen">
       <Navbar />
       <main>
-        <HeroSection />
-        {!hasAmbassadorView ? <HomeGallerySection /> : null}
+        {isInternalHome ? <HeroSection /> : <HomeGallerySection />}
         {hasAmbassadorView && viewer ? <AmbassadorDiscussionZone author={viewer.name} /> : null}
         {!hasAmbassadorView ? <AboutSection /> : null}
         {!hasAmbassadorView ? <GoalsSection /> : null}
