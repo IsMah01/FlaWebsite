@@ -31,11 +31,11 @@ export default function ActivitiesSection() {
             >
               <Link
                 to={`/activities/${activity.slug}`}
-                className="group flex flex-col overflow-hidden rounded-2xl border border-gray-100 bg-[#F8FAF9] transition-colors hover:border-[#4A9B8E]/20 hover:bg-[#F3F8F6] md:flex-row"
+                className="group flex h-full min-h-[26rem] flex-col overflow-hidden rounded-2xl border border-gray-100 bg-[#F8FAF9] transition-colors hover:border-[#4A9B8E]/20 hover:bg-[#F3F8F6] sm:min-h-[23rem] md:h-72 md:min-h-0 md:flex-row"
               >
                 {activity.coverImage ? (
                   <div
-                    className={`h-56 shrink-0 overflow-hidden md:h-auto md:w-72 ${
+                    className={`h-56 shrink-0 overflow-hidden sm:h-60 md:h-full md:w-72 ${
                       activity.coverImageBackground === "dark"
                         ? "bg-[#1f5148]"
                         : activity.coverImageBackground === "light"
@@ -57,9 +57,9 @@ export default function ActivitiesSection() {
                     />
                   </div>
                 ) : null}
-                <div className="p-6">
+                <div className="flex flex-1 flex-col justify-center p-6">
                   <h3 className="text-xl font-bold text-gray-900 mb-3">{activity.title}</h3>
-                  <p className="text-gray-600 leading-relaxed">{activity.description}</p>
+                  <p className="text-gray-600 leading-relaxed line-clamp-4">{activity.description}</p>
                   <div className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[#4A9B8E]">
                     <span>اكتشف تفاصيل النشاط</span>
                     <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
