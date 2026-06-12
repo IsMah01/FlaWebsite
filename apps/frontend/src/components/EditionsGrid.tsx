@@ -8,6 +8,7 @@ type EditionsGridProps = {
   title?: string;
   badge?: string;
   description?: string;
+  editionNumbers?: number[];
   className?: string;
 };
 
@@ -15,10 +16,16 @@ export default function EditionsGrid({
   title = "الدورات السابقة للأكاديمية",
   badge = "الدورات السابقة",
   description = "استعرض الدورات السابقة لأكاديمية أطر الغد منذ البداية، واكتشف أبرز المحطات والأنشطة والصور.",
+  editionNumbers,
   className = "",
 }: EditionsGridProps) {
   const navigate = useNavigate();
   const { data: editions, isLoading } = trpc.editions.list.useQuery();
+  const visibleEditions = editionNumbers
+    ? editions
+        ?.filter((edition) => editionNumbers.includes(edition.editionNumber))
+        .sort((a, b) => editionNumbers.indexOf(a.editionNumber) - editionNumbers.indexOf(b.editionNumber))
+    : editions;
 
   return (
     <section className={className}>
@@ -38,7 +45,7 @@ export default function EditionsGrid({
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {editions?.map((edition, index) => (
+          {visibleEditions?.map((edition, index) => (
             <motion.button
               key={edition.id}
               initial={{ opacity: 0, y: 20 }}

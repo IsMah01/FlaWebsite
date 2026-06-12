@@ -78,7 +78,7 @@ export const activities: ActivityData[] = [
     coverImage: mediaPath("future-leaders-academy", "logo-visible.png"),
     coverImageBackground: "soft",
     coverImageFit: "contain",
-    videoUrl: "https://www.youtube.com/embed/ScMzIvxBSi4",
+    videoUrl: "https://www.youtube.com/embed/oYjeMZ8Cd7Q",
     board: [
       { role: "مديرة الدورة", image: mediaPath("future-leaders-academy", "02.jpg") },
       { role: "مسؤول التغذية والإيواء", image: mediaPath("future-leaders-academy", "03.jpg") },
@@ -140,7 +140,6 @@ export const activities: ActivityData[] = [
     coverImage: mediaPath("ambassadors-forum", "logo.png"),
     coverImageBackground: "dark",
     coverImageFit: "contain",
-    gallery: mediaImages("ambassadors-forum", 22),
     videos: [mediaPath("ambassadors-forum", "23.mp4")],
     highlightsTitle: "أبرز اللحظات",
     highlights: [
@@ -222,7 +221,7 @@ export const activities: ActivityData[] = [
     color: "#6BC4B2",
     intro:
       "مبادرة إنسانية وتنموية جابت عدداً من الدواوير والمناطق القروية، بهدف ترسيخ قيم التضامن والتكافل الاجتماعي، ومد جسور الدعم والتواصل مع الفئات المحتاجة.",
-    coverImage: mediaPath("dignity-caravan", "01.jpg"),
+    coverImage: mediaPath("dignity-caravan", "cover.jpg"),
     videos: [mediaPath("dignity-caravan", "11.mp4"), mediaPath("dignity-caravan", "12.mp4")],
     highlights: [
       "تدخلات ميدانية بالمناطق القروية.",

@@ -57,21 +57,13 @@ export default function ActivitiesSection() {
                     />
                   </div>
                 ) : null}
-                <div className="flex gap-5 p-6">
-                <div
-                  className="p-4 rounded-xl h-fit w-fit"
-                  style={{ backgroundColor: `${activity.color}15` }}
-                >
-                  <activity.icon className="w-8 h-8" style={{ color: activity.color }} />
-                </div>
-                <div className="flex-1">
+                <div className="p-6">
                   <h3 className="text-xl font-bold text-gray-900 mb-3">{activity.title}</h3>
                   <p className="text-gray-600 leading-relaxed">{activity.description}</p>
                   <div className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[#4A9B8E]">
                     <span>اكتشف تفاصيل النشاط</span>
                     <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
                   </div>
-                </div>
                 </div>
               </Link>
             </motion.div>

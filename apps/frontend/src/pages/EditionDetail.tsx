@@ -5,12 +5,9 @@ import {
   Calendar,
   MapPin,
   Video,
-  Image as ImageIcon,
   Clock,
   Star,
   Sparkles,
-  Activity,
-  ChevronRight,
   ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -155,7 +152,7 @@ export default function EditionDetail() {
                 </motion.div>
               )}
 
-              {/* Activities */}
+              {/* Moment fort */}
               {activitiesList.length > 0 && (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
@@ -164,19 +161,16 @@ export default function EditionDetail() {
                   className="bg-white rounded-2xl p-6 md:p-8 border border-gray-100 shadow-sm"
                 >
                   <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-5 flex items-center gap-2">
-                    <Activity className="w-6 h-6 text-[#4A9B8E]" />
-                    الأنشطة والفعاليات
+                    <Sparkles className="w-6 h-6 text-[#4A9B8E]" />
+                    Moment fort
                   </h2>
-                  <div className="space-y-3">
+                  <div className="grid sm:grid-cols-2 gap-3">
                     {activitiesList.map((activity, i) => (
                       <div
                         key={i}
-                        className="flex items-center gap-3 p-4 bg-[#F8FAF9] rounded-xl border border-gray-100"
+                        className="p-4 bg-[#F8FAF9] rounded-xl border border-[#4A9B8E]/10 text-gray-700 font-medium leading-7"
                       >
-                        <div className="w-10 h-10 bg-[#4A9B8E] rounded-lg flex items-center justify-center flex-shrink-0">
-                          <ChevronRight className="w-5 h-5 text-white" />
-                        </div>
-                        <span className="text-gray-700 font-medium">{activity.trim()}</span>
+                        {activity.trim()}
                       </div>
                     ))}
                   </div>
@@ -267,50 +261,7 @@ export default function EditionDetail() {
                       <span className="font-semibold">{edition.location || "المغرب"}</span>
                     </div>
                   </li>
-                  <li className="flex items-center gap-3">
-                    <Activity className="w-5 h-5 opacity-80" />
-                    <div>
-                      <span className="block text-white/70 text-xs">الأنشطة</span>
-                      <span className="font-semibold">{activitiesList.length}</span>
-                    </div>
-                  </li>
                 </ul>
-              </motion.div>
-
-              {/* Gallery */}
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.5, delay: 0.3 }}
-                className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm"
-              >
-                <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                  <ImageIcon className="w-5 h-5 text-[#4A9B8E]" />
-                  معرض الصور
-                </h3>
-                {edition.images && edition.images.length > 0 ? (
-                  <div className="grid grid-cols-2 gap-2">
-                    {edition.images.map((img, i) => (
-                      <div key={i} className="relative group overflow-hidden rounded-lg">
-                        <img
-                          src={img.imageUrl}
-                          alt={img.caption || `صورة ${i + 1}`}
-                          className="w-full h-28 object-cover transition-transform group-hover:scale-105"
-                        />
-                        {img.caption && (
-                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
-                            <span className="text-white text-xs">{img.caption}</span>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-gray-400 bg-[#F8FAF9] rounded-xl">
-                    <ImageIcon className="w-10 h-10 mx-auto mb-2 opacity-40" />
-                    <p className="text-sm">لم تتم إضافة صور لهذه الدورة بعد</p>
-                  </div>
-                )}
               </motion.div>
 
               {/* Quick Actions */}
