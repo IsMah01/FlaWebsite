@@ -69,7 +69,11 @@ export default function ContactSection() {
                 </div>
                 <div>
                   <h3 className="font-bold text-gray-900 mb-1">البريد الإلكتروني</h3>
-                  <a href={contactLinks.emailHref} className="text-gray-600 text-sm hover:text-[#4A9B8E] transition-colors">
+                  <a
+                    href={contactLinks.emailHref}
+                    dir="ltr"
+                    className="text-gray-600 text-sm hover:text-[#4A9B8E] transition-colors [unicode-bidi:isolate]"
+                  >
                     {contactLinks.email}
                   </a>
                 </div>
@@ -81,7 +85,11 @@ export default function ContactSection() {
                 </div>
                 <div>
                   <h3 className="font-bold text-gray-900 mb-1">رقم الهاتف</h3>
-                  <a href={contactLinks.phoneHref} className="text-gray-600 text-sm hover:text-[#4A9B8E] transition-colors">
+                  <a
+                    href={contactLinks.phoneHref}
+                    dir="ltr"
+                    className="text-gray-600 text-sm hover:text-[#4A9B8E] transition-colors [unicode-bidi:isolate]"
+                  >
                     {contactLinks.phone}
                   </a>
                 </div>
