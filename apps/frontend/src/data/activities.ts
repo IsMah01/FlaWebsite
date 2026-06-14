@@ -183,6 +183,7 @@ export const activities: ActivityData[] = [
     coverImage: mediaPath("trustees-program", "logo.png"),
     coverImageBackground: "light",
     coverImageFit: "contain",
+    videos: [mediaPath("trustees-program", "intro.mp4")],
     highlights: [
       "مواكبة سنوية للسفراء والخريجين.",
       "مسارات تطوير شخصية ومهنية متقدمة.",
