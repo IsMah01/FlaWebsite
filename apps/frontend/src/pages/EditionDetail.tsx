@@ -152,7 +152,7 @@ export default function EditionDetail() {
                 </motion.div>
               )}
 
-              {/* Moment fort */}
+              {/* أبرز اللحظات */}
               {activitiesList.length > 0 && (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
@@ -162,7 +162,7 @@ export default function EditionDetail() {
                 >
                   <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-5 flex items-center gap-2">
                     <Sparkles className="w-6 h-6 text-[#4A9B8E]" />
-                    Moment fort
+                    أبرز اللحظات
                   </h2>
                   <div className="grid sm:grid-cols-2 gap-3">
                     {activitiesList.map((activity, i) => (

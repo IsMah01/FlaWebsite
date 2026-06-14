@@ -22,6 +22,7 @@ export type ActivityFeedback = {
 };
 
 export type ActivityBoardMember = {
+  name?: string;
   role: string;
   image: string;
 };
@@ -80,16 +81,14 @@ export const activities: ActivityData[] = [
     coverImageFit: "contain",
     videoUrl: "https://www.youtube.com/embed/oYjeMZ8Cd7Q",
     board: [
-      { role: "مديرة الدورة", image: mediaPath("future-leaders-academy", "02.jpg") },
-      { role: "مسؤول التغذية والإيواء", image: mediaPath("future-leaders-academy", "03.jpg") },
-      { role: "مسؤول المالية", image: mediaPath("future-leaders-academy", "04.jpg") },
-      { role: "مسؤول التواصل", image: mediaPath("future-leaders-academy", "05.jpg") },
-      { role: "مسؤول البرنامج", image: mediaPath("future-leaders-academy", "06.jpg") },
-      { role: "مسؤول اللوجستيك", image: mediaPath("future-leaders-academy", "07.jpg") },
-      { role: "مسؤول الضيوف والبروتوكول", image: mediaPath("future-leaders-academy", "08.jpg") },
-      { role: "مسؤول الإعلام", image: mediaPath("future-leaders-academy", "09.jpg") },
-      { role: "مسؤول المتابعة والتقييم", image: mediaPath("future-leaders-academy", "10.jpg") },
-      { role: "مسؤول التنسيق مع السفراء", image: mediaPath("future-leaders-academy", "11.jpg") },
+      { name: "ندى وارث", role: "مديرة الدورة", image: mediaPath("future-leaders-academy", "pilotage-02.png") },
+      { name: "الإدريسي محمد", role: "مسؤول الإيواء و التغذية", image: mediaPath("future-leaders-academy", "pilotage-03.jpg") },
+      { name: "البراهمي يوسف", role: "مسؤول المالية", image: mediaPath("future-leaders-academy", "pilotage-04.jpg") },
+      { name: "خديجة زغران", role: "مسؤولة التواصل", image: mediaPath("future-leaders-academy", "pilotage-08.jpeg") },
+      { name: "ستيتلة ياسين", role: "مسؤول البرنامج", image: mediaPath("future-leaders-academy", "pilotage-05.jpg") },
+      { name: "المتوكل خديجة", role: "مسؤولة المتابعة", image: mediaPath("future-leaders-academy", "pilotage-06.jpg") },
+      { name: "حجي صلاح الدين", role: "مسؤول الضيوف و البروتوكول", image: mediaPath("future-leaders-academy", "pilotage-07.jpeg") },
+      { name: "الزاير أكرم", role: "مسؤول الإعلام", image: mediaPath("future-leaders-academy", "pilotage-01.png") },
     ],
     highlights: [
       "ندوات فكرية وثقافية.",
@@ -181,7 +180,9 @@ export const activities: ActivityData[] = [
     color: "#3D7A6F",
     intro:
       "برنامج قيادي وتأهيلي مستمر موجه لخريجي أكاديمية أطر الغد، يمتد على مدار السنة، ويهدف إلى إعداد قيادات تجمع بين العمق الفكري، والنضج التربوي، والكفاءة العملية.",
-    coverImage: mediaPath("trustees-program", "01.jpg"),
+    coverImage: mediaPath("trustees-program", "logo.png"),
+    coverImageBackground: "light",
+    coverImageFit: "contain",
     highlights: [
       "مواكبة سنوية للسفراء والخريجين.",
       "مسارات تطوير شخصية ومهنية متقدمة.",

@@ -69,7 +69,7 @@ function HorizontalScroller({
           </button>
         </div>
       </div>
-      <p className="text-sm text-gray-500 mb-5">{hint}</p>
+      {hint ? <p className="text-sm text-gray-500 mb-5">{hint}</p> : null}
       <div
         ref={trackRef}
         className="flex gap-5 overflow-x-auto scroll-smooth pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
@@ -259,11 +259,17 @@ export default function ActivityDetail() {
 
         {isAcademy && showAcademyReminder ? <CountdownCTA compact /> : null}
 
-        {!isAcademy && activity.highlights && activity.highlights.length > 0 ? (
+        {!isAcademy &&
+        activity.slug !== "ambassadors-forum" &&
+        activity.slug !== "trustees-program" &&
+        activity.slug !== "dignity-caravan" &&
+        activity.slug !== "careers-caravan" &&
+        activity.highlights &&
+        activity.highlights.length > 0 ? (
           <section className="bg-white rounded-3xl border border-gray-100 shadow-sm p-8">
             <div className="flex items-center gap-3 mb-6">
               <Sparkles className="w-6 h-6 text-[#4A9B8E]" />
-              <h2 className="text-2xl font-bold text-gray-900">Moment fort</h2>
+              <h2 className="text-2xl font-bold text-gray-900">أبرز اللحظات</h2>
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
               {activity.highlights.map((item) => (
@@ -311,19 +317,25 @@ export default function ActivityDetail() {
 
         {isAcademy && activity.board ? (
           <HorizontalScroller
-            title="المكتب التنفيذي"
-            hint="يمكنك السحب أفقيا أو استعمال الأسهم لعرض جميع المناصب."
+            title="إدارة الدورة 17"
+            hint=""
             icon={<Users className="w-6 h-6 text-[#4A9B8E]" />}
           >
             {activity.board.map((member, index) => (
               <div
-                key={member.role}
+                key={`${member.name ?? member.role}-${member.role}`}
                 className="min-w-[290px] sm:min-w-[340px] lg:min-w-[360px] overflow-hidden rounded-3xl border border-[#4A9B8E]/10 bg-[linear-gradient(180deg,#ffffff_0%,#f4fbf8_100%)]"
               >
-                <img src={member.image} alt={member.role} className="h-56 w-full object-cover" />
+                <img
+                  src={member.image}
+                  alt={member.name ?? member.role}
+                  className="h-72 w-full bg-[#EEF7F4] object-contain object-center p-2"
+                />
                 <div className="p-5">
-                  <div className="text-xs font-semibold text-[#4A9B8E] mb-2">المنصب {index + 1}</div>
-                  <div className="text-gray-900 font-bold text-lg leading-7">{member.role}</div>
+                  {member.name ? (
+                    <div className="text-gray-900 font-bold text-xl leading-8">{member.name}</div>
+                  ) : null}
+                  <div className="text-gray-600 font-semibold text-base leading-7">{member.role}</div>
                 </div>
               </div>
             ))}

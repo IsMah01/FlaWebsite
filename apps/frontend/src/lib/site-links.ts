@@ -1,8 +1,8 @@
 export const contactLinks = {
-  email: "contact@atralghad.org",
-  emailHref: "mailto:contact@atralghad.org",
-  phone: "+212 5XX-XXXXXX",
-  phoneHref: "tel:+2125XXXXXX",
+  email: "fl.fondation.contact@gmail.com",
+  emailHref: "mailto:fl.fondation.contact@gmail.com",
+  phone: "+212 6 62 77 66 25",
+  phoneHref: "tel:+212662776625",
   locationHref: "https://www.google.com/maps/search/?api=1&query=Morocco",
 };
 
