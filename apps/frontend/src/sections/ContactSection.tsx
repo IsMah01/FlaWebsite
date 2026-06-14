@@ -37,33 +37,33 @@ export default function ContactSection() {
   };
 
   return (
-    <section id="contact" className="py-20 bg-white">
+    <section id="contact" className="py-14 bg-white md:py-20">
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-100px" }}
           transition={{ duration: 0.6 }}
-          className="text-center mb-12"
+          className="text-center mb-8 md:mb-12"
         >
           <span className="inline-block px-4 py-1 bg-[#4A9B8E]/10 text-[#4A9B8E] rounded-full text-sm font-medium mb-4">
             اتصل بنا
           </span>
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900">تواصل معنا</h2>
-          <p className="text-gray-600 mt-3 max-w-xl mx-auto">
+          <h2 className="text-2xl md:text-4xl font-bold text-gray-900">تواصل معنا</h2>
+          <p className="text-sm leading-7 text-gray-600 mt-3 max-w-xl mx-auto md:text-base">
             نحن هنا للإجابة على استفساراتك. لا تتردد في التواصل معنا
           </p>
         </motion.div>
 
-        <div className="grid md:grid-cols-2 gap-10">
+        <div className="grid md:grid-cols-2 gap-8 md:gap-10">
           <motion.div
             initial={{ opacity: 0, x: -30 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 0.6 }}
           >
-            <div className="space-y-6">
-              <div className="flex items-start gap-4 p-4 bg-[#F8FAF9] rounded-xl">
+            <div className="space-y-4 md:space-y-6">
+              <div className="flex items-start gap-3 p-4 bg-[#F8FAF9] rounded-xl md:gap-4">
                 <div className="p-3 bg-[#4A9B8E]/10 rounded-xl">
                   <Mail className="w-5 h-5 text-[#4A9B8E]" />
                 </div>
@@ -79,7 +79,7 @@ export default function ContactSection() {
                 </div>
               </div>
 
-              <div className="flex items-start gap-4 p-4 bg-[#F8FAF9] rounded-xl">
+              <div className="flex items-start gap-3 p-4 bg-[#F8FAF9] rounded-xl md:gap-4">
                 <div className="p-3 bg-[#4A9B8E]/10 rounded-xl">
                   <Phone className="w-5 h-5 text-[#4A9B8E]" />
                 </div>
@@ -95,7 +95,7 @@ export default function ContactSection() {
                 </div>
               </div>
 
-              <div className="flex items-start gap-4 p-4 bg-[#F8FAF9] rounded-xl">
+              <div className="flex items-start gap-3 p-4 bg-[#F8FAF9] rounded-xl md:gap-4">
                 <div className="p-3 bg-[#4A9B8E]/10 rounded-xl">
                   <MapPin className="w-5 h-5 text-[#4A9B8E]" />
                 </div>
@@ -107,7 +107,7 @@ export default function ContactSection() {
 
               <div className="pt-4">
                 <h3 className="font-bold text-gray-900 mb-4">تابعنا على</h3>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <a href={socialLinks.facebook} target="_blank" rel="noreferrer" aria-label="Facebook" className="p-3 bg-[#4A9B8E]/10 rounded-xl hover:bg-[#4A9B8E]/20 transition-colors">
                     <Facebook className="w-5 h-5 text-[#4A9B8E]" />
                   </a>
@@ -132,7 +132,7 @@ export default function ContactSection() {
             transition={{ duration: 0.6 }}
           >
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">الاسم *</label>
                   <Input
@@ -153,7 +153,7 @@ export default function ContactSection() {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">رقم الهاتف</label>
                   <Input

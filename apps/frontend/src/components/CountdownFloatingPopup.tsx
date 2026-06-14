@@ -42,9 +42,9 @@ export default function CountdownFloatingPopup() {
             animate={{ opacity: 1, x: 0, scale: 1 }}
             exit={{ opacity: 0, x: 24, scale: 0.96 }}
             transition={{ duration: 0.25 }}
-            className="fixed bottom-5 left-5 right-5 md:left-auto md:right-6 md:w-[390px] z-50"
+            className="fixed bottom-3 left-3 right-3 md:bottom-5 md:left-auto md:right-6 md:w-[390px] z-50"
           >
-            <div className="relative overflow-hidden rounded-[28px] border border-[#4A9B8E]/20 bg-white shadow-2xl">
+            <div className="relative overflow-hidden rounded-2xl border border-[#4A9B8E]/20 bg-white shadow-2xl md:rounded-[28px]">
               <div className="absolute inset-x-0 top-0 h-2 bg-[linear-gradient(90deg,#1f5148_0%,#4A9B8E_55%,#9ad7cb_100%)]" />
               <button
                 onClick={() => setIsOpen(false)}
@@ -53,7 +53,7 @@ export default function CountdownFloatingPopup() {
               >
                 <X className="w-4 h-4" />
               </button>
-              <div className="p-6 pt-8">
+              <div className="p-5 pt-8 md:p-6 md:pt-8">
                 <div className="inline-flex items-center gap-2 rounded-full bg-[#EAF7F3] px-3 py-1 text-xs font-semibold text-[#1f5148]">
                   <Bell className="w-3.5 h-3.5" />
                   {isAmbassadorNotice ? "إعلان داخلي" : "فتح باب التسجيل في الأكاديمية 18"}
@@ -73,7 +73,7 @@ export default function CountdownFloatingPopup() {
                 </p>
                 <div className="mt-4 flex flex-wrap items-end gap-3">
                   <div className="text-sm font-semibold text-gray-600">آخر أجل للتسجيل: 28/05/2026</div>
-                  <div className="text-5xl font-black leading-none text-[#1f5148]">J-{daysLeft}</div>
+                  <div className="text-4xl font-black leading-none text-[#1f5148] md:text-5xl">J-{daysLeft}</div>
                 </div>
                 {!isAmbassadorNotice ? (
                   <p className="mt-4 text-gray-600 leading-7">تبقّى على إغلاق استمارة التسجيل {daysLeft} أيام فقط.</p>

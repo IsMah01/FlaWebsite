@@ -44,11 +44,11 @@ function HorizontalScroller({
   };
 
   return (
-    <section className="bg-white rounded-3xl border border-gray-100 shadow-sm p-8">
-      <div className="flex items-center justify-between gap-4 mb-6">
+    <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6 md:rounded-3xl md:p-8">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-5 md:mb-6">
         <div className="flex items-center gap-3">
           {icon}
-          <h2 className="text-2xl font-bold text-gray-900">{title}</h2>
+          <h2 className="text-xl md:text-2xl font-bold text-gray-900">{title}</h2>
         </div>
         <div className="hidden md:flex items-center gap-2">
           <button
@@ -72,11 +72,11 @@ function HorizontalScroller({
       {hint ? <p className="text-sm text-gray-500 mb-5">{hint}</p> : null}
       <div
         ref={trackRef}
-        className="flex gap-5 overflow-x-auto scroll-smooth pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+        className="flex gap-4 overflow-x-auto scroll-smooth pb-2 md:gap-5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
       >
         {children}
       </div>
-      <div className="mt-5 flex md:hidden justify-center gap-3">
+      <div className="mt-5 flex md:hidden justify-center gap-2">
         <button
           type="button"
           onClick={() => scrollByAmount("prev")}
@@ -141,13 +141,13 @@ export default function ActivityDetail() {
     <div className="min-h-screen bg-[#F8FAF9]">
       <Navbar />
 
-      <section className="pt-20">
+      <section className="pt-16 md:pt-20">
         <div className="relative overflow-hidden bg-[linear-gradient(135deg,#1f5148_0%,#4A9B8E_55%,#9ad7cb_100%)]">
           <div className="absolute inset-0 opacity-30">
             <div className="absolute top-0 left-10 h-72 w-72 rounded-full bg-white blur-3xl" />
             <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-[#1f5148] blur-3xl" />
           </div>
-          <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-16 md:py-20 text-white">
+          <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-14 md:py-20 text-white">
             <button
               onClick={() => navigate("/")}
               className="inline-flex items-center gap-2 text-sm bg-white/10 hover:bg-white/15 px-3 py-2 rounded-lg transition-colors"
@@ -155,7 +155,7 @@ export default function ActivityDetail() {
               <ArrowRight className="w-4 h-4" />
               العودة إلى الرئيسية
             </button>
-            <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_360px] lg:items-end">
+            <div className="mt-6 grid gap-6 md:mt-8 md:gap-8 lg:grid-cols-[1fr_360px] lg:items-end">
               <div className="max-w-3xl">
               <div
                 className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium"
@@ -164,8 +164,8 @@ export default function ActivityDetail() {
                 <activity.icon className="w-4 h-4" />
                 نشاط المؤسسة
               </div>
-              <h1 className="mt-5 text-4xl md:text-6xl font-bold leading-tight">{activity.title}</h1>
-              <p className="mt-5 text-white/85 text-lg leading-8">{activity.description}</p>
+              <h1 className="mt-5 text-3xl sm:text-4xl md:text-6xl font-bold leading-tight">{activity.title}</h1>
+              <p className="mt-4 md:mt-5 text-white/85 text-base md:text-lg leading-8">{activity.description}</p>
               {isAcademy ? (
                 <div className="mt-8 inline-flex items-center gap-4 rounded-2xl bg-white/10 px-5 py-4 backdrop-blur-sm border border-white/15">
                   <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/12">
@@ -198,24 +198,24 @@ export default function ActivityDetail() {
         </div>
       </section>
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-12 space-y-12">
-        <section className="grid lg:grid-cols-[1.3fr_0.7fr] gap-8">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 md:py-12 space-y-8 md:space-y-12">
+        <section className="grid lg:grid-cols-[1.3fr_0.7fr] gap-6 md:gap-8">
           <motion.div
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-3xl border border-gray-100 shadow-sm p-8"
+            className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6 md:rounded-3xl md:p-8"
           >
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">تقديم النشاط</h2>
-            <p className="text-gray-600 leading-8">{activity.intro}</p>
+            <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-4">تقديم النشاط</h2>
+            <p className="text-sm sm:text-base text-gray-600 leading-8">{activity.intro}</p>
           </motion.div>
 
           <motion.aside
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.08 }}
-            className="bg-[#1f5148] rounded-3xl p-8 text-white"
+            className="bg-[#1f5148] rounded-2xl p-5 sm:p-6 md:rounded-3xl md:p-8 text-white"
           >
-            <h3 className="text-xl font-bold mb-6">روابط الأنشطة</h3>
+            <h3 className="text-lg md:text-xl font-bold mb-5 md:mb-6">روابط الأنشطة</h3>
             <div className="space-y-3">
               {activities.map((item) => (
                 <Link
@@ -234,17 +234,17 @@ export default function ActivityDetail() {
         </section>
 
         {showAmbassadorLayer && activity.ambassadorContent ? (
-          <section className="bg-white rounded-3xl border border-[#4A9B8E]/15 shadow-sm p-8">
+          <section className="bg-white rounded-2xl border border-[#4A9B8E]/15 shadow-sm p-5 sm:p-6 md:rounded-3xl md:p-8">
             <div className="flex items-center gap-3 mb-6">
               <Newspaper className="w-6 h-6 text-[#4A9B8E]" />
-              <h2 className="text-2xl font-bold text-gray-900">مساحة خاصة بالسفراء</h2>
+              <h2 className="text-xl md:text-2xl font-bold text-gray-900">مساحة خاصة بالسفراء</h2>
             </div>
             <p className="text-gray-600 leading-8 mb-8">{activity.ambassadorContent.intro}</p>
-            <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5">
+            <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5">
               {activity.ambassadorContent.updates.map((update) => (
                 <article
                   key={`${update.title}-${update.date}`}
-                  className="rounded-3xl border border-[#4A9B8E]/10 bg-[linear-gradient(180deg,#ffffff_0%,#f4fbf8_100%)] p-5"
+                  className="rounded-2xl md:rounded-3xl border border-[#4A9B8E]/10 bg-[linear-gradient(180deg,#ffffff_0%,#f4fbf8_100%)] p-5"
                 >
                   <div className="inline-flex rounded-full bg-[#EAF7F3] px-3 py-1 text-xs font-semibold text-[#1f5148]">
                     {update.date}
@@ -266,10 +266,10 @@ export default function ActivityDetail() {
         activity.slug !== "careers-caravan" &&
         activity.highlights &&
         activity.highlights.length > 0 ? (
-          <section className="bg-white rounded-3xl border border-gray-100 shadow-sm p-8">
+          <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6 md:rounded-3xl md:p-8">
             <div className="flex items-center gap-3 mb-6">
               <Sparkles className="w-6 h-6 text-[#4A9B8E]" />
-              <h2 className="text-2xl font-bold text-gray-900">أبرز اللحظات</h2>
+              <h2 className="text-xl md:text-2xl font-bold text-gray-900">أبرز اللحظات</h2>
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
               {activity.highlights.map((item) => (
@@ -285,7 +285,7 @@ export default function ActivityDetail() {
         ) : null}
 
         {activity.videos && activity.videos.length > 0 ? (
-          <section className="bg-white rounded-3xl border border-gray-100 shadow-sm p-8">
+          <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6 md:rounded-3xl md:p-8">
             <div className="grid gap-5 justify-items-center">
               {activity.videos.map((video, index) => (
                 <video
@@ -293,7 +293,7 @@ export default function ActivityDetail() {
                   src={video}
                   controls
                   preload="metadata"
-                  className="aspect-video w-full max-w-4xl rounded-2xl bg-black object-cover"
+                  className="aspect-video w-full max-w-4xl rounded-xl bg-black object-cover md:rounded-2xl"
                   aria-label={`${activity.title} video ${index + 1}`}
                 />
               ))}
@@ -302,8 +302,8 @@ export default function ActivityDetail() {
         ) : null}
 
         {isAcademy && activity.videoUrl ? (
-          <section className="bg-white rounded-3xl border border-gray-100 shadow-sm p-8">
-            <div className="aspect-video overflow-hidden rounded-2xl bg-gray-100">
+          <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6 md:rounded-3xl md:p-8">
+            <div className="aspect-video overflow-hidden rounded-xl bg-gray-100 md:rounded-2xl">
               <iframe
                 src={activity.videoUrl}
                 title={activity.title}
@@ -321,19 +321,19 @@ export default function ActivityDetail() {
             hint=""
             icon={<Users className="w-6 h-6 text-[#4A9B8E]" />}
           >
-            {activity.board.map((member, index) => (
+            {activity.board.map((member) => (
               <div
                 key={`${member.name ?? member.role}-${member.role}`}
-                className="min-w-[290px] sm:min-w-[340px] lg:min-w-[360px] overflow-hidden rounded-3xl border border-[#4A9B8E]/10 bg-[linear-gradient(180deg,#ffffff_0%,#f4fbf8_100%)]"
+                className="min-w-[260px] sm:min-w-[320px] lg:min-w-[360px] overflow-hidden rounded-2xl md:rounded-3xl border border-[#4A9B8E]/10 bg-[linear-gradient(180deg,#ffffff_0%,#f4fbf8_100%)]"
               >
                 <img
                   src={member.image}
                   alt={member.name ?? member.role}
-                  className="h-72 w-full bg-[#EEF7F4] object-contain object-center p-2"
+                  className="h-64 w-full bg-[#EEF7F4] object-contain object-center p-2 sm:h-72"
                 />
-                <div className="p-5">
+                <div className="p-4 sm:p-5">
                   {member.name ? (
-                    <div className="text-gray-900 font-bold text-xl leading-8">{member.name}</div>
+                    <div className="text-gray-900 font-bold text-lg sm:text-xl leading-8">{member.name}</div>
                   ) : null}
                   <div className="text-gray-600 font-semibold text-base leading-7">{member.role}</div>
                 </div>
@@ -343,10 +343,10 @@ export default function ActivityDetail() {
         ) : null}
 
         {isAcademy ? (
-          <section className="bg-white rounded-3xl border border-gray-100 shadow-sm p-8">
+          <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6 md:rounded-3xl md:p-8">
             <div className="flex items-center gap-3 mb-6">
               <CalendarRange className="w-6 h-6 text-[#4A9B8E]" />
-              <h2 className="text-2xl font-bold text-gray-900">الدورات الست عشرة</h2>
+              <h2 className="text-xl md:text-2xl font-bold text-gray-900">الدورات الست عشرة</h2>
             </div>
             <EditionsGrid
               editionNumbers={[17, 16, 15, 14]}
@@ -366,7 +366,7 @@ export default function ActivityDetail() {
             {activity.feedback.map((item) => (
               <div
                 key={`${item.name}-${item.role}`}
-                className="min-w-[310px] sm:min-w-[420px] lg:min-w-[520px] rounded-3xl border border-gray-100 bg-[#FBFCFC] p-6"
+                className="min-w-[260px] sm:min-w-[380px] lg:min-w-[520px] rounded-2xl md:rounded-3xl border border-gray-100 bg-[#FBFCFC] p-5 sm:p-6"
               >
                 <div className="flex items-center gap-4 mb-4">
                   <img

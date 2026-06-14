@@ -37,34 +37,34 @@ export default function HeroSection() {
   const nextSectionId = isInternalView ? "activities" : "about";
 
   return (
-    <section id="hero" className="relative min-h-screen flex items-center justify-center overflow-hidden gradient-primary">
+    <section id="hero" className="relative flex min-h-[100svh] items-center justify-center overflow-hidden gradient-primary">
       <div className="absolute inset-0 opacity-10">
         <div className="absolute top-20 right-20 w-72 h-72 bg-white rounded-full blur-3xl" />
         <div className="absolute bottom-20 left-20 w-96 h-96 bg-[#6BC4B2] rounded-full blur-3xl" />
       </div>
 
-      <div className="relative z-10 max-w-5xl mx-auto px-4 text-center">
+      <div className="relative z-10 max-w-5xl mx-auto px-4 py-20 text-center sm:py-24">
         <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
-          <img src="/images/logo.png" alt="Fondation" className="h-24 md:h-32 w-auto mx-auto mb-6 drop-shadow-lg" />
+          <img src="/images/logo.png" alt="Fondation" className="h-20 sm:h-24 md:h-32 w-auto mx-auto mb-5 md:mb-6 drop-shadow-lg" />
         </motion.div>
 
         {isInternalView ? (
           <>
-            <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.2 }} className="text-3xl md:text-5xl font-bold text-white mb-5 text-shadow">
+            <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.2 }} className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-4 md:mb-5 text-shadow">
               مرحبًا بك داخل مؤسسة أطر الغد
             </motion.h1>
 
-            <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.35 }} className="text-base md:text-lg text-white/90 mb-4 max-w-4xl mx-auto leading-loose">
+            <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.35 }} className="text-sm sm:text-base md:text-lg text-white/90 mb-4 max-w-4xl mx-auto leading-8 md:leading-loose">
               يسعدنا أن تكون جزءًا من فضاءٍ يؤمن بأن الإنسان هو أساس النهضة، وأن التغيير الحقيقي يبدأ من بناء الوعي، وصناعة الكفاءة، وترسيخ القيم.
             </motion.p>
 
-            <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.5 }} className="text-base md:text-lg text-white/95 mb-8 max-w-3xl mx-auto leading-relaxed font-bold">
+            <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.5 }} className="text-sm sm:text-base md:text-lg text-white/95 mb-7 md:mb-8 max-w-3xl mx-auto leading-relaxed font-bold">
               هنا لا نكتفي بالانتماء، بل نشرع في العمل.
             </motion.p>
           </>
         ) : (
           <>
-            <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.2 }} className="text-3xl md:text-5xl font-bold text-white mb-4 text-shadow">
+            <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.2 }} className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-4 text-shadow">
               مؤسسة أطر الغد
             </motion.h1>
 
@@ -72,7 +72,7 @@ export default function HeroSection() {
               لأن بناء الإنسان هو أول خطوة نحو بناء الوطن ونهضة الأمة
             </motion.p>
 
-            <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.5 }} className="text-base md:text-lg text-white/90 mb-8 max-w-4xl mx-auto leading-loose">
+            <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.5 }} className="text-sm sm:text-base md:text-lg text-white/90 mb-7 md:mb-8 max-w-4xl mx-auto leading-8 md:leading-loose">
               مؤسسة مغربية تُوجّه أنشطتها أساسًا إلى طلبة وخريجي المعاهد العليا، من مهندسين ومسيرين وأطباء، ترمي إلى تأهيل شباب مغربي معتز بهويته، حامل لقيم الصدق والأمانة وحب الوطن، قوي في تخصصه العلمي، وممتلك للمعارف الضرورية، من أجل بناء جيل قادر على تحقيق حلم النهضة، والارتقاء بالوطن إلى أعلى المراتب الحضارية
             </motion.p>
           </>
@@ -102,9 +102,9 @@ export default function HeroSection() {
           </motion.div>
         ) : null}
 
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.2, duration: 0.8 }} className="mt-14 grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.2, duration: 0.8 }} className="mt-9 grid grid-cols-2 md:mt-14 md:grid-cols-4 gap-3 md:gap-4">
           {heroStats.map((stat, i) => (
-            <div key={i} className="rounded-2xl border border-white/20 bg-white/10 px-3 py-4 text-center backdrop-blur-sm">
+            <div key={i} className="rounded-2xl border border-white/20 bg-white/10 px-2.5 py-3 text-center backdrop-blur-sm md:px-3 md:py-4">
               <stat.icon className="w-6 h-6 text-white/75 mx-auto mb-2" />
               <div className="text-2xl md:text-3xl font-bold text-white">{stat.value}</div>
               <div className="text-xs md:text-sm text-white/90 font-semibold">{stat.label}</div>

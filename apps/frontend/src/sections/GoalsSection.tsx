@@ -36,22 +36,22 @@ const goals = [
 
 export default function GoalsSection() {
   return (
-    <section id="goals" className="py-20 bg-[#F8FAF9]">
+    <section id="goals" className="py-14 bg-[#F8FAF9] md:py-20">
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-100px" }}
           transition={{ duration: 0.6 }}
-          className="text-center mb-12"
+          className="text-center mb-8 md:mb-12"
         >
           <span className="inline-block px-4 py-1 bg-[#4A9B8E]/10 text-[#4A9B8E] rounded-full text-sm font-medium mb-4">
             أهدافنا
           </span>
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900">ما نسعى لتحقيقه</h2>
+          <h2 className="text-2xl md:text-4xl font-bold text-gray-900">ما نسعى لتحقيقه</h2>
         </motion.div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           {goals.map((goal, index) => (
             <motion.div
               key={index}
@@ -59,7 +59,7 @@ export default function GoalsSection() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-50px" }}
               transition={{ duration: 0.5, delay: index * 0.1 }}
-              className="bg-white rounded-2xl p-6 border border-gray-100 card-hover"
+              className="bg-white rounded-2xl p-5 md:p-6 border border-gray-100 card-hover"
             >
               <div className="p-3 bg-[#4A9B8E]/10 rounded-xl w-fit mb-4">
                 <goal.icon className="w-6 h-6 text-[#4A9B8E]" />

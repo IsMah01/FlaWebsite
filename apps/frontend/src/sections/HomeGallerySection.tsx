@@ -41,7 +41,7 @@ export default function HomeGallerySection() {
   const activeImage = galleryImages[activeIndex];
 
   return (
-    <section id="hero" className="relative min-h-screen overflow-hidden bg-[#101817]">
+    <section id="hero" className="relative min-h-[100svh] overflow-hidden bg-[#101817]">
       <AnimatePresence initial={false} custom={direction} mode="popLayout">
         <motion.img
           key={activeImage.src}
@@ -58,21 +58,21 @@ export default function HomeGallerySection() {
 
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.34)_0%,rgba(0,0,0,0.18)_46%,rgba(0,0,0,0.46)_100%)]" />
 
-      <div className="relative z-10 flex min-h-screen items-center justify-center px-4 pt-24 pb-20 text-center text-white sm:px-6">
+      <div className="relative z-10 flex min-h-[100svh] items-center justify-center px-4 pt-20 pb-16 text-center text-white sm:px-6 md:pt-24 md:pb-20">
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
           className="mx-auto max-w-4xl"
         >
-          <img src="/images/logo.png" alt="Fondation" className="mx-auto mb-8 h-24 w-auto drop-shadow-xl md:h-32" />
-          <h1 className="mb-4 text-4xl font-bold leading-tight text-white text-shadow md:text-6xl">
+          <img src="/images/logo.png" alt="Fondation" className="mx-auto mb-5 h-20 w-auto drop-shadow-xl sm:h-24 md:mb-8 md:h-32" />
+          <h1 className="mb-3 text-3xl font-bold leading-tight text-white text-shadow sm:text-4xl md:mb-4 md:text-6xl">
             مؤسسة أطر الغد
           </h1>
-          <p className="mx-auto mb-6 max-w-3xl text-base font-bold leading-8 text-white md:text-xl">
+          <p className="mx-auto mb-4 max-w-3xl text-sm font-bold leading-7 text-white sm:text-base md:mb-6 md:text-xl md:leading-8">
             لأن بناء الإنسان هو أول خطوة نحو بناء الوطن ونهضة الأمة
           </p>
-          <p className="mx-auto max-w-4xl text-base leading-9 text-white/95 md:text-xl">
+          <p className="mx-auto max-w-4xl text-sm leading-8 text-white/95 sm:text-base md:text-xl md:leading-9">
             مؤسسة مغربية تُوجّه أنشطتها أساسًا إلى طلبة وخريجي المعاهد العليا، من مهندسين ومسيرين وأطباء، ترمي إلى تأهيل شباب مغربي معتز بهويته، حامل لقيم الصدق والأمانة وحب الوطن، قوي في تخصصه العلمي، وممتلك للمعارف الضرورية، من أجل بناء جيل قادر على تحقيق حلم النهضة، والارتقاء بالوطن إلى أعلى المراتب الحضارية
           </p>
         </motion.div>
@@ -81,7 +81,7 @@ export default function HomeGallerySection() {
       <button
         type="button"
         onClick={() => move(activeIndex - 1, "prev")}
-        className="absolute right-4 top-1/2 z-20 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/25 bg-black/35 text-white backdrop-blur-md transition-colors hover:bg-black/50 md:right-6 md:h-12 md:w-12"
+        className="absolute right-4 top-1/2 z-20 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/25 bg-black/35 text-white backdrop-blur-md transition-colors hover:bg-black/50 sm:inline-flex md:right-6 md:h-12 md:w-12"
         aria-label="الصورة السابقة"
       >
         <ArrowRight className="h-5 w-5" />
@@ -89,13 +89,13 @@ export default function HomeGallerySection() {
       <button
         type="button"
         onClick={() => move(activeIndex + 1, "next")}
-        className="absolute left-4 top-1/2 z-20 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/25 bg-black/35 text-white backdrop-blur-md transition-colors hover:bg-black/50 md:left-6 md:h-12 md:w-12"
+        className="absolute left-4 top-1/2 z-20 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/25 bg-black/35 text-white backdrop-blur-md transition-colors hover:bg-black/50 sm:inline-flex md:left-6 md:h-12 md:w-12"
         aria-label="الصورة التالية"
       >
         <ArrowLeft className="h-5 w-5" />
       </button>
 
-      <div className="absolute bottom-8 left-5 z-20 flex items-center gap-2 md:left-8">
+      <div className="absolute bottom-5 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 sm:left-5 sm:translate-x-0 md:bottom-8 md:left-8">
         {galleryImages.map((image, index) => (
           <button
             key={image.src}

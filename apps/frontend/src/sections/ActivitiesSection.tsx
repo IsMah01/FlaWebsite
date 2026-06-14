@@ -5,19 +5,19 @@ import { activities } from "@/data/activities";
 
 export default function ActivitiesSection() {
   return (
-    <section id="activities" className="py-20 bg-white">
+    <section id="activities" className="py-14 bg-white md:py-20">
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-100px" }}
           transition={{ duration: 0.6 }}
-          className="text-center mb-12"
+          className="text-center mb-8 md:mb-12"
         >
           <span className="inline-block px-4 py-1 bg-[#4A9B8E]/10 text-[#4A9B8E] rounded-full text-sm font-medium mb-4">
             أنشطتنا
           </span>
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900">أنشطة المؤسسة</h2>
+          <h2 className="text-2xl md:text-4xl font-bold text-gray-900">أنشطة المؤسسة</h2>
         </motion.div>
 
         <div className="space-y-6">
@@ -31,11 +31,11 @@ export default function ActivitiesSection() {
             >
               <Link
                 to={`/activities/${activity.slug}`}
-                className="group flex h-full min-h-[26rem] flex-col overflow-hidden rounded-2xl border border-gray-100 bg-[#F8FAF9] transition-colors hover:border-[#4A9B8E]/20 hover:bg-[#F3F8F6] sm:min-h-[23rem] md:h-72 md:min-h-0 md:flex-row"
+                className="group flex h-full flex-col overflow-hidden rounded-2xl border border-gray-100 bg-[#F8FAF9] transition-colors hover:border-[#4A9B8E]/20 hover:bg-[#F3F8F6] md:h-72 md:flex-row"
               >
                 {activity.coverImage ? (
                   <div
-                    className={`h-56 shrink-0 overflow-hidden sm:h-60 md:h-full md:w-72 ${
+                    className={`h-44 shrink-0 overflow-hidden sm:h-56 md:h-full md:w-72 ${
                       activity.coverImageBackground === "dark"
                         ? "bg-[#1f5148]"
                         : activity.coverImageBackground === "light"
@@ -57,9 +57,9 @@ export default function ActivitiesSection() {
                     />
                   </div>
                 ) : null}
-                <div className="flex flex-1 flex-col justify-center p-6">
-                  <h3 className="text-xl font-bold text-gray-900 mb-3">{activity.title}</h3>
-                  <p className="text-gray-600 leading-relaxed line-clamp-4">{activity.description}</p>
+                <div className="flex flex-1 flex-col justify-center p-5 sm:p-6">
+                  <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-3">{activity.title}</h3>
+                  <p className="text-sm sm:text-base text-gray-600 leading-relaxed line-clamp-3 md:line-clamp-4">{activity.description}</p>
                   <div className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[#4A9B8E]">
                     <span>اكتشف تفاصيل النشاط</span>
                     <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />

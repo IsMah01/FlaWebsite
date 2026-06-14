@@ -5,10 +5,10 @@ import { contactLinks, homeSectionPath, socialLinks } from "@/lib/site-links";
 export default function Footer() {
   return (
     <footer className="bg-[#2D5F56] text-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 md:py-12">
+        <div className="grid grid-cols-1 gap-8 text-center md:grid-cols-3 md:text-right">
           <div className="space-y-4">
-            <img src="/images/logo.png" alt="مؤسسة أطر الغد" className="h-14 w-auto" />
+            <img src="/images/logo.png" alt="مؤسسة أطر الغد" className="mx-auto h-14 w-auto md:mx-0" />
             <p className="text-sm text-white/80 leading-relaxed">
               مؤسسة أطر الغد هي مؤسسة مغربية توجه أنشطتها أساسا إلى طلبة وخريجي المعاهد العليا،
               من مهندسين ومسيرين وأطر، بهدف تأهيل شباب مغربي معتز بهويته.
@@ -48,7 +48,7 @@ export default function Footer() {
                 </a>
               </li>
             </ul>
-            <div className="flex items-center gap-3 pt-2">
+            <div className="flex items-center justify-center gap-3 pt-2 md:justify-start">
               <a href={socialLinks.facebook} target="_blank" rel="noreferrer" aria-label="Facebook" className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors">
                 <Facebook className="w-4 h-4" />
               </a>

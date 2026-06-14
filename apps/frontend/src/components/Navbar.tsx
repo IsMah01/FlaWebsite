@@ -109,7 +109,7 @@ export default function Navbar() {
       </div>
 
       {menuOpen && (
-        <div className="lg:hidden bg-white border-t border-gray-100 px-4 py-4 space-y-2 shadow-lg">
+        <div className="lg:hidden max-h-[calc(100svh-4rem)] overflow-y-auto bg-white border-t border-gray-100 px-4 py-4 space-y-2 shadow-lg">
           {navLinks.map((link) => (
             <button
               key={link.label}
@@ -119,7 +119,7 @@ export default function Navbar() {
               {link.label}
             </button>
           ))}
-          <div className="pt-2 border-t border-gray-100 flex gap-2">
+          <div className="pt-2 border-t border-gray-100 flex flex-col gap-2 sm:flex-row">
             {isAuthenticated && viewer ? (
               <Button
                 variant="ghost"
