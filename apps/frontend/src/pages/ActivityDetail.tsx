@@ -357,25 +357,22 @@ export default function ActivityDetail() {
           </section>
         ) : null}
 
-        {isAcademy && activity.feedbackImages ? (
+        {isAcademy && activity.feedback ? (
           <HorizontalScroller
-            title="آراء السفراء"
+            title="أنا و الأكاديمية"
             hint=""
             icon={<Quote className="w-6 h-6 text-[#4A9B8E]" />}
           >
-            {activity.feedbackImages.map((image, index) => (
+            {activity.feedback.map((item) => (
               <div
-                key={image}
-                className="min-w-[280px] overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm sm:min-w-[420px] lg:min-w-[560px]"
+                key={`${item.name}-${item.role}`}
+                className="min-w-[260px] rounded-2xl border border-gray-100 bg-[#FBFCFC] p-5 sm:min-w-[380px] sm:p-6 md:rounded-3xl lg:min-w-[520px]"
               >
-                <div className="flex aspect-[4/3] items-center justify-center bg-[#F8FAF9] p-3 sm:p-4">
-                  <img
-                    src={image}
-                    alt={`رأي سفير ${index + 1}`}
-                    loading="lazy"
-                    className="max-h-full max-w-full object-contain"
-                  />
+                <div className="mb-4">
+                  <div className="font-bold text-gray-900">{item.name}</div>
+                  <div className="mt-1 text-sm text-[#4A9B8E]">{item.role}</div>
                 </div>
+                <p className="leading-8 text-gray-600">{item.comment}</p>
               </div>
             ))}
           </HorizontalScroller>

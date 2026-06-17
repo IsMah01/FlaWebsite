@@ -5,8 +5,8 @@ import { ArrowLeft, Bell, ChevronLeft, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useViewerSession } from "@/hooks/useViewerSession";
 
-const REGISTRATION_DEADLINE = "2026-07-15";
-const REGISTRATION_DEADLINE_LABEL = "15/07/2026";
+const REGISTRATION_DEADLINE = "2026-07-05";
+const REGISTRATION_DEADLINE_LABEL = "05/07/2026";
 
 function getCountdownDays(targetDate: string) {
   const target = new Date(`${targetDate}T00:00:00`);

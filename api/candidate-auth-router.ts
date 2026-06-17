@@ -91,6 +91,9 @@ function enforceAuthRateLimit(options: {
   return { ip, email };
 }
 
+const passwordPolicyMessage = "يجب أن تتكون كلمة المرور من 8 أحرف على الأقل وأن تحتوي على حرف كبير واحد على الأقل.";
+const strongPasswordSchema = z.string().regex(/^(?=.*[A-Z]).{8,}$/, passwordPolicyMessage);
+
 function requireCandidateSession(cookieHeader: string) {
   const token = readCandidateToken(cookieHeader);
   if (!token) {
@@ -143,7 +146,7 @@ export const candidateAuthRouter = createRouter({
           phoneNumber: z.string().min(1, "رقم الهاتف مطلوب"),
           email: z.string().email("بريد إلكتروني غير صالح"),
           isAmbassador: z.boolean().default(false),
-          password: z.string().min(6, "كلمة المرور يجب أن تتكون من 6 أحرف على الأقل"),
+          password: strongPasswordSchema,
           confirmPassword: z.string(),
           newsletterConsent: z.boolean().default(false),
         })

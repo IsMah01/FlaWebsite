@@ -122,6 +122,11 @@ const candidateQuestionnaireFields: CandidateQuestionField[] = [
     kind: "textarea",
   },
   {
+    key: "most_influential_knowledge_material",
+    label: "ما هي الفكرة العامة لأكثر مادة معرفية أثرت فيك؟",
+    kind: "textarea",
+  },
+  {
     key: "academy_knowledge",
     label: "كيف تعرفت على الأكاديمية؟ وماذا تعرف عنها؟",
     kind: "textarea",
@@ -237,6 +242,7 @@ export const candidateQuestionnaireSteps: CandidateQuestionnaireStep[] = [
       "life_goals",
       "core_value",
       "knowledge_sources",
+      "most_influential_knowledge_material",
     ]),
   },
   {

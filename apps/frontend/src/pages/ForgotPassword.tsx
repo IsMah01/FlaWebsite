@@ -71,7 +71,7 @@ export default function ForgotPassword({ accountType }: { accountType: AccountTy
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#4A9B8E]/10">
               <KeyRound className="h-8 w-8 text-[#4A9B8E]" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">Mot de passe oublié</h1>
+            <h1 className="text-2xl font-bold text-gray-900">هل نسيت كلمة المرور؟</h1>
             <p className="mt-2 text-sm text-gray-500">
               {submitted
                 ? "Votre demande de réinitialisation a été traitée."

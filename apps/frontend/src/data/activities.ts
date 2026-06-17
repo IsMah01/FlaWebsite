@@ -55,7 +55,6 @@ export type ActivityData = {
   highlightsTitle?: string;
   highlights?: string[];
   feedback?: ActivityFeedback[];
-  feedbackImages?: string[];
   ambassadorContent?: AmbassadorActivityContent;
 };
 
@@ -97,10 +96,28 @@ export const activities: ActivityData[] = [
       "مسابقات مهارية وإبداعية.",
       "برامج للتطوير الذاتي وصناعة القيادات الشابة.",
     ],
-    feedbackImages: [
-      mediaPath("future-leaders-academy", "ambassador-opinion-01.png"),
-      mediaPath("future-leaders-academy", "ambassador-opinion-02.png"),
-      mediaPath("future-leaders-academy", "ambassador-opinion-03.png"),
+    feedback: [
+      {
+        name: "سفيان محسن",
+        role: "سفير الدورة 15",
+        comment:
+          "سوية مثل فضاء للأكاديمية أو لكل مشارك، في الأكاديمية. لقد ربطتني بها ذكريات ومعانٍ كثيرة، وساعدتني على تطوير شخصيتي وتوسيع مداركي. تعلمت أن الحياة أوسع من حدود التخصص، وأن خدمة المجتمع تبدأ من الوعي والمسؤولية.",
+        image: "/images/logo.png",
+      },
+      {
+        name: "SARA SADIK",
+        role: "2nd Year Pharmacy Student at FMPM | 15th edition ambassador",
+        comment:
+          "As the days passed and the challenges multiplied, my love and attachment to this academy deepened. The supervisors and participants created a harmonious, educational, respectful, and unparalleled environment, where we led each other, united in the hope of guiding our nation toward success and prosperity. Though we were divided by our academic disciplines, we were bound together by a shared purpose; this was the true beauty of the program.",
+        image: "/images/logo.png",
+      },
+      {
+        name: "Enzo Paris",
+        role: "طالب بشعبة الهندسة بمدرسة الحكامة وعلوم الاقتصاد الاجتماعي والتضامني بسلا",
+        comment:
+          "تنتمي لأكاديمية و يبقى حنينك لأيامها أعمق من حماسك قبل بدئها. ساعاتها تدارب معنى اللحظات التي عشتها، بمحاضريها وضيوفها. تتذكر ورش الصباحيات حيث أخذ الحوار من التحدي قواعد. ذكريات نقاشات وحوارات هادفة تختصرها، ومناظرات في رحاب محاضرات تستنهض الفكر، وتوسع مداركك، فتخرج من براثن الجهل وحيل التلقين إلى أنوار التعلم والرسالية.",
+        image: "/images/logo.png",
+      },
     ],
   },
   {
