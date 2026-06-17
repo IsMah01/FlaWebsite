@@ -34,7 +34,7 @@ export async function ensureDatabaseSchema() {
         lastName VARCHAR(255) NOT NULL,
         studyStatus ENUM('student','graduated','master_student','phd_student','other') NOT NULL,
         attestationUrl TEXT NULL,
-        \`Ø§Ù„ÙˆØ«Ø§Ø¦Ù‚\` TEXT NULL,
+        \`الوثائق\` TEXT NULL,
         phoneNumber VARCHAR(50) NOT NULL,
         email VARCHAR(320) NOT NULL UNIQUE,
         isAmbassador BOOLEAN NOT NULL DEFAULT false,

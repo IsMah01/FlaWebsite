@@ -16,6 +16,7 @@ ENV NODE_ENV=production
 COPY apps/backend/package*.json ./
 RUN npm install --omit=dev
 COPY --from=build /app/dist ./dist
+COPY apps/frontend/public/images/logo.png ./public/images/logo.png
 RUN mkdir -p storage/private/uploads
 EXPOSE 3000
 CMD ["npm", "start"]

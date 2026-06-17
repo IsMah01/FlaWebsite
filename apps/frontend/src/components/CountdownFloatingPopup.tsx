@@ -5,6 +5,9 @@ import { ArrowLeft, Bell, ChevronLeft, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useViewerSession } from "@/hooks/useViewerSession";
 
+const REGISTRATION_DEADLINE = "2026-07-15";
+const REGISTRATION_DEADLINE_LABEL = "15/07/2026";
+
 function getCountdownDays(targetDate: string) {
   const target = new Date(`${targetDate}T00:00:00`);
   const now = new Date();
@@ -19,7 +22,8 @@ export default function CountdownFloatingPopup() {
   const navigate = useNavigate();
   const { isCandidate, hasAmbassadorView } = useViewerSession();
   const [isOpen, setIsOpen] = useState(true);
-  const daysLeft = getCountdownDays("2026-05-28");
+  const daysLeft = getCountdownDays(REGISTRATION_DEADLINE);
+  const isClosed = daysLeft <= 0;
   const isAmbassadorNotice = hasAmbassadorView && !isCandidate;
 
   useEffect(() => {
@@ -42,10 +46,10 @@ export default function CountdownFloatingPopup() {
             animate={{ opacity: 1, x: 0, scale: 1 }}
             exit={{ opacity: 0, x: 24, scale: 0.96 }}
             transition={{ duration: 0.25 }}
-            className="fixed bottom-3 left-3 right-3 md:bottom-5 md:left-auto md:right-6 md:w-[390px] z-50"
+            className="fixed bottom-3 left-3 right-3 z-50 md:bottom-5 md:left-auto md:right-6 md:w-[400px]"
           >
-            <div className="relative overflow-hidden rounded-2xl border border-[#4A9B8E]/20 bg-white shadow-2xl md:rounded-[28px]">
-              <div className="absolute inset-x-0 top-0 h-2 bg-[linear-gradient(90deg,#1f5148_0%,#4A9B8E_55%,#9ad7cb_100%)]" />
+            <div className="relative overflow-hidden rounded-2xl border border-[#4A9B8E]/20 bg-white shadow-2xl">
+              <div className="absolute inset-x-0 top-0 h-1.5 bg-[#4A9B8E]" />
               <button
                 onClick={() => setIsOpen(false)}
                 className="absolute left-4 top-4 rounded-full bg-gray-100 p-2 text-gray-500 transition-colors hover:bg-gray-200"
@@ -56,14 +60,16 @@ export default function CountdownFloatingPopup() {
               <div className="p-5 pt-8 md:p-6 md:pt-8">
                 <div className="inline-flex items-center gap-2 rounded-full bg-[#EAF7F3] px-3 py-1 text-xs font-semibold text-[#1f5148]">
                   <Bell className="w-3.5 h-3.5" />
-                  {isAmbassadorNotice ? "إعلان داخلي" : "فتح باب التسجيل في الأكاديمية 18"}
+                  {isAmbassadorNotice ? "تذكير داخلي" : "التسجيل مفتوح للأكاديمية 18"}
                 </div>
                 <p className="mt-4 text-gray-600 leading-7">
-                  {isAmbassadorNotice ? (
+                  {isClosed ? (
+                    <>انتهت فترة التسجيل الحالية. سيتم الإعلان عن أي تمديد عبر القنوات الرسمية.</>
+                  ) : isAmbassadorNotice ? (
                     <>
-                      تذكير : بقي
+                      تذكير داخلي: بقي
                       <span className="font-bold text-[#1f5148]"> {daysLeft} يوما</span>
-                      {" "}على تاريخ الاستمارة.
+                      {" "}على آخر أجل للتسجيل.
                     </>
                   ) : (
                     <>
@@ -72,13 +78,15 @@ export default function CountdownFloatingPopup() {
                   )}
                 </p>
                 <div className="mt-4 flex flex-wrap items-end gap-3">
-                  <div className="text-sm font-semibold text-gray-600">آخر أجل للتسجيل: 28/05/2026</div>
-                  <div className="text-4xl font-black leading-none text-[#1f5148] md:text-5xl">J-{daysLeft}</div>
+                  <div className="text-sm font-semibold text-gray-600">آخر أجل للتسجيل: {REGISTRATION_DEADLINE_LABEL}</div>
+                  <div className="text-4xl font-black leading-none text-[#1f5148] md:text-5xl">
+                    {isClosed ? "انتهى" : `J-${daysLeft}`}
+                  </div>
                 </div>
-                {!isAmbassadorNotice ? (
-                  <p className="mt-4 text-gray-600 leading-7">تبقّى على إغلاق استمارة التسجيل {daysLeft} أيام فقط.</p>
+                {!isAmbassadorNotice && !isClosed ? (
+                  <p className="mt-4 text-gray-600 leading-7">أكمل التسجيل قبل {REGISTRATION_DEADLINE_LABEL} حتى لا تفوتك فرصة المشاركة.</p>
                 ) : null}
-                {!isAmbassadorNotice ? (
+                {!isAmbassadorNotice && !isClosed ? (
                   <Button
                     onClick={() => navigate(isCandidate ? "/candidate-questionnaire" : "/signup")}
                     className="mt-5 w-full h-11 bg-[#4A9B8E] hover:bg-[#3D7A6F]"
@@ -106,7 +114,9 @@ export default function CountdownFloatingPopup() {
             aria-label="Afficher la notification"
           >
             <ChevronLeft className="w-5 h-5 text-[#1f5148]" />
-            <span className="text-xs font-semibold text-[#1f5148] whitespace-nowrap">J-{daysLeft}</span>
+            <span className="text-xs font-semibold text-[#1f5148] whitespace-nowrap">
+              {isClosed ? "انتهى" : `J-${daysLeft}`}
+            </span>
           </motion.button>
         ) : null}
       </AnimatePresence>

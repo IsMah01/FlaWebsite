@@ -96,7 +96,7 @@ function requireCandidateSession(cookieHeader: string) {
   if (!token) {
     throw new TRPCError({
       code: "UNAUTHORIZED",
-      message: "ÙŠØ¬Ø¨ ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„ Ø£ÙˆÙ„Ø§.",
+      message: "يجب تسجيل الدخول أولا.",
     });
   }
 
@@ -105,7 +105,7 @@ function requireCandidateSession(cookieHeader: string) {
   } catch {
     throw new TRPCError({
       code: "UNAUTHORIZED",
-      message: "Ø¬Ù„Ø³Ø© ØºÙŠØ± ØµØ§Ù„Ø­Ø©.",
+      message: "جلسة غير صالحة.",
     });
   }
 }
@@ -331,11 +331,11 @@ export const candidateAuthRouter = createRouter({
       z
         .object({
           token: z.string().min(20),
-          password: z.string().min(6, "ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ± ÙŠØ¬Ø¨ Ø£Ù† ØªØªÙƒÙˆÙ† Ù…Ù† 6 Ø£Ø­Ø±Ù Ø¹Ù„Ù‰ Ø§Ù„Ø£Ù‚Ù„"),
+          password: z.string().min(6, "كلمة المرور يجب أن تتكون من 6 أحرف على الأقل"),
           confirmPassword: z.string(),
         })
         .refine((data) => data.password === data.confirmPassword, {
-          message: "ÙƒÙ„Ù…ØªØ§ Ø§Ù„Ù…Ø±ÙˆØ± ØºÙŠØ± Ù…ØªØ·Ø§Ø¨Ù‚ØªÙŠÙ†",
+          message: "كلمتا المرور غير متطابقتين",
           path: ["confirmPassword"],
         }),
     )
@@ -354,7 +354,7 @@ export const candidateAuthRouter = createRouter({
       if (!account || !account.passwordResetExpiresAt || account.passwordResetExpiresAt.getTime() < Date.now()) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "Ø±Ø§Ø¨Ø· Ø¥Ø¹Ø§Ø¯Ø© ØªØ¹ÙŠÙŠÙ† ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ± ØºÙŠØ± ØµØ§Ù„Ø­ Ø£Ùˆ Ù…Ù†ØªÙ‡ÙŠ Ø§Ù„ØµÙ„Ø§Ø­ÙŠØ©",
+          message: "رابط إعادة تعيين كلمة المرور غير صالح أو منتهي الصلاحية",
         });
       }
 
@@ -523,7 +523,7 @@ export const candidateAuthRouter = createRouter({
     if (!account) {
       throw new TRPCError({
         code: "NOT_FOUND",
-        message: "Ø§Ù„Ø­Ø³Ø§Ø¨ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯.",
+        message: "الحساب غير موجود.",
       });
     }
 
