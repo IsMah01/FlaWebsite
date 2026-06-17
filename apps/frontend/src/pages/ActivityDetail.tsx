@@ -4,7 +4,6 @@ import { motion } from "framer-motion";
 import {
   ArrowLeft,
   ArrowRight,
-  CalendarRange,
   ChevronLeft,
   Newspaper,
   Quote,
@@ -344,22 +343,18 @@ export default function ActivityDetail() {
 
         {isAcademy ? (
           <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6 md:rounded-3xl md:p-8">
-            <div className="flex items-center gap-3 mb-6">
-              <CalendarRange className="w-6 h-6 text-[#4A9B8E]" />
-              <h2 className="text-xl md:text-2xl font-bold text-gray-900">الدورات الست عشرة</h2>
-            </div>
             <EditionsGrid
               editionNumbers={[17, 16, 15]}
               badge="أكاديمية أطر الغد"
               title="الدورات السابقة لأكاديمية أطر الغد"
-              description="تم نقل جميع الدورات السابقة من الصفحة الرئيسية إلى هذه الصفحة حتى تبقى تجربة التصفح أكثر تركيزا على الأنشطة."
+              description=""
             />
           </section>
         ) : null}
 
         {isAcademy && activity.feedback ? (
           <HorizontalScroller
-            title="آراء الضيوف والسفراء"
+            title="أنا و الأكادمية"
             hint=""
             icon={<Quote className="w-6 h-6 text-[#4A9B8E]" />}
           >

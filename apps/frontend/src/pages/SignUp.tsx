@@ -29,6 +29,8 @@ export default function SignUp() {
   });
   const [uploadingAttestation, setUploadingAttestation] = useState(false);
   const attestationRef = useRef<HTMLInputElement>(null);
+  const passwordPolicyMessage = "يجب أن تتكون كلمة المرور من 8 أحرف على الأقل وأن تحتوي على حرف كبير واحد على الأقل.";
+  const passwordPattern = /^(?=.*[A-Z]).{8,}$/;
 
   const uploadMutation = trpc.upload.upload.useMutation();
   const registerMutation = trpc.candidateAuth.register.useMutation({
@@ -82,6 +84,10 @@ export default function SignUp() {
       toast.error("كلمتا المرور غير متطابقتين");
       return;
     }
+    if (!passwordPattern.test(formData.password)) {
+      toast.error(passwordPolicyMessage);
+      return;
+    }
     if (!formData.studyStatus) {
       toast.error("يرجى اختيار الوضعية الدراسية");
       return;
@@ -110,8 +116,8 @@ export default function SignUp() {
               <div className="w-16 h-16 bg-[#4A9B8E]/10 rounded-full flex items-center justify-center mx-auto mb-4">
                 <UserPlus className="w-8 h-8 text-[#4A9B8E]" />
               </div>
-              <h1 className="text-2xl font-bold text-gray-900">التسجيل</h1>
-              <p className="text-gray-500 text-sm mt-2">أنشئ حسابك للانضمام إلى المؤسسة</p>
+              <h1 className="text-2xl font-bold text-gray-900">انضم إلى مؤسسة أطر الغد</h1>
+              <p className="text-gray-500 text-sm mt-2">أنشئ حسابك وكن جزءًا من فضاء مؤسسة أطر الغد</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -143,27 +149,27 @@ export default function SignUp() {
               </div>
 
               <div>
-                <Label>شهادة التمدرس</Label>
+                <Label>رفع شهادة التمدرس</Label>
                 <input ref={attestationRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])} />
                 <Button type="button" variant="outline" onClick={() => attestationRef.current?.click()} disabled={uploadingAttestation} className={`w-full mt-1 ${formData.attestationUrl ? "border-green-500 text-green-600" : ""}`}>
                   <FileText className="w-4 h-4 mr-2" />
-                  {uploadingAttestation ? "جاري الرفع..." : formData.attestationUrl ? "تم رفع الملف" : "إضافة الشهادة"}
+                  {uploadingAttestation ? "جاري الرفع..." : formData.attestationUrl ? "تم رفع الملف" : "رفع شهادة التمدرس"}
                 </Button>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="phoneNumber">رقم الهاتف *</Label>
-                  <Input id="phoneNumber" value={formData.phoneNumber} onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })} placeholder="+212..." required className="text-right mt-1" />
+                  <Input id="phoneNumber" value={formData.phoneNumber} onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })} placeholder="+212XXXXXXXXX" pattern="^\+212\d{9}$" required className="text-right mt-1" />
                 </div>
                 <div>
                   <Label htmlFor="email">البريد الإلكتروني *</Label>
-                  <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="email@example.com" required className="text-right mt-1" />
+                  <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="example@email.com" required className="text-right mt-1" />
                 </div>
               </div>
 
               <div className="p-4 bg-[#F8FAF9] rounded-xl">
-                <Label className="mb-3 block">هل أنت سفير سابق؟</Label>
+                <Label className="mb-3 block">هل أنت سفير إحدى دورات أكاديمية أطر الغد؟</Label>
                 <div className="flex gap-6">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input type="radio" name="ambassador" checked={formData.isAmbassador} onChange={() => setFormData({ ...formData, isAmbassador: true })} className="w-4 h-4 text-[#4A9B8E]" />
@@ -179,10 +185,11 @@ export default function SignUp() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="relative">
                   <Label htmlFor="password">كلمة المرور *</Label>
-                  <Input id="password" type={showPassword ? "text" : "password"} value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} placeholder="******" required minLength={6} className="text-right mt-1 pr-10" />
+                  <Input id="password" type={showPassword ? "text" : "password"} value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} placeholder="******" required minLength={8} pattern="(?=.*[A-Z]).{8,}" className="text-right mt-1 pr-10" />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-[34px] text-gray-400 hover:text-gray-600">
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
+                  <p className="mt-1 text-xs leading-5 text-gray-500">{passwordPolicyMessage}</p>
                 </div>
                 <div className="relative">
                   <Label htmlFor="confirmPassword">تأكيد كلمة المرور *</Label>

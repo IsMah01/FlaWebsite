@@ -235,11 +235,11 @@ export default function CandidateQuestionnaire() {
 
   const currentStep = candidateQuestionnaireSteps[currentStepIndex];
   const isFinalStep = currentStepIndex === candidateQuestionnaireSteps.length - 1;
-  const totalQuestions = candidateQuestionnaireSteps.reduce(
-    (total, step) => total + step.fields.length,
-    0,
+  const questionnaireFieldKeys = candidateQuestionnaireSteps.flatMap((step) =>
+    step.fields.map((field) => field.key),
   );
-  const answeredCount = Object.values(answers).filter((value) => isFieldFilled(value)).length;
+  const totalQuestions = questionnaireFieldKeys.length;
+  const answeredCount = questionnaireFieldKeys.filter((key) => isFieldFilled(answers[key])).length;
   const completionRate = totalQuestions > 0 ? Math.round((answeredCount / totalQuestions) * 100) : 0;
 
   const questionOffset = candidateQuestionnaireSteps
@@ -438,6 +438,21 @@ export default function CandidateQuestionnaire() {
                       </button>
                     ))}
                   </div>
+
+                  <div className="mt-6 rounded-2xl border border-[#4A9B8E]/15 bg-white p-4">
+                    <Label htmlFor="observations" className="mb-3 block text-base font-semibold text-gray-900">
+                      ملاحظات
+                    </Label>
+                    <Textarea
+                      id="observations"
+                      value={answers.observations ?? ""}
+                      onChange={(event) =>
+                        setAnswers((previous) => ({ ...previous, observations: event.target.value }))
+                      }
+                      placeholder="اكتب أي ملاحظات إضافية هنا..."
+                      className="min-h-32 resize-y border-[#4A9B8E]/20 bg-white"
+                    />
+                  </div>
                 </div>
 
                 <div className="rounded-[28px] bg-[linear-gradient(180deg,#1f5148_0%,#2b7468_100%)] p-6 text-white">
@@ -502,4 +517,3 @@ export default function CandidateQuestionnaire() {
     </div>
   );
 }
-

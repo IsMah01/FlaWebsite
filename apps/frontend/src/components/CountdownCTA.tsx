@@ -20,7 +20,7 @@ type CountdownCTAProps = {
 export default function CountdownCTA({ compact = false, className = "" }: CountdownCTAProps) {
   const navigate = useNavigate();
   const { isCandidate, hasAmbassadorView } = useViewerSession();
-  const daysLeft = getCountdownDays("2026-05-28");
+  const daysLeft = getCountdownDays("2026-07-05");
   const isAmbassadorNotice = hasAmbassadorView && !isCandidate;
 
   return (
@@ -45,7 +45,7 @@ export default function CountdownCTA({ compact = false, className = "" }: Countd
           >
             J-{daysLeft}
           </div>
-          <div className="pb-2 text-sm md:text-base text-gray-500">آخر أجل للتسجيل: 28/05/2026</div>
+          <div className="pb-2 text-sm md:text-base text-gray-500">آخر أجل للتسجيل: 05/07/2026</div>
         </div>
         <p className={`mt-5 max-w-3xl text-gray-700 ${compact ? "text-base leading-7" : "text-lg leading-8"}`}>
           {isAmbassadorNotice ? (

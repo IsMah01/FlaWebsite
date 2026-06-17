@@ -19,7 +19,7 @@ export default function CountdownFloatingPopup() {
   const navigate = useNavigate();
   const { isCandidate, hasAmbassadorView } = useViewerSession();
   const [isOpen, setIsOpen] = useState(true);
-  const daysLeft = getCountdownDays("2026-05-28");
+  const daysLeft = getCountdownDays("2026-07-05");
   const isAmbassadorNotice = hasAmbassadorView && !isCandidate;
 
   useEffect(() => {
@@ -72,7 +72,7 @@ export default function CountdownFloatingPopup() {
                   )}
                 </p>
                 <div className="mt-4 flex flex-wrap items-end gap-3">
-                  <div className="text-sm font-semibold text-gray-600">آخر أجل للتسجيل: 28/05/2026</div>
+                  <div className="text-sm font-semibold text-gray-600">آخر أجل للتسجيل: 05/07/2026</div>
                   <div className="text-4xl font-black leading-none text-[#1f5148] md:text-5xl">J-{daysLeft}</div>
                 </div>
                 {!isAmbassadorNotice ? (

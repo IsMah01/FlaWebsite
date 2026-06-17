@@ -98,31 +98,24 @@ export const activities: ActivityData[] = [
     ],
     feedback: [
       {
-        name: "د. يوسف السالمي",
-        role: "ضيف ومحاضر",
+        name: "سفيان محسن",
+        role: "سفير الدورة 15",
         comment:
-          "ما يميز الأكاديمية هو الجمع بين العمق الفكري والتنظيم المحكم، مع حضور شبابي واع يمتلك قابلية حقيقية للتأثير.",
+          "سوية مثل فضاء للأكاديمية أو لكل مشارك، في الأكاديمية. لقد ربطتني بها ذكريات ومعانٍ كثيرة، وساعدتني على تطوير شخصيتي وتوسيع مداركي. تعلمت أن الحياة أوسع من حدود التخصص، وأن خدمة المجتمع تبدأ من الوعي والمسؤولية.",
         image: "/images/logo.png",
       },
       {
-        name: "سارة العلوي",
-        role: "سفيرة من خريجي الأكاديمية",
+        name: "SARA SADIK",
+        role: "2nd Year Pharmacy Student at FMPM | 15th edition ambassador",
         comment:
-          "كانت الأكاديمية نقطة تحول في تجربتي؛ منحتني الثقة، ووسعت رؤيتي، وربطتني بشبكة من السفراء الذين يصنعون الفرق.",
+          "As the days passed and the challenges multiplied, my love and attachment to this academy deepened. The supervisors and participants created a harmonious, educational, respectful, and unparalleled environment, where we led each other, united in the hope of guiding our nation toward success and prosperity. Though we were divided by our academic disciplines, we were bound together by a shared purpose; this was the true beauty of the program.",
         image: "/images/logo.png",
       },
       {
-        name: "أمين بلمقدم",
-        role: "سفير",
+        name: "Enzo Paris",
+        role: "طالب بشعبة الهندسة بمدرسة الحكامة وعلوم الاقتصاد الاجتماعي والتضامني بسلا",
         comment:
-          "الورشات التطبيقية والنقاشات المفتوحة خلقت تجربة متوازنة بين التكوين المعرفي والعمل الجماعي والالتزام العملي.",
-        image: "/images/logo.png",
-      },
-      {
-        name: "الأستاذة مريم الإدريسي",
-        role: "ضيفة",
-        comment:
-          "الهوية الواضحة للأكاديمية وانضباط مكتبها التنفيذي يمنحان كل دورة قيمة تنظيمية وتربوية عالية.",
+          "تنتمي لأكاديمية و يبقى حنينك لأيامها أعمق من حماسك قبل بدئها. ساعاتها تدارب معنى اللحظات التي عشتها، بمحاضريها وضيوفها. تتذكر ورش الصباحيات حيث أخذ الحوار من التحدي قواعد. ذكريات نقاشات وحوارات هادفة تختصرها، ومناظرات في رحاب محاضرات تستنهض الفكر، وتوسع مداركك، فتخرج من براثن الجهل وحيل التلقين إلى أنوار التعلم والرسالية.",
         image: "/images/logo.png",
       },
     ],

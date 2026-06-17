@@ -90,8 +90,8 @@ export default function SignIn() {
               <div className="relative">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="password">كلمة المرور *</Label>
-                  <Link to="/forgot-password" dir="ltr" className="text-sm font-medium text-[#4A9B8E] hover:text-[#3D7A6F]">
-                    Mot de passe oublié ?
+                  <Link to="/forgot-password" className="text-sm font-medium text-[#4A9B8E] hover:text-[#3D7A6F]">
+                    هل نسيت كلمة المرور؟
                   </Link>
                 </div>
                 <Input
