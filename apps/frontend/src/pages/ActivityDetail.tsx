@@ -357,29 +357,25 @@ export default function ActivityDetail() {
           </section>
         ) : null}
 
-        {isAcademy && activity.feedback ? (
+        {isAcademy && activity.feedbackImages ? (
           <HorizontalScroller
-            title="آراء الضيوف والسفراء"
+            title="آراء السفراء"
             hint=""
             icon={<Quote className="w-6 h-6 text-[#4A9B8E]" />}
           >
-            {activity.feedback.map((item) => (
+            {activity.feedbackImages.map((image, index) => (
               <div
-                key={`${item.name}-${item.role}`}
-                className="min-w-[260px] sm:min-w-[380px] lg:min-w-[520px] rounded-2xl md:rounded-3xl border border-gray-100 bg-[#FBFCFC] p-5 sm:p-6"
+                key={image}
+                className="min-w-[280px] overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm sm:min-w-[420px] lg:min-w-[560px]"
               >
-                <div className="flex items-center gap-4 mb-4">
+                <div className="flex aspect-[4/3] items-center justify-center bg-[#F8FAF9] p-3 sm:p-4">
                   <img
-                    src={item.image}
-                    alt={item.name}
-                    className="w-16 h-16 rounded-full object-cover border border-[#4A9B8E]/20"
+                    src={image}
+                    alt={`رأي سفير ${index + 1}`}
+                    loading="lazy"
+                    className="max-h-full max-w-full object-contain"
                   />
-                  <div>
-                    <div className="font-bold text-gray-900">{item.name}</div>
-                    <div className="text-sm text-[#4A9B8E]">{item.role}</div>
-                  </div>
                 </div>
-                <p className="text-gray-600 leading-8">{item.comment}</p>
               </div>
             ))}
           </HorizontalScroller>

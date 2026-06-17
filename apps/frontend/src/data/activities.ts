@@ -55,6 +55,7 @@ export type ActivityData = {
   highlightsTitle?: string;
   highlights?: string[];
   feedback?: ActivityFeedback[];
+  feedbackImages?: string[];
   ambassadorContent?: AmbassadorActivityContent;
 };
 
@@ -96,35 +97,10 @@ export const activities: ActivityData[] = [
       "مسابقات مهارية وإبداعية.",
       "برامج للتطوير الذاتي وصناعة القيادات الشابة.",
     ],
-    feedback: [
-      {
-        name: "د. يوسف السالمي",
-        role: "ضيف ومحاضر",
-        comment:
-          "ما يميز الأكاديمية هو الجمع بين العمق الفكري والتنظيم المحكم، مع حضور شبابي واع يمتلك قابلية حقيقية للتأثير.",
-        image: "/images/logo.png",
-      },
-      {
-        name: "سارة العلوي",
-        role: "سفيرة من خريجي الأكاديمية",
-        comment:
-          "كانت الأكاديمية نقطة تحول في تجربتي؛ منحتني الثقة، ووسعت رؤيتي، وربطتني بشبكة من السفراء الذين يصنعون الفرق.",
-        image: "/images/logo.png",
-      },
-      {
-        name: "أمين بلمقدم",
-        role: "سفير",
-        comment:
-          "الورشات التطبيقية والنقاشات المفتوحة خلقت تجربة متوازنة بين التكوين المعرفي والعمل الجماعي والالتزام العملي.",
-        image: "/images/logo.png",
-      },
-      {
-        name: "الأستاذة مريم الإدريسي",
-        role: "ضيفة",
-        comment:
-          "الهوية الواضحة للأكاديمية وانضباط مكتبها التنفيذي يمنحان كل دورة قيمة تنظيمية وتربوية عالية.",
-        image: "/images/logo.png",
-      },
+    feedbackImages: [
+      mediaPath("future-leaders-academy", "ambassador-opinion-01.png"),
+      mediaPath("future-leaders-academy", "ambassador-opinion-02.png"),
+      mediaPath("future-leaders-academy", "ambassador-opinion-03.png"),
     ],
   },
   {
