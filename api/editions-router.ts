@@ -5,13 +5,18 @@ import { editions, editionImages } from "@db/schema";
 import { eq } from "drizzle-orm";
 import { getPublicEditionByNumber, publicEditions } from "./edition-content";
 
+const hiddenPublicEditionNumbers = new Set([14]);
+
 export const editionsRouter = createRouter({
   list: publicQuery.query(async () => {
     const db = getDb();
-    const allEditions = await db.select().from(editions).orderBy(editions.editionNumber);
+    const allEditions = (await db.select().from(editions).orderBy(editions.editionNumber)).filter(
+      (edition) => !hiddenPublicEditionNumbers.has(edition.editionNumber),
+    );
     const dbEditionNumbers = new Set(allEditions.map((edition) => edition.editionNumber));
     const fallbackEditions = publicEditions.filter(
       (edition) => !dbEditionNumbers.has(edition.editionNumber)
+        && !hiddenPublicEditionNumbers.has(edition.editionNumber)
     );
     return [
       ...allEditions.map((edition) => ({ ...edition, links: [] as string[] })),
@@ -22,6 +27,10 @@ export const editionsRouter = createRouter({
   getByNumber: publicQuery
     .input(z.object({ editionNumber: z.number() }))
     .query(async ({ input }) => {
+      if (hiddenPublicEditionNumbers.has(input.editionNumber)) {
+        return null;
+      }
+
       const db = getDb();
       const [edition] = await db
         .select()

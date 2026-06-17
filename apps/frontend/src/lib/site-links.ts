@@ -1,6 +1,6 @@
 export const contactLinks = {
-  email: "fl.fondation.contact@gmail.com",
-  emailHref: "mailto:fl.fondation.contact@gmail.com",
+  email: "fl.foundation.contact@gmail.com",
+  emailHref: "mailto:fl.foundation.contact@gmail.com",
   phone: "+212 6 62 77 66 25",
   phoneHref: "tel:+212662776625",
   locationHref: "https://www.google.com/maps/search/?api=1&query=Morocco",

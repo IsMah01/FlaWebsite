@@ -30,7 +30,6 @@ export async function sendConfirmationEmail(
 ) {
   if (!SMTP_HOST || !SMTP_USER) {
     console.warn("[Email] SMTP not configured. Skipping email send.");
-    console.log(`[Email] Confirmation link: ${APP_URL}/confirm-email?token=${token}`);
     return { success: false, reason: "SMTP_NOT_CONFIGURED" };
   }
 

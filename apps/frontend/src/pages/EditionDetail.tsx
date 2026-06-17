@@ -1,8 +1,11 @@
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowRight,
   Calendar,
+  ChevronLeft,
+  ChevronRight,
   MapPin,
   Video,
   Clock,
@@ -17,15 +20,111 @@ import { toast } from "sonner";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
+type GalleryImage = {
+  src: string;
+  srcSet: string;
+};
+
+function galleryImage(edition: number, name: string): GalleryImage {
+  const basePath = `/edition-media/edition-${edition}/${name}`;
+  return {
+    src: `${basePath}-1600.webp`,
+    srcSet: `${basePath}-800.webp 800w, ${basePath}-1600.webp 1600w`,
+  };
+}
+
+const edition17GalleryImages = [
+  galleryImage(17, "DSC00200"),
+  galleryImage(17, "DSC00229"),
+  galleryImage(17, "DSC00304"),
+  galleryImage(17, "DSC00559"),
+  galleryImage(17, "DSC07709"),
+  galleryImage(17, "DSC08004"),
+  galleryImage(17, "DSC08103"),
+  galleryImage(17, "DSC08276"),
+];
+
+const edition16GalleryImages = [
+  galleryImage(16, "DSC02367"),
+  galleryImage(16, "DSC03725"),
+  galleryImage(16, "DSC03733"),
+  galleryImage(16, "DSC04048"),
+  galleryImage(16, "DSC04145"),
+  galleryImage(16, "DSC05099"),
+  galleryImage(16, "DSC05112"),
+  galleryImage(16, "DSC05185"),
+  galleryImage(16, "IMG_8397"),
+  galleryImage(16, "IMG_8403"),
+];
+
+const edition15GalleryImages = [
+  galleryImage(15, "CF5B8013"),
+  galleryImage(15, "CF5B8334"),
+  galleryImage(15, "CF5B8723"),
+  galleryImage(15, "CF5B9121"),
+  galleryImage(15, "CF5B9417"),
+  galleryImage(15, "CF5B9440"),
+  galleryImage(15, "CF5B9446"),
+  galleryImage(15, "CF5B9654"),
+  galleryImage(15, "DSC09445"),
+];
+
+const editionGalleryImages: Record<number, GalleryImage[]> = {
+  15: edition15GalleryImages,
+  16: edition16GalleryImages,
+  17: edition17GalleryImages,
+};
+
 export default function EditionDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const editionNumber = parseInt(id || "0");
+  const [activeGalleryIndex, setActiveGalleryIndex] = useState(0);
+  const [galleryDirection, setGalleryDirection] = useState(1);
 
   const { data: edition, isLoading } = trpc.editions.getByNumber.useQuery(
     { editionNumber },
     { enabled: editionNumber > 0 }
   );
+  const galleryImages = editionGalleryImages[editionNumber] ?? [];
+  const activeGalleryImage = galleryImages[activeGalleryIndex] ?? galleryImages[0];
+  const nextGalleryImage = galleryImages.length > 1
+    ? galleryImages[(activeGalleryIndex + 1) % galleryImages.length]
+    : null;
+  const showActivitiesAsGallery = galleryImages.length > 0;
+  const goToPreviousImage = () => {
+    setGalleryDirection(-1);
+    setActiveGalleryIndex((current) => (current - 1 + galleryImages.length) % galleryImages.length);
+  };
+  const goToNextImage = () => {
+    setGalleryDirection(1);
+    setActiveGalleryIndex((current) => (current + 1) % galleryImages.length);
+  };
+
+  useEffect(() => {
+    setGalleryDirection(1);
+    setActiveGalleryIndex(0);
+  }, [editionNumber]);
+
+  useEffect(() => {
+    if (!nextGalleryImage) return;
+
+    const image = new Image();
+    image.srcset = nextGalleryImage.srcSet;
+    image.sizes = "(max-width: 640px) 100vw, 66vw";
+    image.src = nextGalleryImage.src;
+  }, [nextGalleryImage]);
+
+  useEffect(() => {
+    if (galleryImages.length < 2) return;
+
+    const intervalId = window.setInterval(() => {
+      setGalleryDirection(1);
+      setActiveGalleryIndex((current) => (current + 1) % galleryImages.length);
+    }, 4500);
+
+    return () => window.clearInterval(intervalId);
+  }, [galleryImages.length]);
 
   if (isLoading) {
     return (
@@ -153,7 +252,7 @@ export default function EditionDetail() {
               )}
 
               {/* أبرز اللحظات */}
-              {activitiesList.length > 0 && (
+              {(activitiesList.length > 0 || showActivitiesAsGallery) && (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -164,16 +263,60 @@ export default function EditionDetail() {
                     <Sparkles className="w-6 h-6 text-[#4A9B8E]" />
                     أبرز اللحظات
                   </h2>
-                  <div className="grid sm:grid-cols-2 gap-3">
-                    {activitiesList.map((activity, i) => (
-                      <div
-                        key={i}
-                        className="p-4 bg-[#F8FAF9] rounded-xl border border-[#4A9B8E]/10 text-gray-700 font-medium leading-7"
-                      >
-                        {activity.trim()}
+                  {showActivitiesAsGallery ? (
+                    <div className="space-y-4">
+                      <div className="relative h-[22rem] overflow-hidden rounded-2xl bg-[#EEF7F4] sm:h-[28rem]">
+                        <AnimatePresence initial={false} custom={galleryDirection}>
+                          <motion.img
+                            key={activeGalleryImage.src}
+                            src={activeGalleryImage.src}
+                            srcSet={activeGalleryImage.srcSet}
+                            sizes="(max-width: 640px) 100vw, 66vw"
+                            alt={`أبرز لحظات الدورة ${edition.editionNumber} - ${activeGalleryIndex + 1}`}
+                            loading={activeGalleryIndex === 0 ? "eager" : "lazy"}
+                            decoding="async"
+                            custom={galleryDirection}
+                            initial={(direction) => ({ x: `${direction * 100}%` })}
+                            animate={{ x: "0%" }}
+                            exit={(direction) => ({ x: `${direction * -100}%` })}
+                            transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+                            className="absolute inset-0 h-full w-full object-cover"
+                          />
+                        </AnimatePresence>
+                        <div className="absolute inset-x-0 bottom-0 flex justify-end bg-gradient-to-t from-black/55 to-transparent p-4">
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={goToPreviousImage}
+                              aria-label="الصورة السابقة"
+                              className="grid h-10 w-10 place-items-center rounded-full bg-white/90 text-[#24564e] shadow-sm transition hover:bg-white"
+                            >
+                              <ChevronRight className="h-5 w-5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={goToNextImage}
+                              aria-label="الصورة التالية"
+                              className="grid h-10 w-10 place-items-center rounded-full bg-white/90 text-[#24564e] shadow-sm transition hover:bg-white"
+                            >
+                              <ChevronLeft className="h-5 w-5" />
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="grid sm:grid-cols-2 gap-3">
+                      {activitiesList.map((activity, i) => (
+                        <div
+                          key={i}
+                          className="p-4 bg-[#F8FAF9] rounded-xl border border-[#4A9B8E]/10 text-gray-700 font-medium leading-7"
+                        >
+                          {activity.trim()}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </motion.div>
               )}
 

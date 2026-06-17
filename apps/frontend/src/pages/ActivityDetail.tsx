@@ -317,7 +317,7 @@ export default function ActivityDetail() {
 
         {isAcademy && activity.board ? (
           <HorizontalScroller
-            title="إدارة الدورة 17"
+            title="إدارة الدورة 18"
             hint=""
             icon={<Users className="w-6 h-6 text-[#4A9B8E]" />}
           >
@@ -349,7 +349,7 @@ export default function ActivityDetail() {
               <h2 className="text-xl md:text-2xl font-bold text-gray-900">الدورات الست عشرة</h2>
             </div>
             <EditionsGrid
-              editionNumbers={[17, 16, 15, 14]}
+              editionNumbers={[17, 16, 15]}
               badge="أكاديمية أطر الغد"
               title="الدورات السابقة لأكاديمية أطر الغد"
               description="تم نقل جميع الدورات السابقة من الصفحة الرئيسية إلى هذه الصفحة حتى تبقى تجربة التصفح أكثر تركيزا على الأنشطة."
@@ -360,7 +360,7 @@ export default function ActivityDetail() {
         {isAcademy && activity.feedback ? (
           <HorizontalScroller
             title="آراء الضيوف والسفراء"
-            hint="يمكنك السحب يمينا ويسارا أو استعمال الأسهم لقراءة كل الآراء."
+            hint=""
             icon={<Quote className="w-6 h-6 text-[#4A9B8E]" />}
           >
             {activity.feedback.map((item) => (

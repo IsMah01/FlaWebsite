@@ -45,6 +45,23 @@ function createPasswordResetToken() {
   };
 }
 
+function createConfirmationToken(email: string) {
+  const token = jwt.sign(
+    { email, nonce: crypto.randomBytes(16).toString("hex") },
+    JWT_SECRET,
+    { expiresIn: "24h" },
+  );
+
+  return {
+    token,
+    tokenHash: crypto.createHash("sha256").update(token).digest("hex"),
+  };
+}
+
+function hashConfirmationToken(token: string) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
 function hashPasswordResetToken(token: string) {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
@@ -153,7 +170,7 @@ export const candidateAuthRouter = createRouter({
       }
 
       const hashedPassword = await bcrypt.hash(input.password, 12);
-      const confirmationToken = jwt.sign({ email: normalizedEmail }, JWT_SECRET, { expiresIn: "24h" });
+      const confirmation = createConfirmationToken(normalizedEmail);
 
       const [newUser] = await db.insert(newUsers).values({
         firstName: input.firstName,
@@ -165,18 +182,16 @@ export const candidateAuthRouter = createRouter({
         isAmbassador: input.isAmbassador,
         password: hashedPassword,
         emailConfirmed: false,
-        confirmationToken,
+        confirmationToken: confirmation.tokenHash,
         newsletterConsent: input.newsletterConsent,
       });
 
-      const emailResult = await sendConfirmationEmail(normalizedEmail, input.firstName, confirmationToken);
-      const confirmationUrl = `${process.env.APP_URL || "http://localhost:3000"}/confirm-email?token=${confirmationToken}`;
+      const emailResult = await sendConfirmationEmail(normalizedEmail, input.firstName, confirmation.token);
 
       return {
         success: true,
         newUserId: newUser.insertId,
         emailSent: emailResult.success,
-        confirmationUrl,
         message: emailResult.success
           ? "تم التسجيل بنجاح! يرجى التحقق من بريدك الإلكتروني لتأكيد حسابك."
           : "تم التسجيل بنجاح! (لم يتم إرسال البريد - يرجى التحقق من إعدادات SMTP)",
@@ -189,13 +204,14 @@ export const candidateAuthRouter = createRouter({
       const db = getDb();
       try {
         const decoded = jwt.verify(input.token, JWT_SECRET) as { email: string };
+        const tokenHash = hashConfirmationToken(input.token);
         const account = await db
-          .select({ id: newUsers.id })
+          .select({ id: newUsers.id, confirmationToken: newUsers.confirmationToken })
           .from(newUsers)
           .where(eq(newUsers.email, decoded.email))
           .limit(1);
 
-        if (account.length === 0) {
+        if (account.length === 0 || account[0].confirmationToken !== tokenHash) {
           throw new TRPCError({
             code: "NOT_FOUND",
             message: "المستخدم غير موجود",
@@ -242,11 +258,11 @@ export const candidateAuthRouter = createRouter({
         });
       }
 
-      const confirmationToken = jwt.sign({ email: normalizedEmail }, JWT_SECRET, { expiresIn: "24h" });
+      const confirmation = createConfirmationToken(normalizedEmail);
 
-      await db.update(newUsers).set({ confirmationToken }).where(eq(newUsers.email, normalizedEmail));
+      await db.update(newUsers).set({ confirmationToken: confirmation.tokenHash }).where(eq(newUsers.email, normalizedEmail));
 
-      const emailResult = await sendConfirmationEmail(normalizedEmail, account.firstName, confirmationToken);
+      const emailResult = await sendConfirmationEmail(normalizedEmail, account.firstName, confirmation.token);
 
       return {
         success: true,
