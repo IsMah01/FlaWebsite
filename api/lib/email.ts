@@ -74,7 +74,7 @@ export async function sendConfirmationEmail(
   const logo = getEmailLogo();
 
   const html = `
-    <div dir="rtl" style="font-family: 'Noto Sans Arabic', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8faf9; border-radius: 12px;">
+    <div dir="rtl" style="font-family: 'Tajawal', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8faf9; border-radius: 12px;">
       <div style="text-align: center; padding: 20px 0;">
         <img src="${logo.src}" width="220" alt="Future Leaders Foundation" style="display: block; width: 220px; max-width: 100%; height: auto; margin: 0 auto 18px;">
         <h1 style="color: #4A9B8E; margin: 0;">${AR_ORG}</h1>
@@ -135,7 +135,7 @@ export async function sendPasswordResetEmail(
   const logo = getEmailLogo();
 
   const html = `
-    <div dir="rtl" style="font-family: 'Noto Sans Arabic', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8faf9; border-radius: 12px;">
+    <div dir="rtl" style="font-family: 'Tajawal', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8faf9; border-radius: 12px;">
       <div style="text-align: center; padding: 20px 0;">
         <img src="${logo.src}" width="220" alt="Future Leaders Foundation" style="display: block; width: 220px; max-width: 100%; height: auto; margin: 0 auto 18px;">
         <h1 style="color: #4A9B8E; margin: 0;">${AR_ORG}</h1>
@@ -195,7 +195,7 @@ export async function sendNewsletterEmail(
   const logo = getEmailLogo();
 
   const html = `
-    <div dir="rtl" style="font-family: 'Noto Sans Arabic', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8faf9; border-radius: 12px;">
+    <div dir="rtl" style="font-family: 'Tajawal', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8faf9; border-radius: 12px;">
       <div style="text-align: center; padding: 20px 0;">
         <img src="${logo.src}" width="220" alt="Future Leaders Foundation" style="display: block; width: 220px; max-width: 100%; height: auto; margin: 0 auto 18px;">
         <h1 style="color: #4A9B8E; margin: 0;">${AR_ORG}</h1>

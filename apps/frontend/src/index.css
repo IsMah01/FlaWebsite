@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;600;700;800;900&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -57,11 +57,21 @@
   }
   html {
     scroll-behavior: smooth;
+    font-family: 'Tajawal', system-ui, sans-serif;
   }
   body {
     @apply bg-background text-foreground;
-    font-family: 'Noto Sans Arabic', sans-serif;
+    font-family: inherit;
     direction: rtl;
+  }
+  #root {
+    font-family: inherit;
+  }
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
   }
 }
 

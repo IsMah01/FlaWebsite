@@ -366,13 +366,13 @@ export default function ActivityDetail() {
             {activity.feedback.map((item) => (
               <div
                 key={`${item.name}-${item.role}`}
-                className="min-w-[260px] rounded-2xl border border-gray-100 bg-[#FBFCFC] p-5 sm:min-w-[380px] sm:p-6 md:rounded-3xl lg:min-w-[520px]"
+                className="min-w-[260px] sm:min-w-[380px] lg:min-w-[520px] rounded-2xl md:rounded-3xl border border-gray-100 bg-[#FBFCFC] p-5 sm:p-6"
               >
                 <div className="mb-4">
                   <div className="font-bold text-gray-900">{item.name}</div>
                   <div className="mt-1 text-sm text-[#4A9B8E]">{item.role}</div>
                 </div>
-                <p className="leading-8 text-gray-600">{item.comment}</p>
+                <p className="text-gray-600 leading-8">{item.comment}</p>
               </div>
             ))}
           </HorizontalScroller>

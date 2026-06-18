@@ -33,10 +33,12 @@ export default function CountdownCTA({ compact = false, className = "" }: Countd
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-100px" }}
       transition={{ duration: 0.5 }}
-      className={`relative overflow-hidden rounded-2xl border border-[#4A9B8E]/20 bg-white shadow-sm ${className}`}
+      className={`relative overflow-hidden rounded-[32px] border border-[#4A9B8E]/20 bg-[linear-gradient(135deg,#f9fffd_0%,#ebf7f3_55%,#ffffff_100%)] shadow-sm ${className}`}
     >
+      <div className="absolute -top-10 -left-10 h-40 w-40 rounded-full bg-[#9ad7cb]/30 blur-3xl" />
+      <div className="absolute -bottom-10 -right-10 h-48 w-48 rounded-full bg-[#1f5148]/10 blur-3xl" />
       <div className={`relative ${compact ? "p-6 md:p-7" : "p-7 md:p-10"}`}>
-        <div className="inline-flex rounded-md bg-[#EAF7F3] px-3 py-1.5 text-xs font-semibold text-[#1f5148]">
+        <div className="inline-flex rounded-full bg-[#1f5148] px-4 py-1.5 text-xs font-semibold text-white">
           {isAmbassadorNotice ? "تذكير داخلي للأكاديمية" : "التسجيل مفتوح للأكاديمية 18"}
         </div>
         <div
