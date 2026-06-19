@@ -66,8 +66,12 @@ function hashPasswordResetToken(token: string) {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
-function enforceAuthRateLimit(options: {
-  action: "password_reset" | "candidate_login";
+async function enforceAuthRateLimit(options: {
+  action:
+    | "candidate_register"
+    | "confirmation_resend"
+    | "password_reset"
+    | "candidate_login";
   req: Request;
   email: string;
   limit: number;
@@ -76,13 +80,13 @@ function enforceAuthRateLimit(options: {
 }) {
   const ip = getClientIp(options.req);
   const email = options.email.trim().toLowerCase();
-  rateLimitOrThrow({
+  await rateLimitOrThrow({
     key: `${options.action}:ip:${ip}`,
     limit: options.limit,
     windowMs: options.windowMs,
     message: options.message,
   });
-  rateLimitOrThrow({
+  await rateLimitOrThrow({
     key: `${options.action}:email:${email}`,
     limit: options.limit,
     windowMs: options.windowMs,
@@ -155,9 +159,17 @@ export const candidateAuthRouter = createRouter({
           path: ["confirmPassword"],
         }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const db = getDb();
       const normalizedEmail = input.email.trim().toLowerCase();
+      await enforceAuthRateLimit({
+        action: "candidate_register",
+        req: ctx.req,
+        email: normalizedEmail,
+        limit: 5,
+        windowMs: 60 * 60 * 1000,
+        message: "Trop de créations de compte ont été demandées.",
+      });
 
       const existing = await db
         .select({ id: newUsers.id })
@@ -234,9 +246,17 @@ export const candidateAuthRouter = createRouter({
 
   resendConfirmation: publicQuery
     .input(z.object({ email: z.string().email() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const db = getDb();
       const normalizedEmail = input.email.trim().toLowerCase();
+      await enforceAuthRateLimit({
+        action: "confirmation_resend",
+        req: ctx.req,
+        email: normalizedEmail,
+        limit: 3,
+        windowMs: 15 * 60 * 1000,
+        message: "Trop de demandes de renvoi ont été effectuées.",
+      });
       const [account] = await db
         .select({
           id: newUsers.id,
@@ -280,7 +300,7 @@ export const candidateAuthRouter = createRouter({
     .input(z.object({ email: z.string().email() }))
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
-      const { ip, email: normalizedEmail } = enforceAuthRateLimit({
+      const { ip, email: normalizedEmail } = await enforceAuthRateLimit({
         action: "password_reset",
         req: ctx.req,
         email: input.email,
@@ -334,7 +354,7 @@ export const candidateAuthRouter = createRouter({
       z
         .object({
           token: z.string().min(20),
-          password: z.string().min(6, "كلمة المرور يجب أن تتكون من 6 أحرف على الأقل"),
+          password: strongPasswordSchema,
           confirmPassword: z.string(),
         })
         .refine((data) => data.password === data.confirmPassword, {
@@ -392,7 +412,7 @@ export const candidateAuthRouter = createRouter({
     )
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
-      const { ip, email: normalizedEmail } = enforceAuthRateLimit({
+      const { ip, email: normalizedEmail } = await enforceAuthRateLimit({
         action: "candidate_login",
         req: ctx.req,
         email: input.email,

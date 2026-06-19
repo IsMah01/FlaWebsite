@@ -3,6 +3,7 @@ import { createRouter, publicQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { contactMessages, newsletterSubscribers } from "@db/schema";
 import { eq } from "drizzle-orm";
+import { getClientIp, rateLimitOrThrow } from "./lib/abuse-protection";
 
 export const contactRouter = createRouter({
   submit: publicQuery
@@ -15,7 +16,14 @@ export const contactRouter = createRouter({
         message: z.string().min(1, "الرسالة مطلوبة"),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      const ip = getClientIp(ctx.req);
+      await rateLimitOrThrow({
+        key: `contact:${ip}`,
+        limit: 5,
+        windowMs: 10 * 60 * 1000,
+        message: "Trop de messages ont été envoyés.",
+      });
       const db = getDb();
       await db.insert(contactMessages).values(input);
       return { success: true, message: "تم إرسال رسالتك بنجاح" };
@@ -30,7 +38,14 @@ export const newsletterRouter = createRouter({
         name: z.string().optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      const ip = getClientIp(ctx.req);
+      await rateLimitOrThrow({
+        key: `newsletter:${ip}`,
+        limit: 10,
+        windowMs: 60 * 60 * 1000,
+        message: "Trop de demandes d’abonnement ont été effectuées.",
+      });
       const db = getDb();
       const existing = await db
         .select()

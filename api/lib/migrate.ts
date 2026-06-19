@@ -201,21 +201,40 @@ export async function ensureDatabaseSchema() {
       )
     `);
 
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS rate_limit_buckets (
+        bucketKey CHAR(64) NOT NULL,
+        windowStart BIGINT UNSIGNED NOT NULL,
+        expiresAt BIGINT UNSIGNED NOT NULL,
+        hitCount INT UNSIGNED NOT NULL DEFAULT 0,
+        PRIMARY KEY (bucketKey, windowStart),
+        INDEX rate_limit_expires_idx (expiresAt)
+      )
+    `);
+
     await addColumnIfMissing(connection, "admin_users", "updatedAt", "updatedAt TIMESTAMP NULL");
     await addColumnIfMissing(connection, "admin_users", "passwordResetToken", "passwordResetToken VARCHAR(64) NULL");
     await addColumnIfMissing(connection, "admin_users", "passwordResetExpiresAt", "passwordResetExpiresAt TIMESTAMP NULL");
 
+    const adminEmail = process.env.ADMIN_EMAIL || "admin@example.com";
+    const adminPassword = process.env.ADMIN_PASSWORD;
+    const adminName = process.env.ADMIN_NAME || "Admin";
     const [adminRows] = await connection.execute<mysql.RowDataPacket[]>(
       "SELECT id FROM admin_users WHERE email = ? LIMIT 1",
-      [process.env.ADMIN_EMAIL || "admin@example.com"],
+      [adminEmail],
     );
     if (adminRows.length === 0) {
+      if (!adminPassword || !/^(?=.*[A-Z]).{8,}$/.test(adminPassword)) {
+        throw new Error(
+          "ADMIN_PASSWORD must contain at least 8 characters and one uppercase letter",
+        );
+      }
       await connection.execute(
         "INSERT INTO admin_users (name, email, passwordHash, role, isActive) VALUES (?, ?, ?, 'super_admin', true)",
         [
-          process.env.ADMIN_NAME || "Admin",
-          process.env.ADMIN_EMAIL || "admin@example.com",
-          await bcrypt.hash(process.env.ADMIN_PASSWORD || "admin123", 12),
+          adminName,
+          adminEmail,
+          await bcrypt.hash(adminPassword, 12),
         ],
       );
     }

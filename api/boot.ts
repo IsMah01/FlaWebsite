@@ -12,7 +12,7 @@ import { PRIVATE_UPLOAD_DIR } from "./upload-router";
 import { readFile } from "fs/promises";
 import path from "path";
 import jwt from "jsonwebtoken";
-import { getDb } from "./queries/connection";
+import { getDb, getSqlPool } from "./queries/connection";
 import { adminUsers } from "@db/schema";
 import { eq } from "drizzle-orm";
 import { ensureDatabaseSchema } from "./lib/migrate";
@@ -67,6 +67,24 @@ app.use("*", async (c, next) => {
     c.header("Cache-Control", "no-store");
   }
 });
+
+app.get("/api/health", (c) =>
+  c.json({
+    ok: true,
+    service: "flf-api",
+    uptimeSeconds: Math.round(process.uptime()),
+  }),
+);
+
+app.get("/api/db-health", async (c) => {
+  try {
+    await getSqlPool().query("SELECT 1");
+    return c.json({ ok: true, database: "reachable" });
+  } catch {
+    return c.json({ ok: false, database: "unreachable" }, 503);
+  }
+});
+
 app.get(Paths.oauthCallback, createOAuthCallbackHandler());
 
 app.get("/api/private-files/:fileName", async (c) => {

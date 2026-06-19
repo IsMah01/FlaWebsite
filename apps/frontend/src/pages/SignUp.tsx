@@ -69,8 +69,10 @@ export default function SignUp() {
         });
         setFormData((prev) => ({ ...prev, attestationUrl: result.fileRef }));
         toast.success("تم رفع شهادة التمدرس بنجاح");
-      } catch {
-        toast.error("حدث خطأ أثناء رفع الملف");
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "حدث خطأ أثناء رفع الملف",
+        );
       } finally {
         setUploadingAttestation(false);
       }

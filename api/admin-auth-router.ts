@@ -12,6 +12,12 @@ import { getClientIp, rateLimitOrThrow, securityLog } from "./lib/abuse-protecti
 
 const ADMIN_COOKIE_NAME = "admin_token";
 const ADMIN_TOKEN_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
+const strongPasswordSchema = z
+  .string()
+  .regex(
+    /^(?=.*[A-Z]).{8,}$/,
+    "Le mot de passe doit contenir au moins 8 caractères et une majuscule",
+  );
 
 function getJwtSecret() {
   const secret = process.env.APP_SECRET;
@@ -48,7 +54,7 @@ function hashPasswordResetToken(token: string) {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
-function enforceAuthRateLimit(options: {
+async function enforceAuthRateLimit(options: {
   action: "admin_password_reset" | "admin_login";
   req: Request;
   email: string;
@@ -58,13 +64,13 @@ function enforceAuthRateLimit(options: {
 }) {
   const ip = getClientIp(options.req);
   const email = options.email.trim().toLowerCase();
-  rateLimitOrThrow({
+  await rateLimitOrThrow({
     key: `${options.action}:ip:${ip}`,
     limit: options.limit,
     windowMs: options.windowMs,
     message: options.message,
   });
-  rateLimitOrThrow({
+  await rateLimitOrThrow({
     key: `${options.action}:email:${email}`,
     limit: options.limit,
     windowMs: options.windowMs,
@@ -78,7 +84,7 @@ export const adminAuthRouter = createRouter({
     .input(z.object({ email: z.string().email() }))
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
-      const { ip, email: normalizedEmail } = enforceAuthRateLimit({
+      const { ip, email: normalizedEmail } = await enforceAuthRateLimit({
         action: "admin_password_reset",
         req: ctx.req,
         email: input.email,
@@ -125,7 +131,7 @@ export const adminAuthRouter = createRouter({
       z
         .object({
           token: z.string().min(20),
-          password: z.string().min(8, "Le mot de passe doit contenir au moins 8 caracteres"),
+          password: strongPasswordSchema,
           confirmPassword: z.string(),
         })
         .refine((data) => data.password === data.confirmPassword, {
@@ -174,7 +180,7 @@ export const adminAuthRouter = createRouter({
     )
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
-      const { ip, email: normalizedEmail } = enforceAuthRateLimit({
+      const { ip, email: normalizedEmail } = await enforceAuthRateLimit({
         action: "admin_login",
         req: ctx.req,
         email: input.email,

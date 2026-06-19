@@ -1,7 +1,7 @@
 FROM node:20-alpine AS deps
 WORKDIR /app
 COPY apps/backend/package*.json ./
-RUN npm install
+RUN npm ci
 
 FROM deps AS build
 COPY api ./api
@@ -14,7 +14,7 @@ FROM node:20-alpine AS production
 WORKDIR /app
 ENV NODE_ENV=production
 COPY apps/backend/package*.json ./
-RUN npm install --omit=dev
+RUN npm ci --omit=dev
 COPY --from=build /app/dist ./dist
 COPY apps/frontend/public/images/logo.png ./public/images/logo.png
 RUN mkdir -p storage/private/uploads

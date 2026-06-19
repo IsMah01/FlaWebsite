@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { motion } from "framer-motion";
 import {
@@ -7,6 +7,7 @@ import {
   CalendarRange,
   ChevronLeft,
   Newspaper,
+  Play,
   Quote,
   Sparkles,
   Users,
@@ -95,6 +96,58 @@ function HorizontalScroller({
         </button>
       </div>
     </section>
+  );
+}
+
+function LazyVideo({
+  src,
+  title,
+  poster,
+}: {
+  src: string;
+  title: string;
+  poster?: string;
+}) {
+  const [started, setStarted] = useState(false);
+
+  if (started) {
+    return (
+      <video
+        src={src}
+        controls
+        autoPlay
+        preload="metadata"
+        className="aspect-video w-full max-w-4xl rounded-xl bg-black object-contain md:rounded-2xl"
+        aria-label={title}
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setStarted(true)}
+      className="group relative aspect-video w-full max-w-4xl overflow-hidden rounded-xl bg-[#173f38] text-white md:rounded-2xl"
+      aria-label={`تشغيل ${title}`}
+    >
+      {poster ? (
+        <img
+          src={poster}
+          alt=""
+          loading="lazy"
+          className="absolute inset-0 h-full w-full object-cover opacity-45 transition-transform duration-500 group-hover:scale-[1.02]"
+        />
+      ) : null}
+      <span className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-black/20" />
+      <span className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+        <span className="flex h-16 w-16 items-center justify-center rounded-full bg-white/95 text-[#1f5148] shadow-xl transition-transform group-hover:scale-105">
+          <Play className="h-7 w-7 fill-current" />
+        </span>
+        <span className="rounded-full bg-black/45 px-4 py-2 text-sm font-semibold backdrop-blur-sm">
+          تشغيل الفيديو
+        </span>
+      </span>
+    </button>
   );
 }
 
@@ -288,13 +341,11 @@ export default function ActivityDetail() {
           <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6 md:rounded-3xl md:p-8">
             <div className="grid gap-5 justify-items-center">
               {activity.videos.map((video, index) => (
-                <video
+                <LazyVideo
                   key={video}
                   src={video}
-                  controls
-                  preload="metadata"
-                  className="aspect-video w-full max-w-4xl rounded-xl bg-black object-cover md:rounded-2xl"
-                  aria-label={`${activity.title} video ${index + 1}`}
+                  poster={activity.coverImage}
+                  title={`${activity.title} video ${index + 1}`}
                 />
               ))}
             </div>

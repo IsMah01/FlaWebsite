@@ -1,8 +1,11 @@
 import { TRPCError } from "@trpc/server";
-import { mkdir, readdir, stat, unlink, appendFile } from "fs/promises";
+import { appendFile, mkdir, readdir, stat, unlink } from "fs/promises";
+import { createHash } from "node:crypto";
+import { isIP } from "node:net";
 import path from "path";
-import { getDb } from "../queries/connection";
+import type { RowDataPacket } from "mysql2";
 import { candidates } from "@db/schema";
+import { getDb, getSqlPool } from "../queries/connection";
 
 export const PRIVATE_UPLOAD_DIR = path.resolve(
   process.cwd(),
@@ -14,24 +17,18 @@ export const PRIVATE_UPLOAD_DIR = path.resolve(
 const LOG_DIR = path.resolve(process.cwd(), "storage", "logs");
 const SECURITY_LOG_FILE = path.join(LOG_DIR, "security.log");
 
-type Bucket = {
-  count: number;
-  resetAt: number;
-};
-
-const buckets = new Map<string, Bucket>();
-
 export function getClientIp(req: Request): string {
-  const forwardedFor = req.headers.get("x-forwarded-for");
-  if (forwardedFor) {
-    return forwardedFor.split(",")[0]?.trim() || "unknown";
+  // In production the backend is reachable only through our reverse proxy.
+  // X-Real-IP is overwritten by Nginx, unlike a client-provided forwarding chain.
+  for (const value of [
+    req.headers.get("cf-connecting-ip"),
+    req.headers.get("x-real-ip"),
+  ]) {
+    const normalized = value?.trim();
+    if (normalized && isIP(normalized)) return normalized;
   }
 
-  return (
-    req.headers.get("cf-connecting-ip") ||
-    req.headers.get("x-real-ip") ||
-    "unknown"
-  );
+  return "direct";
 }
 
 export async function securityLog(event: string, details: Record<string, unknown>) {
@@ -49,35 +46,65 @@ export async function securityLog(event: string, details: Record<string, unknown
   }
 }
 
-export function rateLimitOrThrow(options: {
+export async function rateLimitOrThrow(options: {
   key: string;
   limit: number;
   windowMs: number;
   message?: string;
 }) {
   const now = Date.now();
-  const existing = buckets.get(options.key);
+  const windowStart = Math.floor(now / options.windowMs) * options.windowMs;
+  const expiresAt = windowStart + options.windowMs;
+  const bucketKey = createHash("sha256").update(options.key).digest("hex");
+  const connection = await getSqlPool().getConnection();
 
-  if (!existing || existing.resetAt <= now) {
-    buckets.set(options.key, {
-      count: 1,
-      resetAt: now + options.windowMs,
-    });
-    return;
+  try {
+    await connection.beginTransaction();
+    await connection.execute(
+      `INSERT INTO rate_limit_buckets
+        (bucketKey, windowStart, expiresAt, hitCount)
+       VALUES (?, ?, ?, 1)
+       ON DUPLICATE KEY UPDATE hitCount = hitCount + 1`,
+      [bucketKey, windowStart, expiresAt],
+    );
+    const [rows] = await connection.execute<RowDataPacket[]>(
+      `SELECT hitCount
+       FROM rate_limit_buckets
+       WHERE bucketKey = ? AND windowStart = ?`,
+      [bucketKey, windowStart],
+    );
+
+    const hitCount = Number(rows[0]?.hitCount || 0);
+    if (hitCount > options.limit) {
+      await connection.rollback();
+      const retryAfterSeconds = Math.max(1, Math.ceil((expiresAt - now) / 1000));
+      const message =
+        options.message ||
+        "Trop de tentatives. Veuillez patienter avant de réessayer.";
+
+      throw new TRPCError({
+        code: "TOO_MANY_REQUESTS",
+        message: `${message} Réessayez dans ${retryAfterSeconds} secondes. [retry_after=${retryAfterSeconds}]`,
+      });
+    }
+
+    await connection.commit();
+  } catch (error) {
+    try {
+      await connection.rollback();
+    } catch {
+      // Preserve the original error.
+    }
+    throw error;
+  } finally {
+    connection.release();
   }
 
-  existing.count += 1;
-
-  if (existing.count > options.limit) {
-    const retryAfterSeconds = Math.max(1, Math.ceil((existing.resetAt - now) / 1000));
-    const message =
-      options.message ||
-      "Trop de tentatives. Veuillez patienter avant de réessayer.";
-
-    throw new TRPCError({
-      code: "TOO_MANY_REQUESTS",
-      message: `${message} Réessayez dans ${retryAfterSeconds} secondes. [retry_after=${retryAfterSeconds}]`,
-    });
+  // Bounded opportunistic cleanup avoids an unbounded table.
+  if (Math.random() < 0.01) {
+    void getSqlPool()
+      .execute("DELETE FROM rate_limit_buckets WHERE expiresAt < ? LIMIT 500", [now])
+      .catch(() => undefined);
   }
 }
 
@@ -88,8 +115,8 @@ export async function cleanupOrphanUploads(options?: {
   minAgeMs?: number;
   intervalMs?: number;
 }) {
-  const minAgeMs = options?.minAgeMs ?? 2 * 60 * 60 * 1000; // 2 hours
-  const intervalMs = options?.intervalMs ?? 30 * 60 * 1000; // 30 minutes
+  const minAgeMs = options?.minAgeMs ?? 2 * 60 * 60 * 1000;
+  const intervalMs = options?.intervalMs ?? 30 * 60 * 1000;
   const now = Date.now();
 
   if (cleanupPromise) return cleanupPromise;
@@ -121,8 +148,7 @@ export async function cleanupOrphanUploads(options?: {
       const files = await readdir(PRIVATE_UPLOAD_DIR);
 
       for (const fileName of files) {
-        if (fileName === ".gitkeep") continue;
-        if (referencedFiles.has(fileName)) continue;
+        if (fileName === ".gitkeep" || referencedFiles.has(fileName)) continue;
 
         const filePath = path.join(PRIVATE_UPLOAD_DIR, fileName);
         if (!filePath.startsWith(PRIVATE_UPLOAD_DIR + path.sep)) continue;

@@ -10,6 +10,9 @@ import { Label } from "@/components/ui/label";
 import { trpc } from "@/providers/trpc";
 
 type AccountType = "candidate" | "admin";
+const passwordPattern = /^(?=.*[A-Z]).{8,}$/;
+const passwordPolicyMessage =
+  "Utilisez au moins 8 caractères, dont une lettre majuscule.";
 
 export default function ResetPassword({ accountType }: { accountType: AccountType }) {
   const navigate = useNavigate();
@@ -38,6 +41,15 @@ export default function ResetPassword({ accountType }: { accountType: AccountTyp
 
   function submit(event: FormEvent) {
     event.preventDefault();
+    if (!passwordPattern.test(formData.password)) {
+      toast.error(passwordPolicyMessage);
+      return;
+    }
+    if (formData.password !== formData.confirmPassword) {
+      toast.error("Les mots de passe ne correspondent pas.");
+      return;
+    }
+
     const payload = {
       token,
       password: formData.password,
@@ -84,7 +96,8 @@ export default function ResetPassword({ accountType }: { accountType: AccountTyp
                   value={formData.password}
                   onChange={(event) => setFormData({ ...formData, password: event.target.value })}
                   required
-                  minLength={isAdmin ? 8 : 6}
+                  minLength={8}
+                  pattern="(?=.*[A-Z]).{8,}"
                   className="mt-1 pr-10"
                 />
                 <button
@@ -95,6 +108,9 @@ export default function ResetPassword({ accountType }: { accountType: AccountTyp
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
+                <p className="mt-1 text-xs leading-5 text-gray-500">
+                  {passwordPolicyMessage}
+                </p>
               </div>
 
               <div>
@@ -105,7 +121,8 @@ export default function ResetPassword({ accountType }: { accountType: AccountTyp
                   value={formData.confirmPassword}
                   onChange={(event) => setFormData({ ...formData, confirmPassword: event.target.value })}
                   required
-                  minLength={isAdmin ? 8 : 6}
+                  minLength={8}
+                  pattern="(?=.*[A-Z]).{8,}"
                   className="mt-1"
                 />
               </div>
