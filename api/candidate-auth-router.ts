@@ -75,6 +75,7 @@ async function enforceAuthRateLimit(options: {
   req: Request;
   email: string;
   limit: number;
+  ipLimit?: number;
   windowMs: number;
   message: string;
 }) {
@@ -82,7 +83,7 @@ async function enforceAuthRateLimit(options: {
   const email = options.email.trim().toLowerCase();
   await rateLimitOrThrow({
     key: `${options.action}:ip:${ip}`,
-    limit: options.limit,
+    limit: options.ipLimit ?? options.limit,
     windowMs: options.windowMs,
     message: options.message,
   });
@@ -167,6 +168,7 @@ export const candidateAuthRouter = createRouter({
         req: ctx.req,
         email: normalizedEmail,
         limit: 5,
+        ipLimit: 25,
         windowMs: 60 * 60 * 1000,
         message: "Trop de créations de compte ont été demandées.",
       });
