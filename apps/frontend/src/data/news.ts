@@ -1,3 +1,5 @@
+import { REGISTRATION_DEADLINE, REGISTRATION_DEADLINE_AR } from "./registration";
+
 export type NewsItem = {
   id: string;
   title: string;
@@ -30,10 +32,10 @@ export const upcomingEvents: EventItem[] = [
   {
     id: "academy-deadline",
     title: "إغلاق استمارة الترشح لأكاديمية أطر الغد",
-    date: "2026-07-17",
+    date: REGISTRATION_DEADLINE,
     location: "عن بعد",
     summary:
-      "آخر أجل للتسجيل هو 17 يوليوز 2026. لا تفوت الفرصة، املأ الاستمارة وانضم إلينا في تجربة تعاش ولا تحكى",
+      `آخر أجل للتسجيل هو ${REGISTRATION_DEADLINE_AR}. لا تفوت الفرصة، املأ الاستمارة وانضم إلينا في تجربة تعاش ولا تحكى`,
     cta: "املأ الاستمارة",
   },
 ];

@@ -3,18 +3,8 @@ import { useNavigate } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Bell, ChevronLeft, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { REGISTRATION_DEADLINE_LABEL, getRegistrationCountdownDays } from "@/data/registration";
 import { useViewerSession } from "@/hooks/useViewerSession";
-
-const REGISTRATION_DEADLINE = "2026-07-17";
-const REGISTRATION_DEADLINE_LABEL = "17/07/2026";
-
-function getCountdownDays(targetDate: string) {
-  const target = new Date(`${targetDate}T00:00:00`);
-  const now = new Date();
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const diff = target.getTime() - startOfToday.getTime();
-  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
-}
 
 const REOPEN_INTERVAL_MS = 8 * 60 * 1000;
 
@@ -22,7 +12,7 @@ export default function CountdownFloatingPopup() {
   const navigate = useNavigate();
   const { isCandidate, hasAmbassadorView } = useViewerSession();
   const [isOpen, setIsOpen] = useState(true);
-  const daysLeft = getCountdownDays(REGISTRATION_DEADLINE);
+  const daysLeft = getRegistrationCountdownDays();
   const isClosed = daysLeft <= 0;
   const isAmbassadorNotice = hasAmbassadorView && !isCandidate;
 
