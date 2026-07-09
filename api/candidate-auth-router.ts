@@ -223,12 +223,27 @@ export const candidateAuthRouter = createRouter({
         const decoded = jwt.verify(input.token, JWT_SECRET) as { email: string };
         const tokenHash = hashConfirmationToken(input.token);
         const account = await db
-          .select({ id: newUsers.id, confirmationToken: newUsers.confirmationToken })
+          .select({
+            id: newUsers.id,
+            emailConfirmed: newUsers.emailConfirmed,
+            confirmationToken: newUsers.confirmationToken,
+          })
           .from(newUsers)
           .where(eq(newUsers.email, decoded.email))
           .limit(1);
 
-        if (account.length === 0 || account[0].confirmationToken !== tokenHash) {
+        if (account.length === 0) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "المستخدم غير موجود",
+          });
+        }
+
+        if (account[0].emailConfirmed) {
+          return { success: true, message: "تم تأكيد البريد الإلكتروني بنجاح" };
+        }
+
+        if (account[0].confirmationToken !== tokenHash) {
           throw new TRPCError({
             code: "NOT_FOUND",
             message: "المستخدم غير موجود",

@@ -70,7 +70,7 @@ export async function sendConfirmationEmail(
     return { success: false, reason: "SMTP_NOT_CONFIGURED" };
   }
 
-  const confirmUrl = `${APP_URL}/confirm-email?token=${token}`;
+  const confirmUrl = `${PUBLIC_APP_URL}/confirm-email?token=${encodeURIComponent(token)}`;
   const logo = getEmailLogo();
 
   const html = `
@@ -85,15 +85,19 @@ export async function sendConfirmationEmail(
         <p style="color: #444; line-height: 1.8; font-size: 15px;">
           ${AR_CONFIRM_BODY}
         </p>
-        <div style="text-align: center; margin: 30px 0;">
-          <a href="${confirmUrl}" 
-             style="display: inline-block; background: linear-gradient(135deg, #4A9B8E, #6BC4B2); color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
-            ${AR_CONFIRM_BUTTON}
-          </a>
-        </div>
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin: 30px auto;">
+          <tr>
+            <td bgcolor="#4A9B8E" style="border-radius: 8px; text-align: center;">
+              <a href="${confirmUrl}" target="_blank" rel="noopener noreferrer"
+                 style="display: inline-block; background: #4A9B8E; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
+                ${AR_CONFIRM_BUTTON}
+              </a>
+            </td>
+          </tr>
+        </table>
         <p style="color: #888; font-size: 13px; text-align: center; margin-top: 20px;">
           ${AR_COPY_LINK}<br>
-          <code style="direction: ltr; display: inline-block; margin-top: 8px; background: #f0f0f0; padding: 6px 12px; border-radius: 4px; font-size: 12px;">${confirmUrl}</code>
+          <a href="${confirmUrl}" target="_blank" rel="noopener noreferrer" style="direction: ltr; display: inline-block; margin-top: 8px; color: #4A9B8E; word-break: break-all;">${confirmUrl}</a>
         </p>
         <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
         <p style="color: #999; font-size: 12px; text-align: center;">
