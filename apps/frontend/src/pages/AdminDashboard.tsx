@@ -414,10 +414,10 @@ export default function AdminDashboard() {
   const ambassadorMessagesCsvRows = useMemo(
     () =>
       filteredAmbassadorMessages.map((message) => ({
-        "Ø§Ù„ÙƒØ§ØªØ¨": message.authorName,
-        "Ø§Ù„Ø¯ÙˆØ±": message.authorType === "admin" ? "Ø¥Ø¯Ø§Ø±Ø©" : "Ø³ÙÙŠØ±",
-        "Ø§Ù„Ø±Ø³Ø§Ù„Ø©": message.message,
-        "Ø§Ù„ØªØ§Ø±ÙŠØ®": formatDateDMYH(message.createdAt),
+        "الكاتب": message.authorName,
+        "الدور": message.authorType === "admin" ? "إدارة" : "سفير",
+        "الرسالة": message.message,
+        "التاريخ": formatDateDMYH(message.createdAt),
       })),
     [filteredAmbassadorMessages],
   );

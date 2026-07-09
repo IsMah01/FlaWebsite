@@ -36,23 +36,23 @@ export default function CountdownFloatingPopup() {
             animate={{ opacity: 1, x: 0, scale: 1 }}
             exit={{ opacity: 0, x: 24, scale: 0.96 }}
             transition={{ duration: 0.25 }}
-            className="fixed bottom-3 left-3 right-3 z-50 md:bottom-5 md:left-auto md:right-6 md:w-[400px]"
+            className="fixed bottom-[calc(0.75rem+env(safe-area-inset-bottom))] left-3 right-3 z-50 md:bottom-5 md:left-auto md:right-6 md:w-[400px]"
           >
-            <div className="relative overflow-hidden rounded-2xl border border-[#4A9B8E]/20 bg-white shadow-2xl">
+            <div className="relative max-h-[calc(100svh-1.5rem)] overflow-y-auto rounded-2xl border border-[#4A9B8E]/20 bg-white shadow-2xl">
               <div className="absolute inset-x-0 top-0 h-1.5 bg-[#4A9B8E]" />
               <button
                 onClick={() => setIsOpen(false)}
-                className="absolute left-4 top-4 rounded-full bg-gray-100 p-2 text-gray-500 transition-colors hover:bg-gray-200"
+                className="absolute left-3 top-3 rounded-full bg-gray-100 p-1.5 text-gray-500 transition-colors hover:bg-gray-200 md:left-4 md:top-4 md:p-2"
                 aria-label="Fermer"
               >
                 <X className="w-4 h-4" />
               </button>
-              <div className="p-5 pt-8 md:p-6 md:pt-8">
+              <div className="p-4 pt-7 md:p-6 md:pt-8">
                 <div className="inline-flex items-center gap-2 rounded-full bg-[#EAF7F3] px-3 py-1 text-xs font-semibold text-[#1f5148]">
                   <Bell className="w-3.5 h-3.5" />
                   {isAmbassadorNotice ? "تذكير داخلي" : "التسجيل مفتوح للأكاديمية 18"}
                 </div>
-                <p className="mt-4 text-gray-600 leading-7">
+                <p className="mt-3 hidden text-gray-600 leading-7 sm:block">
                   {isClosed ? (
                     <>انتهت فترة التسجيل الحالية. سيتم الإعلان عن أي تمديد عبر القنوات الرسمية.</>
                   ) : isAmbassadorNotice ? (
@@ -67,19 +67,19 @@ export default function CountdownFloatingPopup() {
                     </>
                   )}
                 </p>
-                <div className="mt-4 flex flex-wrap items-end gap-3">
+                <div className="mt-4 flex items-end justify-between gap-3 sm:flex-wrap sm:justify-start">
                   <div className="text-sm font-semibold text-gray-600">آخر أجل للتسجيل: {REGISTRATION_DEADLINE_LABEL}</div>
-                  <div className="text-4xl font-black leading-none text-[#1f5148] md:text-5xl">
+                  <div className="shrink-0 text-3xl font-black leading-none text-[#1f5148] md:text-5xl">
                     {isClosed ? "انتهى" : `J-${daysLeft}`}
                   </div>
                 </div>
                 {!isAmbassadorNotice && !isClosed ? (
-                  <p className="mt-4 text-gray-600 leading-7">أكمل التسجيل قبل {REGISTRATION_DEADLINE_LABEL} حتى لا تفوتك فرصة المشاركة.</p>
+                  <p className="mt-3 text-sm leading-6 text-gray-600 sm:mt-4 sm:text-base sm:leading-7">أكمل التسجيل قبل {REGISTRATION_DEADLINE_LABEL} حتى لا تفوتك فرصة المشاركة.</p>
                 ) : null}
                 {!isAmbassadorNotice && !isClosed ? (
                   <Button
                     onClick={() => navigate(isCandidate ? "/candidate-questionnaire" : "/signup")}
-                    className="mt-5 w-full h-11 bg-[#4A9B8E] hover:bg-[#3D7A6F]"
+                    className="mt-4 h-10 w-full bg-[#4A9B8E] hover:bg-[#3D7A6F] sm:mt-5 sm:h-11"
                   >
                     سجّل الآن
                     <ArrowLeft className="w-4 h-4 mr-2" />

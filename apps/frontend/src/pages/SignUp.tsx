@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { trpc } from "@/providers/trpc";
 import { toast } from "sonner";
 import Navbar from "@/components/Navbar";
+import { REGISTRATION_DEADLINE_LABEL, getRegistrationCountdownDays } from "@/data/registration";
 
 export default function SignUp() {
   const navigate = useNavigate();
@@ -31,6 +32,7 @@ export default function SignUp() {
   const attestationRef = useRef<HTMLInputElement>(null);
   const passwordPolicyMessage = "يجب أن تتكون كلمة المرور من 8 أحرف على الأقل وأن تحتوي على حرف كبير واحد على الأقل.";
   const passwordPattern = /^(?=.*[A-Z]).{8,}$/;
+  const daysLeft = getRegistrationCountdownDays();
 
   const uploadMutation = trpc.upload.upload.useMutation();
   const registerMutation = trpc.candidateAuth.register.useMutation({
@@ -111,10 +113,21 @@ export default function SignUp() {
   return (
     <div className="min-h-screen bg-[#F8FAF9]">
       <Navbar />
-      <div className="pt-24 pb-12 px-4">
+      <div className="px-4 pb-12 pt-20 sm:pt-24">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="max-w-2xl mx-auto">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8">
-            <div className="text-center mb-8">
+          <div className="mb-4 rounded-2xl border border-[#4A9B8E]/15 bg-white p-4 shadow-sm">
+            <div className="flex flex-col gap-2 text-right sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-[#1f5148]">آخر أجل للتسجيل: {REGISTRATION_DEADLINE_LABEL}</p>
+                <p className="mt-1 text-xs leading-5 text-gray-500">أكمل الحساب ثم املأ استمارة المترشح بعد تسجيل الدخول.</p>
+              </div>
+              <div className="w-fit rounded-full bg-[#EAF7F3] px-3 py-1 text-sm font-bold text-[#1f5148]">
+                J-{daysLeft}
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6 md:p-8">
+            <div className="text-center mb-6 sm:mb-8">
               <div className="w-16 h-16 bg-[#4A9B8E]/10 rounded-full flex items-center justify-center mx-auto mb-4">
                 <UserPlus className="w-8 h-8 text-[#4A9B8E]" />
               </div>
@@ -123,7 +136,7 @@ export default function SignUp() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <Label htmlFor="firstName">الاسم الشخصي *</Label>
                   <Input id="firstName" value={formData.firstName} onChange={(e) => setFormData({ ...formData, firstName: e.target.value })} placeholder="الاسم الشخصي" required className="text-right mt-1" />
@@ -159,7 +172,7 @@ export default function SignUp() {
                 </Button>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <Label htmlFor="phoneNumber">رقم الهاتف *</Label>
                   <Input id="phoneNumber" value={formData.phoneNumber} onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })} placeholder="+212..." required className="text-right mt-1" />
@@ -172,7 +185,7 @@ export default function SignUp() {
 
               <div className="p-4 bg-[#F8FAF9] rounded-xl">
                 <Label className="mb-3 block">هل أنت سفير إحدى دورات أكاديمية أطر الغد؟</Label>
-                <div className="flex gap-6">
+                <div className="flex flex-wrap gap-6">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input type="radio" name="ambassador" checked={formData.isAmbassador} onChange={() => setFormData({ ...formData, isAmbassador: true })} className="w-4 h-4 text-[#4A9B8E]" />
                     <span className="text-sm">نعم</span>
@@ -184,7 +197,7 @@ export default function SignUp() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="relative">
                   <Label htmlFor="password">كلمة المرور *</Label>
                   <Input id="password" type={showPassword ? "text" : "password"} value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} placeholder="******" required minLength={8} pattern="(?=.*[A-Z]).{8,}" className="text-right mt-1 pr-10" />
