@@ -100,6 +100,19 @@ async function ensureAmbassadorMessagesTable() {
   `);
 }
 
+function canManageOwnMessage(
+  actor: NonNullable<Awaited<ReturnType<typeof getDiscussionActor>>>,
+  message: {
+    authorType: "ambassador" | "admin";
+    authorCandidateId: number | null;
+    authorAdminId: number | null;
+  },
+) {
+  if (actor.type !== message.authorType) return false;
+  if (actor.type === "ambassador") return actor.candidateId === message.authorCandidateId;
+  return actor.adminId === message.authorAdminId;
+}
+
 export const ambassadorRouter = createRouter({
   listMessages: publicQuery.query(async ({ ctx }) => {
     const actor = await getDiscussionActor(ctx.req, ctx.user);
@@ -113,7 +126,7 @@ export const ambassadorRouter = createRouter({
     await ensureAmbassadorMessagesTable();
     const db = getDb();
     try {
-      return await db
+      const rows = await db
         .select({
           id: ambassadorMessages.id,
           authorName: ambassadorMessages.authorName,
@@ -125,6 +138,11 @@ export const ambassadorRouter = createRouter({
         })
         .from(ambassadorMessages)
         .orderBy(desc(ambassadorMessages.createdAt));
+
+      return rows.map((entry) => ({
+        ...entry,
+        canDelete: canManageOwnMessage(actor, entry),
+      }));
     } catch {
       const legacyRows = await db
         .select({
@@ -141,6 +159,7 @@ export const ambassadorRouter = createRouter({
         authorType: "ambassador" as const,
         authorCandidateId: null,
         authorAdminId: null,
+        canDelete: false,
       }));
     }
   }),
@@ -183,6 +202,49 @@ export const ambassadorRouter = createRouter({
         }
       }
 
+      return { success: true };
+    }),
+
+  deleteOwnMessage: publicQuery
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input, ctx }) => {
+      const actor = await getDiscussionActor(ctx.req, ctx.user);
+
+      if (!actor) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Cette zone est reservee aux ambassadeurs et aux administrateurs.",
+        });
+      }
+
+      await ensureAmbassadorMessagesTable();
+      const db = getDb();
+      const [message] = await db
+        .select({
+          id: ambassadorMessages.id,
+          authorType: ambassadorMessages.authorType,
+          authorCandidateId: ambassadorMessages.authorCandidateId,
+          authorAdminId: ambassadorMessages.authorAdminId,
+        })
+        .from(ambassadorMessages)
+        .where(eq(ambassadorMessages.id, input.id))
+        .limit(1);
+
+      if (!message) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Message not found",
+        });
+      }
+
+      if (!canManageOwnMessage(actor, message)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Vous ne pouvez supprimer que vos propres messages.",
+        });
+      }
+
+      await db.delete(ambassadorMessages).where(eq(ambassadorMessages.id, input.id));
       return { success: true };
     }),
 });

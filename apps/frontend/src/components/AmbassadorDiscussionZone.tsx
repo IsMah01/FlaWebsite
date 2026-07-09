@@ -1,9 +1,14 @@
 import { useState } from "react";
-import { MessageSquareText, SendHorizontal } from "lucide-react";
+import { MessageSquareText, SendHorizontal, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/providers/trpc";
+
+function messageExcerpt(text: string) {
+  const compact = text.replace(/\s+/g, " ").trim();
+  return compact.length > 120 ? `${compact.slice(0, 120)}...` : compact;
+}
 
 export default function AmbassadorDiscussionZone({ author }: { author: string }) {
   const [message, setMessage] = useState("");
@@ -20,11 +25,29 @@ export default function AmbassadorDiscussionZone({ author }: { author: string })
       toast.error(error.message || "تعذر نشر الرسالة");
     },
   });
+  const deleteMutation = trpc.ambassador.deleteOwnMessage.useMutation({
+    onSuccess: async () => {
+      await utils.ambassador.listMessages.invalidate();
+      toast.success("تم حذف الرسالة");
+    },
+    onError: (error) => {
+      toast.error(error.message || "Impossible de supprimer le message");
+    },
+  });
 
   const submit = () => {
     const trimmed = message.trim();
     if (!trimmed) return;
     postMutation.mutate({ message: trimmed });
+  };
+
+  const deleteOwnMessage = (id: number, text: string) => {
+    const excerpt = messageExcerpt(text);
+    const confirmed = window.confirm(
+      `Supprimer votre message ?\n\n"${excerpt}"\n\nCette action est definitive.`,
+    );
+    if (!confirmed) return;
+    deleteMutation.mutate({ id });
   };
 
   return (
@@ -75,9 +98,24 @@ export default function AmbassadorDiscussionZone({ author }: { author: string })
                           {entry.authorType === "admin" ? "إدارة" : "سفير"}
                         </p>
                       </div>
-                      <time className="text-xs text-gray-400">
-                        {new Date(entry.createdAt).toLocaleString()}
-                      </time>
+                      <div className="flex items-center gap-2">
+                        <time className="text-xs text-gray-400">
+                          {new Date(entry.createdAt).toLocaleString()}
+                        </time>
+                        {entry.canDelete ? (
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700"
+                            disabled={deleteMutation.isPending}
+                            onClick={() => deleteOwnMessage(entry.id, entry.message)}
+                            aria-label="Supprimer le message"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        ) : null}
+                      </div>
                     </div>
                     <p className="text-gray-600 leading-8 whitespace-pre-wrap">{entry.message}</p>
                   </article>

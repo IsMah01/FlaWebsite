@@ -15,9 +15,10 @@ import {
 export const adminRouter = createRouter({
   stats: adminQuery.query(async () => {
     const db = getDb();
-    const [allCandidates, allMessages, allEditions, allNewUsers, allUsers] = await Promise.all([
+    const [allCandidates, allMessages, allAmbassadorMessages, allEditions, allNewUsers, allUsers] = await Promise.all([
       db.select().from(candidates),
       db.select().from(contactMessages),
+      db.select().from(ambassadorMessages),
       db.select().from(editions),
       db
         .select({
@@ -38,6 +39,7 @@ export const adminRouter = createRouter({
       acceptedCandidates: allCandidates.filter((c) => (c as any).applicationStatus === "accepted").length,
       rejectedCandidates: allCandidates.filter((c) => (c as any).applicationStatus === "rejected").length,
       messages: allMessages.length,
+      ambassadorMessages: allAmbassadorMessages.length,
       editions: allEditions.length,
       newsletterSubscribers: allNewUsers.filter((user) => user.newsletterConsent).length,
     };

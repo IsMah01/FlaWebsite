@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
-import { Download, FileText, LogOut, Mail, RefreshCw, ShieldCheck, Trash2, Users } from "lucide-react";
+import { Download, FileText, LogOut, Mail, MessageSquareText, RefreshCw, ShieldCheck, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,6 +62,20 @@ function formatDateYMDH(value?: string | Date | null) {
   const hour = String(date.getHours()).padStart(2, "0");
   const minute = String(date.getMinutes()).padStart(2, "0");
   return `${year}-${month}-${day} ${hour}:${minute}`;
+}
+
+function formatDateYMD(value?: string | Date | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function messageExcerpt(text: string) {
+  const compact = text.replace(/\s+/g, " ").trim();
+  return compact.length > 140 ? `${compact.slice(0, 140)}...` : compact;
 }
 
 function mapStudyStatus(studyStatus?: string | null) {
@@ -222,6 +236,8 @@ export default function AdminDashboard() {
   });
   const [tab, setTab] = useState<Tab>("newUsers");
   const [search, setSearch] = useState("");
+  const [ambassadorMessageAuthorFilter, setAmbassadorMessageAuthorFilter] = useState("");
+  const [ambassadorMessageDateFilter, setAmbassadorMessageDateFilter] = useState("");
   const isAdmin = user?.role === "admin";
 
   const stats = trpc.admin.stats.useQuery(undefined, {
@@ -294,7 +310,10 @@ export default function AdminDashboard() {
   const deleteAmbassadorMessage = trpc.admin.deleteAmbassadorMessage.useMutation({
     onSuccess: async () => {
       toast.success("Message supprime");
-      await utils.admin.listAmbassadorMessages.invalidate();
+      await Promise.all([
+        utils.admin.listAmbassadorMessages.invalidate(),
+        utils.admin.stats.invalidate(),
+      ]);
     },
     onError: (err) => toast.error(err.message || "Impossible de supprimer le message"),
   });
@@ -309,8 +328,9 @@ export default function AdminDashboard() {
     deleteUser.mutate({ id });
   }
 
-  function handleDeleteAmbassadorMessage(id: number, label: string) {
-    if (!window.confirm(`Supprimer le message de ${label || id} ? Cette action est definitive.`)) return;
+  function handleDeleteAmbassadorMessage(id: number, label: string, text: string) {
+    const excerpt = messageExcerpt(text);
+    if (!window.confirm(`Supprimer le message de ${label || id} ?\n\n"${excerpt}"\n\nCette action est definitive.`)) return;
     deleteAmbassadorMessage.mutate({ id });
   }
 
@@ -324,6 +344,18 @@ export default function AdminDashboard() {
         .includes(q),
     );
   }, [candidates.data, search]);
+
+  const filteredAmbassadorMessages = useMemo(() => {
+    const authorQuery = ambassadorMessageAuthorFilter.trim().toLowerCase();
+    const dateQuery = ambassadorMessageDateFilter;
+
+    return (ambassadorMessages.data ?? []).filter((message) => {
+      const authorText = `${message.authorName} ${message.authorType}`.toLowerCase();
+      const matchesAuthor = !authorQuery || authorText.includes(authorQuery);
+      const matchesDate = !dateQuery || formatDateYMD(message.createdAt) === dateQuery;
+      return matchesAuthor && matchesDate;
+    });
+  }, [ambassadorMessages.data, ambassadorMessageAuthorFilter, ambassadorMessageDateFilter]);
 
   const newUsersCsvRows = useMemo(
     () =>
@@ -381,13 +413,13 @@ export default function AdminDashboard() {
 
   const ambassadorMessagesCsvRows = useMemo(
     () =>
-      (ambassadorMessages.data ?? []).map((message) => ({
+      filteredAmbassadorMessages.map((message) => ({
         "Ø§Ù„ÙƒØ§ØªØ¨": message.authorName,
         "Ø§Ù„Ø¯ÙˆØ±": message.authorType === "admin" ? "Ø¥Ø¯Ø§Ø±Ø©" : "Ø³ÙÙŠØ±",
         "Ø§Ù„Ø±Ø³Ø§Ù„Ø©": message.message,
         "Ø§Ù„ØªØ§Ø±ÙŠØ®": formatDateDMYH(message.createdAt),
       })),
-    [ambassadorMessages.data],
+    [filteredAmbassadorMessages],
   );
 
   const subscribersCsvRows = useMemo(
@@ -430,7 +462,13 @@ export default function AdminDashboard() {
   }
 
   const accessError =
-    stats.error ?? newUsers.error ?? platformUsers.error ?? candidates.error ?? messages.error ?? subscribers.error;
+    stats.error ??
+    newUsers.error ??
+    platformUsers.error ??
+    candidates.error ??
+    messages.error ??
+    ambassadorMessages.error ??
+    subscribers.error;
 
   if (accessError?.data?.code === "UNAUTHORIZED" || accessError?.data?.code === "FORBIDDEN") {
     return (
@@ -469,7 +507,7 @@ export default function AdminDashboard() {
           </div>
         </header>
 
-        <section className="grid gap-4 md:grid-cols-4">
+        <section className="grid gap-4 md:grid-cols-5">
           <div className="rounded-2xl border bg-white p-5 shadow-sm">
             <Users className="mb-3 h-5 w-5 text-[#4A9B8E]" />
             <p className="text-sm text-slate-500">المترشحون</p>
@@ -484,6 +522,11 @@ export default function AdminDashboard() {
             <Mail className="mb-3 h-5 w-5 text-[#4A9B8E]" />
             <p className="text-sm text-slate-500">رسائل التواصل</p>
             <p className="text-3xl font-bold">{stats.data?.messages ?? 0}</p>
+          </div>
+          <div className="rounded-2xl border bg-white p-5 shadow-sm">
+            <MessageSquareText className="mb-3 h-5 w-5 text-[#4A9B8E]" />
+            <p className="text-sm text-slate-500">رسائل السفراء</p>
+            <p className="text-3xl font-bold">{stats.data?.ambassadorMessages ?? 0}</p>
           </div>
           <div className="rounded-2xl border bg-white p-5 shadow-sm">
             <FileText className="mb-3 h-5 w-5 text-[#4A9B8E]" />
@@ -724,8 +767,30 @@ export default function AdminDashboard() {
                   <Download className="ml-2 h-4 w-4" /> csv تصدير
                 </Button>
               </div>
+              <div className="mb-4 grid gap-3 md:grid-cols-[1fr_220px_auto]">
+                <Input
+                  placeholder="Rechercher par auteur ou role..."
+                  value={ambassadorMessageAuthorFilter}
+                  onChange={(event) => setAmbassadorMessageAuthorFilter(event.target.value)}
+                />
+                <Input
+                  type="date"
+                  value={ambassadorMessageDateFilter}
+                  onChange={(event) => setAmbassadorMessageDateFilter(event.target.value)}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setAmbassadorMessageAuthorFilter("");
+                    setAmbassadorMessageDateFilter("");
+                  }}
+                >
+                  Reinitialiser
+                </Button>
+              </div>
               <div className="space-y-3">
-                {(ambassadorMessages.data ?? []).map((message) => (
+                {filteredAmbassadorMessages.map((message) => (
                   <article key={message.id} className="rounded-xl border p-4">
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                       <div>
@@ -738,7 +803,7 @@ export default function AdminDashboard() {
                         variant="outline"
                         size="sm"
                         className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-                        onClick={() => handleDeleteAmbassadorMessage(message.id, message.authorName)}
+                        onClick={() => handleDeleteAmbassadorMessage(message.id, message.authorName, message.message)}
                         disabled={deleteAmbassadorMessage.isPending}
                       >
                         <Trash2 className="ml-2 h-4 w-4" /> حذف
@@ -747,7 +812,7 @@ export default function AdminDashboard() {
                     <p className="mt-3 whitespace-pre-wrap text-slate-800">{message.message}</p>
                   </article>
                 ))}
-                {ambassadorMessages.data?.length === 0 ? (
+                {filteredAmbassadorMessages.length === 0 ? (
                   <div className="rounded-xl border border-dashed p-4 text-center text-sm text-slate-500">
                     لا توجد رسائل في فضاء السفراء.
                   </div>
