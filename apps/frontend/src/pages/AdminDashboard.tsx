@@ -244,6 +244,10 @@ export default function AdminDashboard() {
     retry: false,
     enabled: isAdmin,
   });
+  const ambassadorMessages = trpc.admin.listAmbassadorMessages.useQuery(undefined, {
+    retry: false,
+    enabled: isAdmin,
+  });
   const subscribers = trpc.admin.listNewsletterSubscribers.useQuery(undefined, {
     retry: false,
     enabled: isAdmin,
@@ -287,6 +291,14 @@ export default function AdminDashboard() {
     onError: (err) => toast.error(err.message || "Impossible de supprimer l'utilisateur"),
   });
 
+  const deleteAmbassadorMessage = trpc.admin.deleteAmbassadorMessage.useMutation({
+    onSuccess: async () => {
+      toast.success("Message supprime");
+      await utils.admin.listAmbassadorMessages.invalidate();
+    },
+    onError: (err) => toast.error(err.message || "Impossible de supprimer le message"),
+  });
+
   function handleDeleteNewUser(id: number, label: string) {
     if (!window.confirm(`Supprimer le compte ${label || id} ? Cette action est definitive.`)) return;
     deleteNewUser.mutate({ id });
@@ -295,6 +307,11 @@ export default function AdminDashboard() {
   function handleDeleteUser(id: number, label: string) {
     if (!window.confirm(`Supprimer l'utilisateur ${label || id} ? Cette action est definitive.`)) return;
     deleteUser.mutate({ id });
+  }
+
+  function handleDeleteAmbassadorMessage(id: number, label: string) {
+    if (!window.confirm(`Supprimer le message de ${label || id} ? Cette action est definitive.`)) return;
+    deleteAmbassadorMessage.mutate({ id });
   }
 
   const filteredCandidates = useMemo(() => {
@@ -360,6 +377,17 @@ export default function AdminDashboard() {
         "التاريخ": formatDateDMYH(message.createdAt),
       })),
     [messages.data],
+  );
+
+  const ambassadorMessagesCsvRows = useMemo(
+    () =>
+      (ambassadorMessages.data ?? []).map((message) => ({
+        "Ø§Ù„ÙƒØ§ØªØ¨": message.authorName,
+        "Ø§Ù„Ø¯ÙˆØ±": message.authorType === "admin" ? "Ø¥Ø¯Ø§Ø±Ø©" : "Ø³ÙÙŠØ±",
+        "Ø§Ù„Ø±Ø³Ø§Ù„Ø©": message.message,
+        "Ø§Ù„ØªØ§Ø±ÙŠØ®": formatDateDMYH(message.createdAt),
+      })),
+    [ambassadorMessages.data],
   );
 
   const subscribersCsvRows = useMemo(
@@ -685,27 +713,70 @@ export default function AdminDashboard() {
         )}
 
         {tab === "messages" && (
-          <section className="rounded-2xl border bg-white p-4 shadow-sm">
-            <div className="mb-4 flex justify-end">
-              <Button variant="outline" onClick={() => downloadCsv("messages-contact.csv", messagesCsvRows)}>
-                <Download className="ml-2 h-4 w-4" /> csv تصدير الرسائل
-              </Button>
-            </div>
-            <div className="space-y-3">
-              {(messages.data ?? []).map((message) => (
-                <article key={message.id} className="rounded-xl border p-4">
-                  <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                    <h3 className="font-semibold">{message.subject}</h3>
-                    <p className="text-sm text-slate-500">{formatDateDMYH(message.createdAt)}</p>
+          <div className="space-y-4">
+            <section className="rounded-2xl border bg-white p-4 shadow-sm">
+              <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold">فضاء السفراء للنقاش</h2>
+                  <p className="text-sm text-slate-500">رسائل السفراء والإدارة الظاهرة في فضاء النقاش.</p>
+                </div>
+                <Button variant="outline" onClick={() => downloadCsv("ambassador-messages.csv", ambassadorMessagesCsvRows)}>
+                  <Download className="ml-2 h-4 w-4" /> csv تصدير
+                </Button>
+              </div>
+              <div className="space-y-3">
+                {(ambassadorMessages.data ?? []).map((message) => (
+                  <article key={message.id} className="rounded-xl border p-4">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                      <div>
+                        <h3 className="font-semibold">{message.authorName}</h3>
+                        <p className="text-xs text-[#4A9B8E]">
+                          {message.authorType === "admin" ? "إدارة" : "سفير"} - {formatDateDMYH(message.createdAt)}
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                        onClick={() => handleDeleteAmbassadorMessage(message.id, message.authorName)}
+                        disabled={deleteAmbassadorMessage.isPending}
+                      >
+                        <Trash2 className="ml-2 h-4 w-4" /> حذف
+                      </Button>
+                    </div>
+                    <p className="mt-3 whitespace-pre-wrap text-slate-800">{message.message}</p>
+                  </article>
+                ))}
+                {ambassadorMessages.data?.length === 0 ? (
+                  <div className="rounded-xl border border-dashed p-4 text-center text-sm text-slate-500">
+                    لا توجد رسائل في فضاء السفراء.
                   </div>
-                  <p className="mt-1 text-sm text-slate-600">
-                    {message.name} - {message.email} {message.phone ? `- ${message.phone}` : ""}
-                  </p>
-                  <p className="mt-3 whitespace-pre-wrap text-slate-800">{message.message}</p>
-                </article>
-              ))}
-            </div>
-          </section>
+                ) : null}
+              </div>
+            </section>
+
+            <section className="rounded-2xl border bg-white p-4 shadow-sm">
+              <div className="mb-4 flex justify-end">
+                <Button variant="outline" onClick={() => downloadCsv("messages-contact.csv", messagesCsvRows)}>
+                  <Download className="ml-2 h-4 w-4" /> csv تصدير الرسائل
+                </Button>
+              </div>
+              <div className="space-y-3">
+                {(messages.data ?? []).map((message) => (
+                  <article key={message.id} className="rounded-xl border p-4">
+                    <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                      <h3 className="font-semibold">{message.subject}</h3>
+                      <p className="text-sm text-slate-500">{formatDateDMYH(message.createdAt)}</p>
+                    </div>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {message.name} - {message.email} {message.phone ? `- ${message.phone}` : ""}
+                    </p>
+                    <p className="mt-3 whitespace-pre-wrap text-slate-800">{message.message}</p>
+                  </article>
+                ))}
+              </div>
+            </section>
+          </div>
         )}
 
         {tab === "subscribers" && (

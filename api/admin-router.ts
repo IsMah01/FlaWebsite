@@ -5,6 +5,7 @@ import { createRouter, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import {
   candidates,
+  ambassadorMessages,
   contactMessages,
   editions,
   newUsers,
@@ -236,6 +237,30 @@ export const adminRouter = createRouter({
     const db = getDb();
     return db.select().from(contactMessages).orderBy(desc(contactMessages.createdAt));
   }),
+
+  listAmbassadorMessages: adminQuery.query(async () => {
+    const db = getDb();
+    return db
+      .select({
+        id: ambassadorMessages.id,
+        authorName: ambassadorMessages.authorName,
+        authorType: ambassadorMessages.authorType,
+        authorCandidateId: ambassadorMessages.authorCandidateId,
+        authorAdminId: ambassadorMessages.authorAdminId,
+        message: ambassadorMessages.message,
+        createdAt: ambassadorMessages.createdAt,
+      })
+      .from(ambassadorMessages)
+      .orderBy(desc(ambassadorMessages.createdAt));
+  }),
+
+  deleteAmbassadorMessage: adminQuery
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      await db.delete(ambassadorMessages).where(eq(ambassadorMessages.id, input.id));
+      return { success: true };
+    }),
 
   listNewsletterSubscribers: adminQuery.query(async () => {
     const db = getDb();
