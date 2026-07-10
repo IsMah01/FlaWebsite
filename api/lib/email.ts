@@ -186,6 +186,67 @@ export async function sendPasswordResetEmail(
   }
 }
 
+export async function sendCandidateQuestionnaireReminderEmail(
+  to: string,
+  firstName: string,
+  daysLeft: number,
+  deadlineLabel: string,
+) {
+  if (!SMTP_HOST || !SMTP_USER) {
+    console.warn("[Email] SMTP not configured. Skipping candidate reminder email.");
+    return { success: false, reason: "SMTP_NOT_CONFIGURED" };
+  }
+
+  const formUrl = `${PUBLIC_APP_URL}/signin?redirect=/candidate-questionnaire`;
+  const logo = getEmailLogo();
+  const dayWord = daysLeft === 1 ? "يوم واحد" : `${daysLeft} أيام`;
+  const subject = `تذكير بإتمام استمارة أكاديمية أطر الغد - بقي ${dayWord}`;
+
+  const html = `
+    <div dir="rtl" lang="ar" style="margin:0;padding:0;background:#f3f7f6;font-family:Arial,Tahoma,sans-serif;color:#173f39;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f3f7f6;padding:28px 12px;">
+        <tr><td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 18px 45px rgba(23,63,57,0.12);">
+            <tr><td style="background:linear-gradient(135deg,#1f5148 0%,#4A9B8E 58%,#8fd3c5 100%);padding:34px 30px;text-align:right;color:#ffffff;">
+              <img src="${logo.src}" width="180" alt="Future Leaders Foundation" style="display:block;width:180px;max-width:100%;height:auto;margin:0 0 22px auto;background:#ffffff;border-radius:12px;padding:10px;">
+              <div style="display:inline-block;background:rgba(255,255,255,0.16);border-radius:999px;padding:7px 14px;font-size:13px;font-weight:700;margin-bottom:18px;">تذكير مهم</div>
+              <h1 style="margin:0;font-size:28px;line-height:1.45;font-weight:800;">لم يتبق سوى ${dayWord} لإتمام استمارة المشاركة</h1>
+              <p style="margin:14px 0 0;font-size:16px;line-height:1.9;color:rgba(255,255,255,0.92);">أكاديمية أطر الغد - الدورة الثامنة عشرة، دورة الأثر</p>
+            </td></tr>
+            <tr><td style="padding:30px;text-align:right;">
+              <p style="margin:0 0 18px;font-size:17px;line-height:1.9;color:#253b37;">مرحباً ${firstName || ""}،</p>
+              <p style="margin:0 0 18px;font-size:16px;line-height:1.95;color:#3f5550;">لاحظنا أنكم قمتم بإنشاء حسابكم على منصة مؤسسة أطر الغد، لكن استمارة المشاركة في الدورة الثامنة عشرة لم تُستكمل أو لم تُرسل بعد.</p>
+              <p style="margin:0 0 22px;font-size:16px;line-height:1.95;color:#3f5550;">ندعوكم إلى إتمام تعبئة الاستمارة قبل انتهاء الأجل المحدد حتى يتم أخذ ترشحكم بعين الاعتبار ضمن مراحل الانتقاء.</p>
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:24px 0;background:#f4fbf9;border:1px solid #d8eee9;border-radius:14px;"><tr><td style="padding:18px 20px;">
+                <p style="margin:0 0 8px;font-size:14px;color:#4A9B8E;font-weight:800;">الأجل المتبقي</p>
+                <p style="margin:0;font-size:30px;line-height:1.2;color:#1f5148;font-weight:900;">${dayWord}</p>
+                <p style="margin:10px 0 0;font-size:14px;line-height:1.7;color:#60736f;">آخر أجل للتسجيل: ${deadlineLabel}</p>
+              </td></tr></table>
+              <div style="text-align:center;margin:30px 0 26px;"><a href="${formUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:#4A9B8E;color:#ffffff;text-decoration:none;border-radius:10px;padding:14px 30px;font-size:16px;font-weight:800;">إتمام الاستمارة الآن</a></div>
+              <p style="margin:0;font-size:13px;line-height:1.8;color:#7a8a86;text-align:center;">إذا كان الزر لا يعمل، يمكنكم نسخ الرابط التالي وفتحه في المتصفح:<br><a href="${formUrl}" style="color:#4A9B8E;word-break:break-all;direction:ltr;display:inline-block;margin-top:6px;">${formUrl}</a></p>
+            </td></tr>
+            <tr><td style="padding:18px 30px;background:#f8faf9;text-align:center;color:#8a9995;font-size:12px;line-height:1.8;">${AR_ORG}<br>هذه رسالة تذكيرية آلية لمساعدتكم على إتمام ملف الترشيح داخل الآجال المحددة.</td></tr>
+          </table>
+        </td></tr>
+      </table>
+    </div>
+  `;
+
+  try {
+    await transporter.sendMail({
+      from: `"${AR_ORG}" <${SMTP_FROM}>`,
+      to,
+      subject,
+      html,
+      attachments: logo.attachments,
+    });
+    return { success: true };
+  } catch (error) {
+    console.error("[Email] Failed to send candidate reminder email:", error);
+    return { success: false, reason: "SEND_FAILED" };
+  }
+}
+
 export async function sendNewsletterEmail(
   to: string,
   subject: string,

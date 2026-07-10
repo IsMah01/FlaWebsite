@@ -212,6 +212,24 @@ export async function ensureDatabaseSchema() {
       )
     `);
 
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS candidate_reminder_emails (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        newUserId INT NOT NULL,
+        email VARCHAR(320) NOT NULL,
+        reminderDate CHAR(10) NOT NULL,
+        daysLeft INT NOT NULL,
+        status ENUM('pending','sent','failed') NOT NULL DEFAULT 'pending',
+        errorMessage TEXT NULL,
+        sentAt TIMESTAMP NULL,
+        createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY candidate_reminder_daily_unique (newUserId, reminderDate),
+        INDEX candidate_reminder_date_idx (reminderDate),
+        INDEX candidate_reminder_status_idx (status)
+      )
+    `);
+
     await addColumnIfMissing(connection, "admin_users", "updatedAt", "updatedAt TIMESTAMP NULL");
     await addColumnIfMissing(connection, "admin_users", "passwordResetToken", "passwordResetToken VARCHAR(64) NULL");
     await addColumnIfMissing(connection, "admin_users", "passwordResetExpiresAt", "passwordResetExpiresAt TIMESTAMP NULL");

@@ -16,6 +16,7 @@ import { getDb, getSqlPool } from "./queries/connection";
 import { adminUsers } from "@db/schema";
 import { eq } from "drizzle-orm";
 import { ensureDatabaseSchema } from "./lib/migrate";
+import { startCandidateQuestionnaireReminderScheduler } from "./lib/candidate-reminders";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
@@ -139,6 +140,7 @@ export default app;
 
 if (env.isProduction) {
   await ensureDatabaseSchema();
+  startCandidateQuestionnaireReminderScheduler();
 
   const { serve } = await import("@hono/node-server");
   const { serveStaticFiles } = await import("./lib/vite");
