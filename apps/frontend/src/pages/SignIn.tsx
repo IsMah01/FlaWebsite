@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, LogIn } from "lucide-react";
 import { toast } from "sonner";
@@ -12,6 +12,7 @@ import { trpc } from "@/providers/trpc";
 
 export default function SignIn() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const utils = trpc.useUtils();
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({ email: "", password: "" });
@@ -24,7 +25,8 @@ export default function SignIn() {
       await utils.candidateAuth.me.invalidate();
       await utils.auth.me.invalidate();
       toast.success("تم تسجيل الدخول بنجاح!");
-      navigate("/");
+      const redirectPath = searchParams.get("redirect");
+      navigate(redirectPath?.startsWith("/") && !redirectPath.startsWith("//") ? redirectPath : "/");
     },
     onError: (err) => {
       toast.error(rateLimit.blockFromError(err) || err.message || "Erreur pendant la connexion");

@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { motion } from "framer-motion";
 import { ArrowRight, CheckCircle2, ChevronLeft, ChevronRight, FileText, Send } from "lucide-react";
 import { toast } from "sonner";
@@ -223,10 +223,22 @@ export default function CandidateQuestionnaire() {
           <p className="mb-8 text-gray-600">
             لا يمكن الوصول إلى هذه الاستمارة إلا من طرف المترشح المسجل دخوله.
           </p>
-          <Button onClick={() => navigate("/")} className="bg-[#4A9B8E] hover:bg-[#3D7A6F]">
-            <ArrowRight className="mr-2 h-4 w-4" />
-            العودة إلى الرئيسية
-          </Button>
+          <div className="flex flex-col justify-center gap-3 sm:flex-row">
+            <Link to="/signin?redirect=/candidate-questionnaire">
+              <Button className="w-full bg-[#4A9B8E] hover:bg-[#3D7A6F] sm:w-auto">
+                تسجيل الدخول لملء الاستمارة
+              </Button>
+            </Link>
+            <Link to="/signup">
+              <Button variant="outline" className="w-full border-[#4A9B8E]/20 text-[#1f5148] sm:w-auto">
+                إنشاء حساب جديد
+              </Button>
+            </Link>
+            <Button onClick={() => navigate("/")} variant="ghost" className="text-[#1f5148]">
+              <ArrowRight className="mr-2 h-4 w-4" />
+              العودة إلى الرئيسية
+            </Button>
+          </div>
         </div>
         <Footer />
       </div>

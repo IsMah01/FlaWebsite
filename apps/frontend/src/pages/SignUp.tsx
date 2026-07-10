@@ -38,7 +38,7 @@ export default function SignUp() {
   const registerMutation = trpc.candidateAuth.register.useMutation({
     onSuccess: (data) => {
       toast.success(data.message);
-      setTimeout(() => navigate("/signin"), 3000);
+      setTimeout(() => navigate("/signin?redirect=/candidate-questionnaire"), 3000);
     },
     onError: (err) => {
       toast.error(err.message || "حدث خطأ أثناء التسجيل");

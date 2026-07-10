@@ -62,7 +62,7 @@ export default function ConfirmEmail() {
                 <h2 className="text-xl font-bold text-gray-900 mb-2">تم التأكيد بنجاح!</h2>
                 <p className="text-gray-500 mb-6">{message}</p>
                 <div className="space-y-3">
-                  <Link to="/signin">
+                  <Link to="/signin?redirect=/candidate-questionnaire">
                     <Button className="w-full bg-[#4A9B8E] hover:bg-[#3D7A6F] text-white">
                       <Mail className="w-4 h-4 mr-2" />
                       تسجيل الدخول

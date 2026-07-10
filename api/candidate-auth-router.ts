@@ -434,7 +434,7 @@ export const candidateAuthRouter = createRouter({
         req: ctx.req,
         email: input.email,
         limit: 5,
-        windowMs: 5 * 60 * 1000,
+        windowMs: 60 * 1000,
         message: "Trop de tentatives de connexion.",
       });
       const [account] = await db
