@@ -16,7 +16,7 @@ export default function Home() {
   const { viewer, hasAmbassadorView, isAmbassador, hasSubmittedQuestionnaire } = useViewerSession();
   const isAdmin = viewer?.kind === "site-user" && viewer.role === "admin";
   const isInternalHome = hasAmbassadorView || isAdmin;
-  const showAcademyReminder = isAdmin || (!hasSubmittedQuestionnaire && !isAmbassador);
+  const showAcademyReminder = isAdmin || isAmbassador || !hasSubmittedQuestionnaire;
 
   return (
     <div className="min-h-screen">

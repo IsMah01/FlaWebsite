@@ -118,6 +118,7 @@ export function useViewerSession() {
     hasAmbassadorView:
       (viewer?.kind === "candidate" && viewer.isAmbassador) ||
       (viewer?.kind === "site-user" && viewer.role === "admin"),
+    isCandidateAccount: viewer?.kind === "candidate",
     isCandidate: viewer?.kind === "candidate" && !viewer.isAmbassador,
     isAuthenticated: !!viewer,
     isLoading:

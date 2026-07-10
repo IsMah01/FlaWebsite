@@ -12,10 +12,11 @@ type CountdownCTAProps = {
 
 export default function CountdownCTA({ compact = false, className = "" }: CountdownCTAProps) {
   const navigate = useNavigate();
-  const { isCandidate, hasAmbassadorView } = useViewerSession();
+  const { viewer, isCandidateAccount, isCandidate, hasAmbassadorView } = useViewerSession();
   const daysLeft = getRegistrationCountdownDays();
   const isClosed = daysLeft <= 0;
   const isAmbassadorNotice = hasAmbassadorView && !isCandidate;
+  const isAdmin = viewer?.kind === "site-user" && viewer.role === "admin";
 
   return (
     <motion.section
@@ -60,9 +61,9 @@ export default function CountdownCTA({ compact = false, className = "" }: Countd
             </>
           )}
         </p>
-        {!isAmbassadorNotice && !isClosed ? (
+        {!isClosed && !isAdmin ? (
           <Button
-            onClick={() => navigate(isCandidate ? "/candidate-questionnaire" : "/signup")}
+            onClick={() => navigate(isCandidateAccount ? "/candidate-questionnaire" : "/signup")}
             className={`mt-6 ${compact ? "h-11" : "h-12"} bg-[#4A9B8E] hover:bg-[#3D7A6F]`}
           >
             سجّل الآن

@@ -135,13 +135,13 @@ function isStepStarted(stepIndex: number, answers: Record<string, string>) {
 
 export default function CandidateQuestionnaire() {
   const navigate = useNavigate();
-  const { viewer, isCandidate, isLoading } = useViewerSession();
+  const { viewer, isCandidateAccount, isLoading } = useViewerSession();
   const utils = trpc.useUtils();
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [hasLoadedDraft, setHasLoadedDraft] = useState(false);
   const [loadedStorageKey, setLoadedStorageKey] = useState("");
-  const canAccess = useMemo(() => isCandidate && !!viewer, [isCandidate, viewer]);
+  const canAccess = useMemo(() => isCandidateAccount && !!viewer, [isCandidateAccount, viewer]);
   const storageKey = `candidate-questionnaire-${viewer?.id ?? "guest"}`;
   const serverDraftQuery = trpc.candidateAuth.getQuestionnaireDraft.useQuery(undefined, {
     enabled: canAccess,

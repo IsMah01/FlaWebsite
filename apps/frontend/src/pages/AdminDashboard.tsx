@@ -108,6 +108,11 @@ function mapUserRole(role?: string | null) {
   }
 }
 
+function formatPercent(value: number, total: number) {
+  if (!total) return "0%";
+  return `${Math.round((value / total) * 100)}%`;
+}
+
 function normalizeCell(value?: string | null) {
   return (value || "").replace(/\r?\n+/g, " ").replace(/\s+/g, " ").trim();
 }
@@ -434,6 +439,61 @@ export default function AdminDashboard() {
     [subscribers.data],
   );
 
+  const dashboardStats = stats.data ?? {};
+  const totalApplications = dashboardStats.candidates ?? 0;
+  const acceptedApplications = dashboardStats.acceptedCandidates ?? 0;
+  const pendingApplications = dashboardStats.pendingCandidates ?? 0;
+  const rejectedApplications = dashboardStats.rejectedCandidates ?? 0;
+  const confirmedApplications = dashboardStats.confirmedCandidates ?? 0;
+  const primaryCounters = [
+    {
+      label: "الحسابات المنشأة",
+      value: dashboardStats.newUsers ?? 0,
+      hint: "كل المسجلين عبر منصة الترشيح",
+      icon: Users,
+    },
+    {
+      label: "مستخدمو المنصة",
+      value: dashboardStats.users ?? 0,
+      hint: "الحسابات التي سجلت الدخول",
+      icon: ShieldCheck,
+    },
+    {
+      label: "الاستمارات المرسلة",
+      value: totalApplications,
+      hint: "ملفات الترشيح المكتملة",
+      icon: FileText,
+    },
+    {
+      label: "السفراء",
+      value: dashboardStats.ambassadors ?? 0,
+      hint: "مترشحون بعلامة سفير",
+      icon: Users,
+    },
+    {
+      label: "النشرة البريدية",
+      value: dashboardStats.newsletterSubscribers ?? 0,
+      hint: "وافقوا على استقبال الأخبار",
+      icon: Mail,
+    },
+    {
+      label: "البريد المؤكد",
+      value: confirmedApplications,
+      hint: `${formatPercent(confirmedApplications, totalApplications)} من الاستمارات`,
+      icon: ShieldCheck,
+    },
+  ];
+  const decisionCounters = [
+    { label: "قيد المعالجة", value: pendingApplications, className: "bg-amber-500" },
+    { label: "مقبول", value: acceptedApplications, className: "bg-emerald-600" },
+    { label: "مرفوض", value: rejectedApplications, className: "bg-red-500" },
+  ];
+  const activityCounters = [
+    { label: "رسائل التواصل", value: dashboardStats.messages ?? 0, icon: Mail },
+    { label: "رسائل السفراء", value: dashboardStats.ambassadorMessages ?? 0, icon: MessageSquareText },
+    { label: "الدورات المنشورة", value: dashboardStats.editions ?? 0, icon: FileText },
+  ];
+
   if (isLoading) {
     return (
       <div dir="rtl" lang="ar" className="min-h-screen flex items-center justify-center">
@@ -507,31 +567,80 @@ export default function AdminDashboard() {
           </div>
         </header>
 
-        <section className="grid gap-4 md:grid-cols-5">
+        <section className="space-y-4">
           <div className="rounded-2xl border bg-white p-5 shadow-sm">
-            <Users className="mb-3 h-5 w-5 text-[#4A9B8E]" />
-            <p className="text-sm text-slate-500">المترشحون</p>
-            <p className="text-3xl font-bold">{stats.data?.candidates ?? 0}</p>
+            <div className="mb-5 flex flex-col gap-1 md:flex-row md:items-end md:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-[#4A9B8E]">Dashboard</p>
+                <h2 className="text-xl font-bold text-slate-900">مؤشرات المنصة</h2>
+              </div>
+              <p className="text-sm text-slate-500">آخر تحديث: {formatDateDMYH(new Date())}</p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+              {primaryCounters.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <div key={item.label} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <Icon className="h-5 w-5 text-[#4A9B8E]" />
+                      <span className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-slate-500">compteur</span>
+                    </div>
+                    <p className="text-sm text-slate-500">{item.label}</p>
+                    <p className="mt-1 text-3xl font-black text-slate-900">{item.value}</p>
+                    <p className="mt-2 min-h-10 text-xs leading-5 text-slate-500">{item.hint}</p>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-          <div className="rounded-2xl border bg-white p-5 shadow-sm">
-            <ShieldCheck className="mb-3 h-5 w-5 text-[#4A9B8E]" />
-            <p className="text-sm text-slate-500">المترشحون المقبولون</p>
-            <p className="text-3xl font-bold">{stats.data?.acceptedCandidates ?? 0}</p>
-          </div>
-          <div className="rounded-2xl border bg-white p-5 shadow-sm">
-            <Mail className="mb-3 h-5 w-5 text-[#4A9B8E]" />
-            <p className="text-sm text-slate-500">رسائل التواصل</p>
-            <p className="text-3xl font-bold">{stats.data?.messages ?? 0}</p>
-          </div>
-          <div className="rounded-2xl border bg-white p-5 shadow-sm">
-            <MessageSquareText className="mb-3 h-5 w-5 text-[#4A9B8E]" />
-            <p className="text-sm text-slate-500">رسائل السفراء</p>
-            <p className="text-3xl font-bold">{stats.data?.ambassadorMessages ?? 0}</p>
-          </div>
-          <div className="rounded-2xl border bg-white p-5 shadow-sm">
-            <FileText className="mb-3 h-5 w-5 text-[#4A9B8E]" />
-            <p className="text-sm text-slate-500">الدورات</p>
-            <p className="text-3xl font-bold">{stats.data?.editions ?? 0}</p>
+
+          <div className="grid gap-4 lg:grid-cols-[1.4fr_0.9fr]">
+            <div className="rounded-2xl border bg-white p-5 shadow-sm">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm text-slate-500">حالة ملفات الترشيح</p>
+                  <h3 className="text-lg font-bold text-slate-900">متابعة الانتقاء</h3>
+                </div>
+                <p className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">
+                  {totalApplications} ملف
+                </p>
+              </div>
+              <div className="space-y-4">
+                {decisionCounters.map((item) => (
+                  <div key={item.label}>
+                    <div className="mb-1 flex items-center justify-between text-sm">
+                      <span className="font-medium text-slate-700">{item.label}</span>
+                      <span className="text-slate-500">{item.value} ({formatPercent(item.value, totalApplications)})</span>
+                    </div>
+                    <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
+                      <div className={`h-full rounded-full ${item.className}`} style={{ width: formatPercent(item.value, totalApplications) }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border bg-white p-5 shadow-sm">
+              <p className="text-sm text-slate-500">نشاط المنصة</p>
+              <h3 className="mb-4 text-lg font-bold text-slate-900">التواصل والمحتوى</h3>
+              <div className="grid gap-3">
+                {activityCounters.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <div key={item.label} className="flex items-center justify-between rounded-2xl bg-slate-50 p-4">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#4A9B8E]">
+                          <Icon className="h-5 w-5" />
+                        </span>
+                        <span className="font-medium text-slate-700">{item.label}</span>
+                      </div>
+                      <span className="text-2xl font-black text-slate-900">{item.value}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </section>
 

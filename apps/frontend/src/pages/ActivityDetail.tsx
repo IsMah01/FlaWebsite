@@ -176,7 +176,7 @@ export default function ActivityDetail() {
 
   const isAcademy = activity.slug === "future-leaders-academy";
   const isAdmin = viewer?.kind === "site-user" && viewer.role === "admin";
-  const showAcademyReminder = isAdmin || (!hasSubmittedQuestionnaire && !isAmbassador);
+  const showAcademyReminder = isAdmin || isAmbassador || !hasSubmittedQuestionnaire;
   const showAmbassadorLayer =
     hasAmbassadorView &&
     (activity.slug === "trustees-program" || activity.slug === "ambassadors-forum") &&

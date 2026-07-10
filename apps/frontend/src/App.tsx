@@ -18,9 +18,9 @@ import ScrollManager from "./components/ScrollManager";
 import { useViewerSession } from "./hooks/useViewerSession";
 
 function CandidateOnlyPublicRoute({ children }: { children: ReactElement }) {
-  const { isCandidate } = useViewerSession();
+  const { isCandidateAccount } = useViewerSession();
 
-  if (isCandidate) {
+  if (isCandidateAccount) {
     return <Navigate to="/candidate-questionnaire" replace />;
   }
 

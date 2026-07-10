@@ -10,11 +10,12 @@ const REOPEN_INTERVAL_MS = 8 * 60 * 1000;
 
 export default function CountdownFloatingPopup() {
   const navigate = useNavigate();
-  const { isCandidate, hasAmbassadorView } = useViewerSession();
+  const { viewer, isCandidateAccount, isCandidate, hasAmbassadorView } = useViewerSession();
   const [isOpen, setIsOpen] = useState(true);
   const daysLeft = getRegistrationCountdownDays();
   const isClosed = daysLeft <= 0;
   const isAmbassadorNotice = hasAmbassadorView && !isCandidate;
+  const isAdmin = viewer?.kind === "site-user" && viewer.role === "admin";
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -73,12 +74,12 @@ export default function CountdownFloatingPopup() {
                     {isClosed ? "انتهى" : `J-${daysLeft}`}
                   </div>
                 </div>
-                {!isAmbassadorNotice && !isClosed ? (
+                {!isClosed && !isAdmin ? (
                   <p className="mt-3 text-sm leading-6 text-gray-600 sm:mt-4 sm:text-base sm:leading-7">أكمل التسجيل قبل {REGISTRATION_DEADLINE_LABEL} حتى لا تفوتك فرصة المشاركة.</p>
                 ) : null}
-                {!isAmbassadorNotice && !isClosed ? (
+                {!isClosed && !isAdmin ? (
                   <Button
-                    onClick={() => navigate(isCandidate ? "/candidate-questionnaire" : "/signup")}
+                    onClick={() => navigate(isCandidateAccount ? "/candidate-questionnaire" : "/signup")}
                     className="mt-4 h-10 w-full bg-[#4A9B8E] hover:bg-[#3D7A6F] sm:mt-5 sm:h-11"
                   >
                     سجّل الآن
