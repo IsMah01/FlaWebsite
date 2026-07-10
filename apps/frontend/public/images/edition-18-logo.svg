@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 420" role="img" aria-labelledby="title desc">
+  <title id="title">Future Leaders Academy edition 18 logo</title>
+  <desc id="desc">Logo for Future Leaders Academy edition 18, دورة الأثر.</desc>
+  <rect width="1080" height="420" fill="#ffffff"/>
+  <g transform="translate(585 56)">
+    <path d="M95 19 178 19 117 75 34 75Z" fill="#f59a23"/>
+    <path d="M55 90C92 142 118 188 93 296 155 237 203 169 205 103 157 124 106 121 55 90Z" fill="#f6a938"/>
+    <path d="M19 75C7 164 19 247 71 354 55 228 55 145 121 78 78 95 43 93 19 75Z" fill="#2d9cad"/>
+    <path d="M241 67C305 67 356 112 356 174 356 220 331 257 289 275 334 289 364 324 364 363 364 387 356 407 342 420H263C281 407 291 387 291 363 291 320 260 292 209 292H176L190 234H219C258 234 285 211 285 176 285 143 263 123 227 123 189 123 164 147 158 186H89C98 115 155 67 241 67Z" fill="#f5a12d"/>
+    <path d="M180 270C147 268 118 258 93 241 98 222 100 204 97 187 118 210 143 222 172 224Z" fill="#2d9cad"/>
+    <path d="M313 249C344 274 361 309 361 350 361 385 348 412 326 432H255C286 412 302 385 302 351 302 313 280 286 240 271Z" fill="#35aabb"/>
+  </g>
+  <g fill="#111111" text-anchor="middle">
+    <text x="330" y="150" font-family="Arial, 'Segoe UI', sans-serif" font-size="54" font-weight="700">أكاديمية أطر الغد</text>
+    <text x="330" y="220" font-family="Arial, 'Segoe UI', sans-serif" font-size="34" font-weight="700" letter-spacing="1">FUTURE LEADERS ACADEMY</text>
+    <text x="330" y="306" font-family="Arial, 'Segoe UI', sans-serif" font-size="48" font-weight="700">الدورة 18 | دورة الأثر</text>
+  </g>
+</svg>

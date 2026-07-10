@@ -305,7 +305,7 @@ export default function CandidateQuestionnaire() {
 
       <section className="pt-20">
         <div className="relative overflow-hidden bg-[linear-gradient(135deg,#1f5148_0%,#4A9B8E_55%,#9ad7cb_100%)]">
-          <div className="relative mx-auto max-w-6xl px-4 py-16 text-white sm:px-6">
+          <div className="relative mx-auto max-w-[1360px] px-4 py-10 text-white sm:px-6 sm:py-14 md:py-16">
             <button
               onClick={() => navigate("/")}
               className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 text-sm transition-colors hover:bg-white/15"
@@ -314,14 +314,41 @@ export default function CandidateQuestionnaire() {
               العودة إلى الرئيسية
             </button>
 
-            <div className="mt-8 max-w-3xl">
-              <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-medium">
-                <FileText className="h-4 w-4" />
-                استمارة المترشح
+            <div className="mt-7 grid items-center gap-6 sm:mt-8 sm:gap-8 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]">
+              <div className="max-w-none">
+                <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-medium">
+                  <FileText className="h-4 w-4" />
+                  استمارة المترشح
+                </div>
+                <h1 className="mt-5 text-2xl font-bold leading-[1.25] sm:text-3xl md:text-4xl xl:text-[44px]">
+                  إطلاق استمارة المشاركة في الدورة الثامنة عشرة لأكاديمية أطر الغد - دورة الأثر
+                </h1>
+                <p className="mt-5 max-w-none text-base leading-8 text-white/90 md:text-lg">
+                  تعلن أكاديمية أطر الغد عن فتح باب التسجيل للمشاركة في دورتها الثامنة عشرة - "دورة الأثر"، والتي تهدف إلى تأهيل إطار صالح مصلح متشبع بقيم الأمانة والمسؤولية والانخراط في قضايا الوطن و الأمة، متسلح بقوة العلم وروح المبادرة.
+                </p>
+                <div className="mt-6 max-w-none space-y-3 text-sm leading-7 text-white/90 md:text-base">
+                  <p className="font-semibold text-white">وتمر عملية الانتقاء عبر المراحل التالية:</p>
+                  <ol className="list-decimal space-y-2 pr-5">
+                    <li>ملء استمارة المشاركة داخل الآجال المحددة.</li>
+                    <li>الانتقاء الأولي بناء على المعطيات الواردة في الاستمارة.</li>
+                    <li>إجراء المقابلة الشفوية للمترشحين الذين تم قبولهم أوليًا.</li>
+                    <li>الإعلان عن اللائحة النهائية للمشاركين في الدورة الثامنة عشرة لأكاديمية أطر الغد - دورة الأثر.</li>
+                  </ol>
+                  <p className="font-semibold text-white">
+                    ندعو الراغبين في خوض تجربة تعاش ولا تُحكى إلى تعبئة استمارة المشاركة أسفله:
+                  </p>
+                </div>
               </div>
-              <h1 className="mt-5 text-4xl font-bold leading-tight md:text-5xl">
-                أسئلة الترشح للدورة الأكاديمية
-              </h1>
+
+              <div className="mx-auto w-full max-w-xs sm:max-w-sm lg:mx-0">
+                <div className="overflow-hidden rounded-2xl bg-white p-4 shadow-2xl shadow-black/15">
+                  <img
+                    src="/images/edition-18-logo.svg"
+                    alt="أكاديمية أطر الغد - الدورة 18 - دورة الأثر"
+                    className="h-auto w-full"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>
