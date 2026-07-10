@@ -169,8 +169,8 @@ export const candidateAuthRouter = createRouter({
         email: normalizedEmail,
         limit: 5,
         ipLimit: 25,
-        windowMs: 60 * 60 * 1000,
-        message: "Trop de créations de compte ont été demandées.",
+        windowMs: 3 * 60 * 1000,
+        message: "Trop de créations de compte ont été demandées avec cette adresse email ou cette connexion.",
       });
 
       const existing = await db

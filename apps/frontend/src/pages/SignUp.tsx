@@ -11,6 +11,7 @@ import { trpc } from "@/providers/trpc";
 import { toast } from "sonner";
 import Navbar from "@/components/Navbar";
 import { REGISTRATION_DEADLINE_LABEL, getRegistrationCountdownDays } from "@/data/registration";
+import { formatRateLimitError } from "@/hooks/useRateLimitBlock";
 
 export default function SignUp() {
   const navigate = useNavigate();
@@ -41,7 +42,7 @@ export default function SignUp() {
       setTimeout(() => navigate("/signin?redirect=/candidate-questionnaire"), 3000);
     },
     onError: (err) => {
-      toast.error(err.message || "حدث خطأ أثناء التسجيل");
+      toast.error(formatRateLimitError(err, "حدث خطأ أثناء التسجيل"));
     },
   });
 

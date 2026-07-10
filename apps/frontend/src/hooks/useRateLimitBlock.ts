@@ -6,6 +6,10 @@ function getRetryAfterSeconds(error: unknown) {
   return match ? Number(match[1]) : 0;
 }
 
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error ?? "");
+}
+
 export function formatBlockedSeconds(totalSeconds: number) {
   const seconds = Math.max(0, Math.ceil(totalSeconds));
   const minutesPart = Math.floor(seconds / 60);
@@ -16,6 +20,20 @@ export function formatBlockedSeconds(totalSeconds: number) {
   }
 
   return `${minutesPart}min ${secondsPart.toString().padStart(2, "0")}s`;
+}
+
+export function formatRateLimitError(error: unknown, fallbackMessage = "Trop de tentatives.") {
+  const retryAfterSeconds = getRetryAfterSeconds(error);
+  const rawMessage = getErrorMessage(error)
+    .replace(/\s*\[retry_after=\d+\]\s*/g, "")
+    .replace(/\s*Réessayez dans \d+ secondes\.?/gi, "")
+    .trim();
+
+  if (!retryAfterSeconds) {
+    return rawMessage || fallbackMessage;
+  }
+
+  return `${rawMessage || fallbackMessage} Réessayez dans ${formatBlockedSeconds(retryAfterSeconds)}.`;
 }
 
 export function useRateLimitBlock() {
@@ -42,7 +60,7 @@ export function useRateLimitBlock() {
 
         setNow(Date.now());
         setBlockedUntil(Date.now() + retryAfterSeconds * 1000);
-        return `Trop de tentatives. Réessayez dans ${formatBlockedSeconds(retryAfterSeconds)}.`;
+        return formatRateLimitError(error);
       },
       clearBlock() {
         setBlockedUntil(0);
