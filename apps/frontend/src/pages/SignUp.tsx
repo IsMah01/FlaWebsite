@@ -38,7 +38,7 @@ export default function SignUp() {
   const uploadMutation = trpc.upload.upload.useMutation();
   const registerMutation = trpc.candidateAuth.register.useMutation({
     onSuccess: (data) => {
-      toast.success(data.message);
+      toast.success(`${data.message} يرجى أيضًا التحقق من مجلد الرسائل غير المرغوب فيها (Spam).`);
       setTimeout(() => navigate("/signin?redirect=/candidate-questionnaire"), 3000);
     },
     onError: (err) => {
