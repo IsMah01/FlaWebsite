@@ -343,7 +343,7 @@ export default function CandidateQuestionnaire() {
               <div className="mx-auto w-full max-w-xs sm:max-w-sm lg:mx-0">
                 <div className="overflow-hidden rounded-2xl bg-white p-4 shadow-2xl shadow-black/15">
                   <img
-                    src="/images/edition-18-logo.svg"
+                    src="/images/edition-18-logo.jpeg"
                     alt="أكاديمية أطر الغد - الدورة 18 - دورة الأثر"
                     className="h-auto w-full"
                   />

@@ -124,6 +124,24 @@ export const candidateReminderEmails = mysqlTable("candidate_reminder_emails", {
 export type CandidateReminderEmail = typeof candidateReminderEmails.$inferSelect;
 export type InsertCandidateReminderEmail = typeof candidateReminderEmails.$inferInsert;
 
+export const candidateConfirmationReminderEmails = mysqlTable("candidate_confirmation_reminder_emails", {
+  id: int("id").autoincrement().primaryKey(),
+  newUserId: int("newUserId").notNull(),
+  email: varchar("email", { length: 320 }).notNull(),
+  reminderDate: varchar("reminderDate", { length: 10 }).notNull(),
+  status: mysqlEnum("status", ["pending", "sent", "failed"]).default("pending").notNull(),
+  errorMessage: text("errorMessage"),
+  sentAt: timestamp("sentAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt")
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
+});
+
+export type CandidateConfirmationReminderEmail = typeof candidateConfirmationReminderEmails.$inferSelect;
+export type InsertCandidateConfirmationReminderEmail = typeof candidateConfirmationReminderEmails.$inferInsert;
+
 export const editions = mysqlTable("editions", {
   id: int("id").autoincrement().primaryKey(),
   editionNumber: int("editionNumber").notNull().unique(),

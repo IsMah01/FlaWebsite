@@ -20,7 +20,10 @@ const AR_ORG = "\u0645\u0624\u0633\u0633\u0629 \u0623\u0637\u0631 \u0627\u0644\u
 const AR_HELLO = "\u0645\u0631\u062D\u0628\u0627\u064B";
 const AR_CONFIRM_BODY =
   "\u0634\u0643\u0631\u0627\u064B \u0644\u062A\u0633\u062C\u064A\u0644\u0643 \u0641\u064A \u0645\u0624\u0633\u0633\u0629 \u0623\u0637\u0631 \u0627\u0644\u063A\u062F. \u0644\u0625\u0643\u0645\u0627\u0644 \u0639\u0645\u0644\u064A\u0629 \u0627\u0644\u062A\u0633\u062C\u064A\u0644\u060C \u064A\u0631\u062C\u0649 \u0627\u0644\u0646\u0642\u0631 \u0639\u0644\u0649 \u0627\u0644\u0632\u0631 \u0623\u062F\u0646\u0627\u0647 \u0644\u062A\u0623\u0643\u064A\u062F \u0628\u0631\u064A\u062F\u0643 \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A.";
+const AR_CONFIRM_REMINDER_BODY =
+  "\u0646\u0630\u0643\u0651\u0631\u0643 \u0628\u0623\u0646 \u0628\u0631\u064A\u062F\u0643 \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0644\u0645 \u064A\u062A\u0645 \u062A\u0623\u0643\u064A\u062F\u0647 \u0628\u0639\u062F. \u064A\u0631\u062C\u0649 \u062A\u0623\u0643\u064A\u062F\u0647 \u0644\u0644\u062A\u0645\u0643\u0646 \u0645\u0646 \u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u062F\u062E\u0648\u0644 \u0648\u0625\u062A\u0645\u0627\u0645 \u0627\u0633\u062A\u0645\u0627\u0631\u0629 \u0627\u0644\u0645\u0634\u0627\u0631\u0643\u0629. \u0631\u0627\u0628\u0637 \u0627\u0644\u062A\u0623\u0643\u064A\u062F \u0627\u0644\u062C\u062F\u064A\u062F \u0635\u0627\u0644\u062D \u0644\u0645\u062F\u0629 24 \u0633\u0627\u0639\u0629.";
 const AR_CONFIRM_BUTTON = "\u062A\u0623\u0643\u064A\u062F \u0627\u0644\u0628\u0631\u064A\u062F \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A";
+const AR_CONFIRM_REMINDER_SUBJECT = "\u062A\u0630\u0643\u064A\u0631 \u0628\u062A\u0623\u0643\u064A\u062F \u0627\u0644\u0628\u0631\u064A\u062F \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A";
 const AR_COPY_LINK = "\u0623\u0648 \u0627\u0646\u0633\u062E \u0647\u0630\u0627 \u0627\u0644\u0631\u0627\u0628\u0637 \u0648\u0627\u0644\u0635\u0642\u0647 \u0641\u064A \u0627\u0644\u0645\u062A\u0635\u0641\u062D:";
 const AR_IGNORE_CONFIRM =
   "\u0625\u0630\u0627 \u0644\u0645 \u062A\u0642\u0645 \u0628\u0627\u0644\u062A\u0633\u062C\u064A\u0644 \u0641\u064A \u0645\u0624\u0633\u0633\u0629 \u0623\u0637\u0631 \u0627\u0644\u063A\u062F\u060C \u064A\u0645\u0643\u0646\u0643 \u062A\u062C\u0627\u0647\u0644 \u0647\u0630\u0647 \u0627\u0644\u0631\u0633\u0627\u0644\u0629.";
@@ -63,7 +66,8 @@ function getEmailLogo() {
 export async function sendConfirmationEmail(
   to: string,
   firstName: string,
-  token: string
+  token: string,
+  options?: { reminder?: boolean },
 ) {
   if (!SMTP_HOST || !SMTP_USER) {
     console.warn("[Email] SMTP not configured. Skipping email send.");
@@ -72,6 +76,8 @@ export async function sendConfirmationEmail(
 
   const confirmUrl = `${PUBLIC_APP_URL}/confirm-email?token=${encodeURIComponent(token)}`;
   const logo = getEmailLogo();
+  const isReminder = options?.reminder === true;
+  const confirmationBody = isReminder ? AR_CONFIRM_REMINDER_BODY : AR_CONFIRM_BODY;
 
   const html = `
     <div dir="rtl" style="font-family: 'Tajawal', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8faf9; border-radius: 12px;">
@@ -83,7 +89,7 @@ export async function sendConfirmationEmail(
       <div style="background: white; padding: 30px; border-radius: 12px; margin-top: 20px;">
         <h2 style="color: #2d5f56; margin-bottom: 20px;">${AR_HELLO} ${firstName}!</h2>
         <p style="color: #444; line-height: 1.8; font-size: 15px;">
-          ${AR_CONFIRM_BODY}
+          ${confirmationBody}
         </p>
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin: 30px auto;">
           <tr>
@@ -114,7 +120,7 @@ export async function sendConfirmationEmail(
     await transporter.sendMail({
       from: `"${AR_ORG}" <${SMTP_FROM}>`,
       to,
-      subject: `${AR_CONFIRM_BUTTON} - ${AR_ORG}`,
+      subject: `${isReminder ? AR_CONFIRM_REMINDER_SUBJECT : AR_CONFIRM_BUTTON} - ${AR_ORG}`,
       html,
       attachments: logo.attachments,
     });
