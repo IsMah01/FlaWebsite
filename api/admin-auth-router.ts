@@ -28,7 +28,10 @@ function getJwtSecret() {
 }
 
 function secureCookieSuffix() {
-  return process.env.APP_URL?.startsWith("https://") ? "; Secure" : "";
+  const mustUseSecureCookies =
+    process.env.NODE_ENV === "production" ||
+    process.env.APP_URL?.startsWith("https://");
+  return mustUseSecureCookies ? "; Secure" : "";
 }
 
 function buildAdminCookie(token: string) {
