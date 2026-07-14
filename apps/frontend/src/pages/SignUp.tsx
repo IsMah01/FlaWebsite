@@ -226,6 +226,17 @@ export default function SignUp() {
               <Button type="submit" className="w-full bg-[#4A9B8E] hover:bg-[#3D7A6F] text-white h-11" disabled={registerMutation.isPending}>
                 {registerMutation.isPending ? "جاري التسجيل..." : <><CheckCircle className="w-4 h-4 mr-2" />إنشاء الحساب</>}
               </Button>
+
+              <p className="text-center text-sm leading-6 text-gray-500">
+                في حالة وجود أي مشكلة أثناء التسجيل، يرجى التواصل معنا على الرقم{" "}
+                <a
+                  href="tel:+212653309510"
+                  dir="ltr"
+                  className="inline-block font-semibold text-[#4A9B8E] hover:text-[#3D7A6F] hover:underline"
+                >
+                  +212 653-309510
+                </a>
+              </p>
             </form>
 
             <p className="text-center text-sm text-gray-500 mt-6">
