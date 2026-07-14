@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
-import { Download, FileText, LogOut, Mail, MessageSquareText, RefreshCw, ShieldCheck, Trash2, Users } from "lucide-react";
+import { CalendarClock, Download, FileText, LogOut, Mail, MessageSquareText, RefreshCw, ShieldCheck, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,19 @@ import { useAuth } from "@/hooks/useAuth";
 import { trpc } from "@/providers/trpc";
 
 type Tab = "newUsers" | "users" | "candidates" | "messages" | "subscribers";
+type CandidateFilterField =
+  | "all"
+  | "name"
+  | "email"
+  | "phone"
+  | "studyStatus"
+  | "role"
+  | "emailConfirmed"
+  | "applicationStatus"
+  | "questionnaire"
+  | "adminNote"
+  | "dates";
+type AccountFilterField = "all" | "name" | "email" | "phone" | "studyStatus" | "role" | "emailConfirmed" | "date";
 
 function fileUrl(ref?: string | null) {
   if (!ref?.startsWith("private://")) return null;
@@ -241,6 +254,9 @@ export default function AdminDashboard() {
   });
   const [tab, setTab] = useState<Tab>("newUsers");
   const [search, setSearch] = useState("");
+  const [candidateFilterField, setCandidateFilterField] = useState<CandidateFilterField>("all");
+  const [accountSearch, setAccountSearch] = useState("");
+  const [accountFilterField, setAccountFilterField] = useState<AccountFilterField>("all");
   const [ambassadorMessageAuthorFilter, setAmbassadorMessageAuthorFilter] = useState("");
   const [ambassadorMessageDateFilter, setAmbassadorMessageDateFilter] = useState("");
   const isAdmin = user?.role === "admin";
@@ -343,12 +359,55 @@ export default function AdminDashboard() {
     const q = search.trim().toLowerCase();
     const list = candidates.data ?? [];
     if (!q) return list;
-    return list.filter((candidate) =>
-      `${candidate.firstName} ${candidate.lastName} ${candidate.email} ${candidate.phoneNumber}`
-        .toLowerCase()
-        .includes(q),
-    );
-  }, [candidates.data, search]);
+
+    return list.filter((candidate) => {
+      const questionnaire = Object.values(parseQuestionnaireAnswers(candidate.questionnaireAnswers)).join(" ");
+      const fields: Record<CandidateFilterField, string> = {
+        all: "",
+        name: `${candidate.firstName} ${candidate.lastName}`,
+        email: candidate.email || "",
+        phone: candidate.phoneNumber || "",
+        studyStatus: `${candidate.studyStatus || ""} ${mapStudyStatus(candidate.studyStatus)}`,
+        role: candidate.isAmbassador
+          ? "ambassador ambassadeur سفير سفيرة"
+          : "candidate candidat مترشح مترشحة",
+        emailConfirmed: candidate.emailConfirmed ? "oui yes نعم confirmé confirmed" : "non no لا non confirmé",
+        applicationStatus: `${candidate.applicationStatus || "pending"} ${
+          candidate.applicationStatus === "accepted"
+            ? "accepté مقبول"
+            : candidate.applicationStatus === "rejected"
+              ? "refusé مرفوض"
+              : "en attente قيد الانتظار"
+        }`,
+        questionnaire,
+        adminNote: candidate.adminNote || "",
+        dates: `${formatDateDMYH(candidate.createdAt)} ${formatDateDMYH(candidate.updatedAt)}`,
+      };
+      fields.all = Object.values(fields).join(" ");
+      return fields[candidateFilterField].toLowerCase().includes(q);
+    });
+  }, [candidates.data, search, candidateFilterField]);
+
+  const filteredNewUsers = useMemo(() => {
+    const q = accountSearch.trim().toLowerCase();
+    const list = newUsers.data ?? [];
+    if (!q) return list;
+
+    return list.filter((account) => {
+      const fields: Record<AccountFilterField, string> = {
+        all: "",
+        name: account.name || "",
+        email: account.email || "",
+        phone: account.phone || "",
+        studyStatus: `${account.studyStatus || ""} ${mapStudyStatus(account.studyStatus)}`,
+        role: `${account.role || ""} ${account.role === "ambassador" ? "ambassadeur سفير سفيرة" : account.role === "candidate" ? "candidat مترشح" : "utilisateur مستخدم"}`,
+        emailConfirmed: account.emailConfirmed ? "oui yes نعم confirmé confirmed" : "non no لا non confirmé",
+        date: formatDateDMYH(account.loginDate),
+      };
+      fields.all = Object.values(fields).join(" ");
+      return fields[accountFilterField].toLowerCase().includes(q);
+    });
+  }, [newUsers.data, accountSearch, accountFilterField]);
 
   const filteredAmbassadorMessages = useMemo(() => {
     const authorQuery = ambassadorMessageAuthorFilter.trim().toLowerCase();
@@ -364,7 +423,7 @@ export default function AdminDashboard() {
 
   const newUsersCsvRows = useMemo(
     () =>
-      (newUsers.data ?? []).map((account) => ({
+      filteredNewUsers.map((account) => ({
         "الاسم": account.name,
         "الهاتف": account.phone,
         "الوضعية الدراسية": mapStudyStatus(account.studyStatus),
@@ -374,7 +433,7 @@ export default function AdminDashboard() {
         "الوثائق": account.attestationUrl || account.documents || "",
         "دخول التاريخ": formatDateYMDH(account.loginDate),
       })),
-    [newUsers.data],
+    [filteredNewUsers],
   );
 
   const usersCsvRows = useMemo(
@@ -555,6 +614,11 @@ export default function AdminDashboard() {
             <p className="mt-1 text-sm text-slate-500">تم تسجيل الدخول باسم: {user.name || user.email || user.unionId}</p>
           </div>
           <div className="flex gap-2">
+            <Link to="/admin/interviews">
+              <Button className="bg-[#4A9B8E] hover:bg-[#3D7A6F]">
+                <CalendarClock className="ml-2 h-4 w-4" /> المقابلات
+              </Button>
+            </Link>
             <Button variant="outline" onClick={() => window.location.reload()}>
               <RefreshCw className="ml-2 h-4 w-4" /> تحديث
             </Button>
@@ -664,10 +728,41 @@ export default function AdminDashboard() {
 
         {tab === "newUsers" && (
           <section className="overflow-x-auto rounded-2xl border bg-white p-4 shadow-sm">
-            <div className="mb-4 flex justify-end">
-              <Button variant="outline" onClick={() => downloadCsv("new-users.csv", newUsersCsvRows)}>
-                <Download className="ml-2 h-4 w-4" /> csv تصدير new_user
-              </Button>
+            <div className="mb-4 flex min-w-[900px] flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+              <div className="flex flex-1 gap-2">
+                <select
+                  value={accountFilterField}
+                  onChange={(event) => setAccountFilterField(event.target.value as AccountFilterField)}
+                  className="h-10 w-56 rounded-md border border-input bg-background px-3 text-sm"
+                  aria-label="Champ de filtrage des utilisateurs"
+                >
+                  <option value="all">جميع الحقول</option>
+                  <option value="name">الاسم</option>
+                  <option value="email">البريد الإلكتروني</option>
+                  <option value="phone">الهاتف</option>
+                  <option value="studyStatus">الوضعية الدراسية</option>
+                  <option value="role">الدور / السفير</option>
+                  <option value="emailConfirmed">تأكيد البريد</option>
+                  <option value="date">تاريخ الدخول</option>
+                </select>
+                <Input
+                  placeholder="ابحث في المستخدمين... مثال: ambassador"
+                  value={accountSearch}
+                  onChange={(event) => setAccountSearch(event.target.value)}
+                  className="max-w-md"
+                />
+                {(accountSearch || accountFilterField !== "all") ? (
+                  <Button type="button" variant="outline" onClick={() => { setAccountSearch(""); setAccountFilterField("all"); }}>
+                    إعادة الضبط
+                  </Button>
+                ) : null}
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-slate-500">{filteredNewUsers.length} نتيجة</span>
+                <Button variant="outline" onClick={() => downloadCsv("new-users.csv", newUsersCsvRows)}>
+                  <Download className="ml-2 h-4 w-4" /> csv تصدير new_user
+                </Button>
+              </div>
             </div>
             <table className="w-full min-w-[1200px] text-sm">
               <thead className="bg-slate-100">
@@ -684,7 +779,7 @@ export default function AdminDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {(newUsers.data ?? []).map((account) => {
+                {filteredNewUsers.map((account) => {
                   const documentHref = fileUrl(account.attestationUrl);
                   return (
                     <tr key={account.id} className="border-b last:border-b-0">
@@ -765,16 +860,44 @@ export default function AdminDashboard() {
 
         {tab === "candidates" && (
           <section className="overflow-hidden rounded-2xl border bg-white p-4 shadow-sm">
-            <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <Input
-                placeholder="بحث بالاسم، البريد الإلكتروني أو الهاتف..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="md:max-w-sm"
-              />
+            <div className="mb-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+              <div className="flex flex-1 flex-col gap-2 md:flex-row">
+                <select
+                  value={candidateFilterField}
+                  onChange={(event) => setCandidateFilterField(event.target.value as CandidateFilterField)}
+                  className="h-10 rounded-md border border-input bg-background px-3 text-sm md:w-56"
+                  aria-label="Champ de filtrage"
+                >
+                  <option value="all">جميع الحقول</option>
+                  <option value="name">الاسم الكامل</option>
+                  <option value="email">البريد الإلكتروني</option>
+                  <option value="phone">الهاتف</option>
+                  <option value="studyStatus">الوضعية الدراسية</option>
+                  <option value="role">الدور / السفير</option>
+                  <option value="emailConfirmed">تأكيد البريد</option>
+                  <option value="applicationStatus">قرار الترشيح</option>
+                  <option value="questionnaire">أجوبة الاستمارة</option>
+                  <option value="adminNote">ملاحظات الإدارة</option>
+                  <option value="dates">التواريخ</option>
+                </select>
+                <Input
+                  placeholder="اكتب قيمة البحث... مثال: ambassadeur أو مقبول"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="md:max-w-md"
+                />
+                {(search || candidateFilterField !== "all") ? (
+                  <Button type="button" variant="outline" onClick={() => { setSearch(""); setCandidateFilterField("all"); }}>
+                    إعادة الضبط
+                  </Button>
+                ) : null}
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-sm text-slate-500">{filteredCandidates.length} نتيجة</span>
               <Button variant="outline" onClick={() => downloadCsv("candidats.csv", candidatesCsvRows)}>
                 <Download className="ml-2 h-4 w-4" /> csv تصدير المترشحين
               </Button>
+              </div>
             </div>
 
             <div className="overflow-x-auto">

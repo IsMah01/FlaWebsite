@@ -5,7 +5,8 @@ import {
   text, 
   timestamp, 
   boolean, 
-  mysqlEnum 
+  mysqlEnum,
+  uniqueIndex,
 
 } from "drizzle-orm/mysql-core";
 
@@ -104,6 +105,41 @@ export const candidates = mysqlTable("candidates", {
 
 export type Candidate = typeof candidates.$inferSelect;
 export type InsertCandidate = typeof candidates.$inferInsert;
+
+export const interviewSlots = mysqlTable("interview_slots", {
+  id: int("id").autoincrement().primaryKey(),
+  startTime: timestamp("startTime").notNull(),
+  endTime: timestamp("endTime").notNull(),
+  meetingUrl: text("meetingUrl").notNull(),
+  interviewerName: varchar("interviewerName", { length: 255 }),
+  notes: text("notes"),
+  status: mysqlEnum("status", ["active", "cancelled"]).default("active").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt")
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
+});
+
+export type InterviewSlot = typeof interviewSlots.$inferSelect;
+export type InsertInterviewSlot = typeof interviewSlots.$inferInsert;
+
+export const interviewBookings = mysqlTable(
+  "interview_bookings",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    slotId: int("slotId").notNull(),
+    candidateId: int("candidateId").notNull(),
+    bookedAt: timestamp("bookedAt").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("interview_bookings_slot_unique").on(table.slotId),
+    uniqueIndex("interview_bookings_candidate_unique").on(table.candidateId),
+  ],
+);
+
+export type InterviewBooking = typeof interviewBookings.$inferSelect;
+export type InsertInterviewBooking = typeof interviewBookings.$inferInsert;
 
 export const candidateReminderEmails = mysqlTable("candidate_reminder_emails", {
   id: int("id").autoincrement().primaryKey(),

@@ -99,7 +99,7 @@ async function enforceAuthRateLimit(options: {
 const passwordPolicyMessage = "يجب أن تتكون كلمة المرور من 8 أحرف على الأقل وأن تحتوي على حرف كبير واحد على الأقل.";
 const strongPasswordSchema = z.string().regex(/^(?=.*[A-Z]).{8,}$/, passwordPolicyMessage);
 
-function requireCandidateSession(cookieHeader: string) {
+export function requireCandidateSession(cookieHeader: string) {
   const token = readCandidateToken(cookieHeader);
   if (!token) {
     throw new TRPCError({
@@ -530,7 +530,7 @@ export const candidateAuthRouter = createRouter({
         .where(eq(newUsers.id, decoded.newUserId))
         .limit(1);
       const [candidateRecord] = await db
-        .select({ id: candidates.id })
+        .select({ id: candidates.id, applicationStatus: candidates.applicationStatus })
         .from(candidates)
         .where(eq(candidates.newUserId, decoded.newUserId))
         .limit(1);
@@ -545,6 +545,7 @@ export const candidateAuthRouter = createRouter({
         isAmbassador: account.isAmbassador,
         studyStatus: account.studyStatus,
         hasSubmittedQuestionnaire: !!candidateRecord,
+        applicationStatus: candidateRecord?.applicationStatus ?? null,
       };
     } catch {
       return null;

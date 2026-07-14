@@ -7,6 +7,7 @@ import { createRouter, publicQuery } from "./middleware";
 import { adminRouter } from "./admin-router";
 import { adminAuthRouter } from "./admin-auth-router";
 import { ambassadorRouter } from "./ambassador-router";
+import { interviewRouter } from "./interview-router";
 
 export const appRouter = createRouter({
   ping: publicQuery.query(() => ({ ok: true, ts: Date.now() })),
@@ -19,6 +20,7 @@ export const appRouter = createRouter({
   admin: adminRouter,
   adminAuth: adminAuthRouter,
   ambassador: ambassadorRouter,
+  interview: interviewRouter,
 });
 
 export type AppRouter = typeof appRouter;

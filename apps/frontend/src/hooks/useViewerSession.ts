@@ -10,6 +10,7 @@ type ViewerSession =
       isAmbassador: boolean;
       studyStatus?: string;
       hasSubmittedQuestionnaire: boolean;
+      applicationStatus: "pending" | "accepted" | "rejected" | null;
     }
   | {
       kind: "site-user";
@@ -72,6 +73,7 @@ export function useViewerSession() {
         isAmbassador: candidateQuery.data.isAmbassador,
         studyStatus: candidateQuery.data.studyStatus,
         hasSubmittedQuestionnaire: candidateQuery.data.hasSubmittedQuestionnaire,
+        applicationStatus: candidateQuery.data.applicationStatus,
       };
     }
 
@@ -120,6 +122,8 @@ export function useViewerSession() {
       (viewer?.kind === "site-user" && viewer.role === "admin"),
     isCandidateAccount: viewer?.kind === "candidate",
     isCandidate: viewer?.kind === "candidate" && !viewer.isAmbassador,
+    isAcceptedCandidate:
+      viewer?.kind === "candidate" && viewer.applicationStatus === "accepted",
     isAuthenticated: !!viewer,
     isLoading:
       candidateQuery.isLoading ||

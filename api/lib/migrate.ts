@@ -202,6 +202,31 @@ export async function ensureDatabaseSchema() {
     `);
 
     await connection.query(`
+      CREATE TABLE IF NOT EXISTS interview_slots (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        startTime TIMESTAMP NOT NULL,
+        endTime TIMESTAMP NOT NULL,
+        meetingUrl TEXT NOT NULL,
+        interviewerName VARCHAR(255) NULL,
+        notes TEXT NULL,
+        status ENUM('active','cancelled') NOT NULL DEFAULT 'active',
+        createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS interview_bookings (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        slotId INT NOT NULL,
+        candidateId INT NOT NULL,
+        bookedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY interview_bookings_slot_unique (slotId),
+        UNIQUE KEY interview_bookings_candidate_unique (candidateId)
+      )
+    `);
+
+    await connection.query(`
       CREATE TABLE IF NOT EXISTS rate_limit_buckets (
         bucketKey CHAR(64) NOT NULL,
         windowStart BIGINT UNSIGNED NOT NULL,
