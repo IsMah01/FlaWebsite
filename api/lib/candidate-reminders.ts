@@ -6,7 +6,8 @@ import { sendCandidateQuestionnaireReminderEmail, sendConfirmationEmail } from "
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const DEFAULT_DEADLINE = "2026-07-17";
-const DEFAULT_SEND_HOUR = 13;
+const DEFAULT_SEND_HOUR = 11;
+const CONFIRMATION_REMINDER_SEND_HOUR = 13;
 const DEFAULT_TIMEZONE = "Africa/Casablanca";
 
 type ReminderCandidate = RowDataPacket & {
@@ -215,14 +216,10 @@ export async function runCandidateQuestionnaireReminderJob(now = new Date()) {
   }
 
   const users = await getPendingQuestionnaireUsers();
-  const unconfirmedUsers = await getUnconfirmedUsers();
   const deadlineLabel = formatDeadlineLabel(config.deadline);
   let sent = 0;
   let failed = 0;
   let skippedAlreadyReserved = 0;
-  let confirmationSent = 0;
-  let confirmationFailed = 0;
-  let confirmationSkippedAlreadyReserved = 0;
 
   for (const user of users) {
     const reserved = await reserveDailyReminder(user, zonedNow.dateKey, daysLeft);
@@ -247,17 +244,46 @@ export async function runCandidateQuestionnaireReminderJob(now = new Date()) {
     }
   }
 
-  for (const user of unconfirmedUsers) {
+  return {
+    skipped: false,
+    date: zonedNow.dateKey,
+    daysLeft,
+    totalEligible: users.length,
+    sent,
+    failed,
+    skippedAlreadyReserved,
+  };
+}
+
+export async function runCandidateConfirmationReminderJob(now = new Date()) {
+  const config = getReminderConfig();
+  if (!config.enabled) {
+    return { skipped: true, reason: "disabled" };
+  }
+
+  const zonedNow = getZonedNow(config.timezone, now);
+  const daysLeft = daysUntil(config.deadline, zonedNow.dateKey);
+
+  if (daysLeft <= 0) {
+    return { skipped: true, reason: "deadline_reached", date: zonedNow.dateKey };
+  }
+
+  const users = await getUnconfirmedUsers();
+  let sent = 0;
+  let failed = 0;
+  let skippedAlreadyReserved = 0;
+
+  for (const user of users) {
     const reserved = await reserveDailyConfirmationReminder(user, zonedNow.dateKey);
     if (!reserved) {
-      confirmationSkippedAlreadyReserved += 1;
+      skippedAlreadyReserved += 1;
       continue;
     }
 
     const confirmation = createConfirmationReminderToken(user.email);
     const tokenSaved = await saveConfirmationReminderToken(user.id, confirmation.tokenHash);
     if (!tokenSaved) {
-      confirmationFailed += 1;
+      failed += 1;
       await markDailyConfirmationReminderFailed(user.id, zonedNow.dateKey, "ALREADY_CONFIRMED");
       continue;
     }
@@ -270,10 +296,10 @@ export async function runCandidateQuestionnaireReminderJob(now = new Date()) {
     );
 
     if (result.success) {
-      confirmationSent += 1;
+      sent += 1;
       await markDailyConfirmationReminderSent(user.id, zonedNow.dateKey);
     } else {
-      confirmationFailed += 1;
+      failed += 1;
       await markDailyConfirmationReminderFailed(
         user.id,
         zonedNow.dateKey,
@@ -290,10 +316,6 @@ export async function runCandidateQuestionnaireReminderJob(now = new Date()) {
     sent,
     failed,
     skippedAlreadyReserved,
-    confirmationTotalEligible: unconfirmedUsers.length,
-    confirmationSent,
-    confirmationFailed,
-    confirmationSkippedAlreadyReserved,
   };
 }
 
@@ -304,30 +326,43 @@ export function startCandidateQuestionnaireReminderScheduler() {
     return;
   }
 
-  let lastRunDate: string | null = null;
+  let lastQuestionnaireRunDate: string | null = null;
+  let lastConfirmationRunDate: string | null = null;
 
   const tick = async () => {
     const currentConfig = getReminderConfig();
     if (!currentConfig.enabled) return;
 
     const zonedNow = getZonedNow(currentConfig.timezone);
-    const isSendWindow = zonedNow.hour === currentConfig.sendHour && zonedNow.minute < 5;
-    if (!isSendWindow || lastRunDate === zonedNow.dateKey) {
-      return;
+    const isQuestionnaireWindow =
+      zonedNow.hour === currentConfig.sendHour && zonedNow.minute < 5;
+    if (isQuestionnaireWindow && lastQuestionnaireRunDate !== zonedNow.dateKey) {
+      lastQuestionnaireRunDate = zonedNow.dateKey;
+      try {
+        const result = await runCandidateQuestionnaireReminderJob();
+        console.log("[candidate-reminders] Questionnaire run complete:", result);
+      } catch (error) {
+        lastQuestionnaireRunDate = null;
+        console.error("[candidate-reminders] Questionnaire run failed:", error);
+      }
     }
 
-    lastRunDate = zonedNow.dateKey;
-    try {
-      const result = await runCandidateQuestionnaireReminderJob();
-      console.log("[candidate-reminders] Run complete:", result);
-    } catch (error) {
-      lastRunDate = null;
-      console.error("[candidate-reminders] Run failed:", error);
+    const isConfirmationWindow =
+      zonedNow.hour === CONFIRMATION_REMINDER_SEND_HOUR && zonedNow.minute < 5;
+    if (isConfirmationWindow && lastConfirmationRunDate !== zonedNow.dateKey) {
+      lastConfirmationRunDate = zonedNow.dateKey;
+      try {
+        const result = await runCandidateConfirmationReminderJob();
+        console.log("[candidate-reminders] Confirmation run complete:", result);
+      } catch (error) {
+        lastConfirmationRunDate = null;
+        console.error("[candidate-reminders] Confirmation run failed:", error);
+      }
     }
   };
 
   console.log(
-    `[candidate-reminders] Scheduler ready: ${config.sendHour}:00 ${config.timezone}, deadline ${config.deadline}.`,
+    `[candidate-reminders] Scheduler ready: questionnaire ${config.sendHour}:00, confirmation ${CONFIRMATION_REMINDER_SEND_HOUR}:00 ${config.timezone}, deadline ${config.deadline}.`,
   );
   void tick();
   setInterval(() => {
