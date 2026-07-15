@@ -273,7 +273,7 @@ export const candidateAuthRouter = createRouter({
         action: "confirmation_resend",
         req: ctx.req,
         email: normalizedEmail,
-        limit: 3,
+        limit: 5,
         windowMs: 15 * 60 * 1000,
         message: "Trop de demandes de renvoi ont été effectuées.",
       });

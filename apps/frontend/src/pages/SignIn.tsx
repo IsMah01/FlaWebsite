@@ -16,9 +16,14 @@ export default function SignIn() {
   const utils = trpc.useUtils();
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({ email: "", password: "" });
+  const [needsConfirmation, setNeedsConfirmation] = useState(false);
   const rateLimit = useRateLimitBlock();
 
   const candidateLogout = trpc.candidateAuth.logout.useMutation();
+  const resendConfirmation = trpc.candidateAuth.resendConfirmation.useMutation({
+    onSuccess: (data) => toast.success(data.message),
+    onError: (err) => toast.error(rateLimit.blockFromError(err) || err.message || "تعذر إرسال رابط التأكيد"),
+  });
   const loginMutation = trpc.candidateAuth.login.useMutation({
     onSuccess: async () => {
       rateLimit.clearBlock();
@@ -29,6 +34,7 @@ export default function SignIn() {
       navigate(redirectPath?.startsWith("/") && !redirectPath.startsWith("//") ? redirectPath : "/");
     },
     onError: (err) => {
+      setNeedsConfirmation(err.data?.code === "FORBIDDEN");
       toast.error(rateLimit.blockFromError(err) || err.message || "Erreur pendant la connexion");
     },
   });
@@ -36,6 +42,7 @@ export default function SignIn() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (rateLimit.blockedSeconds > 0) return;
+    setNeedsConfirmation(false);
 
     void (async () => {
       try {
@@ -117,6 +124,21 @@ export default function SignIn() {
               {rateLimit.blockedSeconds > 0 ? (
                 <div dir="ltr" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-center text-sm font-medium text-amber-800">
                   Trop de tentatives. Réessayez dans {formatBlockedSeconds(rateLimit.blockedSeconds)}.
+                </div>
+              ) : null}
+
+              {needsConfirmation ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-center text-sm text-amber-900">
+                  <p className="mb-2">لم يتم تأكيد بريدك الإلكتروني. يمكنك طلب رابط جديد.</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full border-amber-300 bg-white"
+                    disabled={!formData.email.trim() || resendConfirmation.isPending}
+                    onClick={() => resendConfirmation.mutate({ email: formData.email.trim().toLowerCase() })}
+                  >
+                    {resendConfirmation.isPending ? "جاري الإرسال..." : "إرسال رابط تأكيد جديد"}
+                  </Button>
                 </div>
               ) : null}
 

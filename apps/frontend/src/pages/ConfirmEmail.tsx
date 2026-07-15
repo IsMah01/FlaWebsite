@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router";
 import { motion } from "framer-motion";
 import { CheckCircle, XCircle, Loader2, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { trpc } from "@/providers/trpc";
 import Navbar from "@/components/Navbar";
 
@@ -11,6 +12,12 @@ export default function ConfirmEmail() {
   const token = searchParams.get("token");
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [message, setMessage] = useState("");
+  const [email, setEmail] = useState("");
+
+  const resendMutation = trpc.candidateAuth.resendConfirmation.useMutation({
+    onSuccess: (data) => setMessage(data.message),
+    onError: (err) => setMessage(err.message || "تعذر إرسال رابط تأكيد جديد"),
+  });
 
   const confirmMutation = trpc.candidateAuth.confirmEmail.useMutation({
     onSuccess: (data) => {
@@ -80,6 +87,22 @@ export default function ConfirmEmail() {
                 <h2 className="text-xl font-bold text-gray-900 mb-2">خطأ في التأكيد</h2>
                 <p className="text-gray-500 mb-6">{message}</p>
                 <div className="space-y-3">
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    placeholder="email@example.com"
+                    aria-label="البريد الإلكتروني"
+                    className="text-right"
+                  />
+                  <Button
+                    type="button"
+                    className="w-full bg-[#4A9B8E] text-white hover:bg-[#3D7A6F]"
+                    disabled={!email.trim() || resendMutation.isPending}
+                    onClick={() => resendMutation.mutate({ email: email.trim().toLowerCase() })}
+                  >
+                    {resendMutation.isPending ? "جاري الإرسال..." : "إرسال رابط تأكيد جديد"}
+                  </Button>
                   <Link to="/signin">
                     <Button variant="outline" className="w-full">
                       العودة لتسجيل الدخول
