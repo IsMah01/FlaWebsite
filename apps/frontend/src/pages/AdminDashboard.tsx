@@ -8,7 +8,7 @@ import { candidateQuestionnaireFields } from "@/data/candidate-questionnaire";
 import { useAuth } from "@/hooks/useAuth";
 import { trpc } from "@/providers/trpc";
 
-type Tab = "newUsers" | "users" | "candidates" | "messages" | "subscribers";
+type Tab = "newUsers" | "users" | "candidates" | "incomplete" | "messages" | "subscribers";
 type CandidateFilterField =
   | "all"
   | "name"
@@ -247,6 +247,15 @@ function questionnaireAnswersToRecord(value?: string | null) {
   );
 }
 
+function parseQuestionnaireDraft(value: string) {
+  try {
+    const parsed = JSON.parse(value) as { answers?: Record<string, string> };
+    return parsed.answers && typeof parsed.answers === "object" ? parsed.answers : {};
+  } catch {
+    return {} as Record<string, string>;
+  }
+}
+
 export default function AdminDashboard() {
   const { user, isLoading, logout } = useAuth({
     redirectOnUnauthenticated: true,
@@ -266,6 +275,10 @@ export default function AdminDashboard() {
     enabled: isAdmin,
   });
   const candidates = trpc.admin.listCandidates.useQuery(undefined, {
+    retry: false,
+    enabled: isAdmin,
+  });
+  const incompleteQuestionnaires = trpc.admin.listIncompleteQuestionnaires.useQuery(undefined, {
     retry: false,
     enabled: isAdmin,
   });
@@ -524,6 +537,12 @@ export default function AdminDashboard() {
       icon: FileText,
     },
     {
+      label: "استمارات غير مكتملة",
+      value: dashboardStats.incompleteQuestionnaires ?? 0,
+      hint: "بدأ أصحابها الإجابة ولم يرسلوها بعد",
+      icon: FileText,
+    },
+    {
       label: "السفراء",
       value: dashboardStats.ambassadors ?? 0,
       hint: "مترشحون بعلامة سفير",
@@ -717,6 +736,9 @@ export default function AdminDashboard() {
           </Button>
           <Button variant={tab === "candidates" ? "default" : "outline"} onClick={() => setTab("candidates")}>
             المترشحون
+          </Button>
+          <Button variant={tab === "incomplete" ? "default" : "outline"} onClick={() => setTab("incomplete")}>
+            استمارات غير مكتملة ({incompleteQuestionnaires.data?.length ?? 0})
           </Button>
           <Button variant={tab === "messages" ? "default" : "outline"} onClick={() => setTab("messages")}>
             رسائل التواصل
@@ -984,6 +1006,60 @@ export default function AdminDashboard() {
                 </tbody>
               </table>
             </div>
+          </section>
+        )}
+
+        {tab === "incomplete" && (
+          <section className="overflow-x-auto rounded-2xl border bg-white p-4 shadow-sm">
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold">المستخدمون الذين بدأوا الاستمارة ولم يرسلوها</h2>
+              <p className="text-sm text-slate-500">يتم تحديث التقدم تلقائيا عند حفظ المسودة.</p>
+            </div>
+            <table className="w-full min-w-[950px] text-sm">
+              <thead className="bg-slate-100">
+                <tr>
+                  <th className="p-3 text-right">الاسم</th>
+                  <th className="p-3 text-right">البريد الإلكتروني</th>
+                  <th className="p-3 text-right">الهاتف</th>
+                  <th className="p-3 text-right">البريد مؤكد</th>
+                  <th className="p-3 text-right">التقدم</th>
+                  <th className="p-3 text-right">آخر تحديث</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(incompleteQuestionnaires.data ?? []).map((account) => {
+                  const answers = parseQuestionnaireDraft(account.questionnaireDraft);
+                  const total = candidateQuestionnaireFields.length;
+                  const answered = candidateQuestionnaireFields.filter(
+                    (field) => typeof answers[field.key] === "string" && answers[field.key].trim().length > 0,
+                  ).length;
+                  const percent = total ? Math.round((answered / total) * 100) : 0;
+
+                  return (
+                    <tr key={account.id} className="border-b last:border-b-0 hover:bg-slate-50">
+                      <td className="p-3 font-medium">{account.firstName} {account.lastName}</td>
+                      <td className="p-3">{account.email}</td>
+                      <td className="p-3">{account.phoneNumber}</td>
+                      <td className="p-3">{account.emailConfirmed ? "نعم" : "لا"}</td>
+                      <td className="p-3">
+                        <div className="w-48">
+                          <div className="mb-1 flex justify-between text-xs text-slate-500">
+                            <span>{answered} / {total} أجوبة</span><span>{percent}%</span>
+                          </div>
+                          <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+                            <div className="h-full rounded-full bg-[#4A9B8E]" style={{ width: `${percent}%` }} />
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-3">{formatDateDMYH(account.updatedAt ?? account.lastLoginAt ?? account.createdAt)}</td>
+                    </tr>
+                  );
+                })}
+                {!incompleteQuestionnaires.isLoading && !(incompleteQuestionnaires.data?.length) ? (
+                  <tr><td colSpan={6} className="p-8 text-center text-slate-500">لا توجد استمارات غير مكتملة حاليا.</td></tr>
+                ) : null}
+              </tbody>
+            </table>
           </section>
         )}
 

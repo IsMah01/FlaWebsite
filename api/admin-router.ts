@@ -24,6 +24,7 @@ export const adminRouter = createRouter({
         .select({
           id: newUsers.id,
           newsletterConsent: newUsers.newsletterConsent,
+          questionnaireDraft: newUsers.questionnaireDraft,
         })
         .from(newUsers),
       db.select().from(users),
@@ -42,6 +43,9 @@ export const adminRouter = createRouter({
       ambassadorMessages: allAmbassadorMessages.length,
       editions: allEditions.length,
       newsletterSubscribers: allNewUsers.filter((user) => user.newsletterConsent).length,
+      incompleteQuestionnaires: allNewUsers.filter(
+        (user) => Boolean(user.questionnaireDraft) && !allCandidates.some((candidate) => candidate.newUserId === user.id),
+      ).length,
     };
   }),
 
@@ -212,6 +216,33 @@ export const adminRouter = createRouter({
       })
       .from(candidates)
       .orderBy(desc(candidates.createdAt));
+  }),
+
+  listIncompleteQuestionnaires: adminQuery.query(async () => {
+    const db = getDb();
+    const [accounts, submittedCandidates] = await Promise.all([
+      db
+        .select({
+          id: newUsers.id,
+          firstName: newUsers.firstName,
+          lastName: newUsers.lastName,
+          email: newUsers.email,
+          phoneNumber: newUsers.phoneNumber,
+          emailConfirmed: newUsers.emailConfirmed,
+          questionnaireDraft: newUsers.questionnaireDraft,
+          createdAt: newUsers.createdAt,
+          updatedAt: newUsers.updatedAt,
+          lastLoginAt: newUsers.lastLoginAt,
+        })
+        .from(newUsers)
+        .orderBy(desc(newUsers.updatedAt)),
+      db.select({ newUserId: candidates.newUserId }).from(candidates),
+    ]);
+
+    const submittedIds = new Set(submittedCandidates.map((candidate) => candidate.newUserId));
+    return accounts
+      .filter((account) => Boolean(account.questionnaireDraft) && !submittedIds.has(account.id))
+      .map((account) => ({ ...account, questionnaireDraft: account.questionnaireDraft! }));
   }),
 
   updateCandidateStatus: adminQuery
