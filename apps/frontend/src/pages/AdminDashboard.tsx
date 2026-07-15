@@ -168,6 +168,7 @@ const questionnaireFieldLabelByKey = new Map(
 
 const questionnaireCsvColumns = candidateQuestionnaireFields.map((field) => ({
   key: field.key,
+  kind: field.kind,
   label: ((
     labels: Record<string, string>,
   ) => labels[field.key] || normalizeQuestionnaireLabel(field.label))({
@@ -236,6 +237,7 @@ function questionnaireAnswersToRecord(value?: string | null) {
     questionnaireCsvColumns.map((column) => {
       const raw = answersByKey.get(column.key) || "";
       const value =
+        column.kind === "date" ? asExcelText(raw) :
         column.key === "sex" ? mapGender(raw) :
         column.key === "member_of_association" || column.key === "participated_in_project" || column.key === "participated_in_academy"
           ? mapBooleanLike(raw)
@@ -493,7 +495,7 @@ export default function AdminDashboard() {
           "عدد الأجوبة": answered,
           "مجموع الأسئلة": total,
           "نسبة التقدم": `${percent}%`,
-          "آخر تحديث": formatDateYMDH(account.updatedAt ?? account.lastLoginAt ?? account.createdAt),
+          "آخر تحديث": asExcelText(formatDateYMDH(account.updatedAt ?? account.lastLoginAt ?? account.createdAt)),
         };
       }),
     [incompleteQuestionnaires.data],
