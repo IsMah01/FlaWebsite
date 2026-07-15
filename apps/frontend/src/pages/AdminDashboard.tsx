@@ -475,6 +475,30 @@ export default function AdminDashboard() {
     [filteredCandidates],
   );
 
+  const incompleteQuestionnairesCsvRows = useMemo(
+    () =>
+      (incompleteQuestionnaires.data ?? []).map((account) => {
+        const answers = parseQuestionnaireDraft(account.questionnaireDraft);
+        const total = candidateQuestionnaireFields.length;
+        const answered = candidateQuestionnaireFields.filter(
+          (field) => typeof answers[field.key] === "string" && answers[field.key].trim().length > 0,
+        ).length;
+        const percent = total ? Math.round((answered / total) * 100) : 0;
+
+        return {
+          "الاسم الكامل": `${account.firstName} ${account.lastName}`,
+          "البريد الإلكتروني": account.email,
+          "الهاتف": asExcelText(account.phoneNumber),
+          "البريد الإلكتروني مؤكد": account.emailConfirmed ? "نعم" : "لا",
+          "عدد الأجوبة": answered,
+          "مجموع الأسئلة": total,
+          "نسبة التقدم": `${percent}%`,
+          "آخر تحديث": formatDateYMDH(account.updatedAt ?? account.lastLoginAt ?? account.createdAt),
+        };
+      }),
+    [incompleteQuestionnaires.data],
+  );
+
   const messagesCsvRows = useMemo(
     () =>
       (messages.data ?? []).map((message) => ({
@@ -1011,9 +1035,17 @@ export default function AdminDashboard() {
 
         {tab === "incomplete" && (
           <section className="overflow-x-auto rounded-2xl border bg-white p-4 shadow-sm">
-            <div className="mb-4">
-              <h2 className="text-lg font-semibold">المستخدمون الذين بدأوا الاستمارة ولم يرسلوها</h2>
-              <p className="text-sm text-slate-500">يتم تحديث التقدم تلقائيا عند حفظ المسودة.</p>
+            <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold">المستخدمون الذين بدأوا الاستمارة ولم يرسلوها</h2>
+                <p className="text-sm text-slate-500">يتم تحديث التقدم تلقائيا عند حفظ المسودة.</p>
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => downloadCsv("formulaires-incomplets.csv", incompleteQuestionnairesCsvRows)}
+              >
+                <Download className="ml-2 h-4 w-4" /> csv تصدير الاستمارات غير المكتملة
+              </Button>
             </div>
             <table className="w-full min-w-[950px] text-sm">
               <thead className="bg-slate-100">
