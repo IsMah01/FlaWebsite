@@ -194,7 +194,7 @@ export async function ensureDatabaseSchema() {
         passwordHash VARCHAR(255) NOT NULL,
         passwordResetToken VARCHAR(64) NULL,
         passwordResetExpiresAt TIMESTAMP NULL,
-        role ENUM('admin','super_admin') NOT NULL DEFAULT 'admin',
+        role ENUM('admin','super_admin','interview_admin') NOT NULL DEFAULT 'admin',
         isActive BOOLEAN NOT NULL DEFAULT true,
         createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -207,13 +207,31 @@ export async function ensureDatabaseSchema() {
         startTime TIMESTAMP NOT NULL,
         endTime TIMESTAMP NOT NULL,
         meetingUrl TEXT NOT NULL,
+        googleEventId VARCHAR(255) NULL,
         interviewerName VARCHAR(255) NULL,
         notes TEXT NULL,
-        status ENUM('active','cancelled') NOT NULL DEFAULT 'active',
+        calendarSyncStatus ENUM('synced','failed') NOT NULL DEFAULT 'synced',
+        calendarSyncError TEXT NULL,
+        createdByAdminId INT NULL,
+        status ENUM('scheduled','completed','absent','cancelled') NOT NULL DEFAULT 'scheduled',
         createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )
     `);
+    await addColumnIfMissing(connection, "interview_slots", "googleEventId", "googleEventId VARCHAR(255) NULL");
+    await addColumnIfMissing(connection, "interview_slots", "calendarSyncStatus", "calendarSyncStatus ENUM('synced','failed') NOT NULL DEFAULT 'synced'");
+    await addColumnIfMissing(connection, "interview_slots", "calendarSyncError", "calendarSyncError TEXT NULL");
+    await addColumnIfMissing(connection, "interview_slots", "createdByAdminId", "createdByAdminId INT NULL");
+    await connection.query(
+      "ALTER TABLE admin_users MODIFY COLUMN role ENUM('admin','super_admin','interview_admin') NOT NULL DEFAULT 'admin'",
+    );
+    await connection.query(
+      "ALTER TABLE interview_slots MODIFY COLUMN status ENUM('active','scheduled','completed','absent','cancelled') NOT NULL DEFAULT 'scheduled'",
+    );
+    await connection.query("UPDATE interview_slots SET status = 'scheduled' WHERE status = 'active'");
+    await connection.query(
+      "ALTER TABLE interview_slots MODIFY COLUMN status ENUM('scheduled','completed','absent','cancelled') NOT NULL DEFAULT 'scheduled'",
+    );
 
     await connection.query(`
       CREATE TABLE IF NOT EXISTS interview_bookings (
@@ -223,6 +241,42 @@ export async function ensureDatabaseSchema() {
         bookedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         UNIQUE KEY interview_bookings_slot_unique (slotId),
         UNIQUE KEY interview_bookings_candidate_unique (candidateId)
+      )
+    `);
+    await addColumnIfMissing(connection, "interview_bookings", "communicationScore", "communicationScore INT NULL");
+    await addColumnIfMissing(connection, "interview_bookings", "motivationScore", "motivationScore INT NULL");
+    await addColumnIfMissing(connection, "interview_bookings", "leadershipScore", "leadershipScore INT NULL");
+    await addColumnIfMissing(connection, "interview_bookings", "recommendation", "recommendation ENUM('pending','accepted','rejected') NOT NULL DEFAULT 'pending'");
+    await addColumnIfMissing(connection, "interview_bookings", "evaluationNotes", "evaluationNotes TEXT NULL");
+    await addColumnIfMissing(connection, "interview_bookings", "evaluatedAt", "evaluatedAt TIMESTAMP NULL");
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS interview_reminder_emails (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        bookingId INT NOT NULL,
+        reminderType ENUM('24h','1h') NOT NULL,
+        email VARCHAR(320) NOT NULL,
+        status ENUM('pending','sent','failed') NOT NULL DEFAULT 'pending',
+        errorMessage TEXT NULL,
+        attemptCount INT NOT NULL DEFAULT 0,
+        nextAttemptAt TIMESTAMP NULL,
+        sentAt TIMESTAMP NULL,
+        createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY interview_reminder_booking_type_unique (bookingId, reminderType),
+        INDEX interview_reminder_status_idx (status)
+      )
+    `);
+    await addColumnIfMissing(connection, "interview_reminder_emails", "attemptCount", "attemptCount INT NOT NULL DEFAULT 0");
+    await addColumnIfMissing(connection, "interview_reminder_emails", "nextAttemptAt", "nextAttemptAt TIMESTAMP NULL");
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS google_calendar_connections (
+        id INT PRIMARY KEY,
+        encryptedRefreshToken TEXT NOT NULL,
+        connectedByAdminId INT NOT NULL,
+        createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )
     `);
 

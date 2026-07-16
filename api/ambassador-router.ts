@@ -21,7 +21,7 @@ function readCookie(cookieHeader: string | null | undefined, name: string) {
 
 async function getDiscussionActor(
   req: Request,
-  ctxUser?: { role?: string; id?: number; name?: string | null },
+  ctxUser?: { role?: string; adminRole?: string; id?: number; name?: string | null },
 ) {
   const db = getDb();
 
@@ -65,7 +65,7 @@ async function getDiscussionActor(
     }
   }
 
-  if (ctxUser?.role === "admin" && ctxUser.id) {
+  if (ctxUser?.role === "admin" && ctxUser.adminRole !== "interview_admin" && ctxUser.id) {
     const [admin] = await db
       .select()
       .from(adminUsers)

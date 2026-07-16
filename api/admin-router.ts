@@ -1,10 +1,12 @@
 import { z } from "zod";
+import bcrypt from "bcryptjs";
 import { desc, eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { createRouter, adminQuery } from "./middleware";
+import { createRouter, adminQuery, superAdminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import {
   candidates,
+  adminUsers,
   ambassadorMessages,
   contactMessages,
   editions,
@@ -13,6 +15,44 @@ import {
 } from "@db/schema";
 
 export const adminRouter = createRouter({
+  listInterviewAdmins: superAdminQuery.query(async () => {
+    const db = getDb();
+    return db
+      .select({ id: adminUsers.id, name: adminUsers.name, email: adminUsers.email, isActive: adminUsers.isActive, createdAt: adminUsers.createdAt })
+      .from(adminUsers)
+      .where(eq(adminUsers.role, "interview_admin"))
+      .orderBy(desc(adminUsers.createdAt));
+  }),
+
+  createInterviewAdmin: superAdminQuery
+    .input(z.object({
+      name: z.string().trim().min(2).max(255),
+      email: z.string().trim().email().max(320),
+      password: z.string().min(8).max(128).regex(/[A-Z]/, "Le mot de passe doit contenir une majuscule."),
+    }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const email = input.email.toLowerCase();
+      const [existing] = await db.select({ id: adminUsers.id }).from(adminUsers).where(eq(adminUsers.email, email)).limit(1);
+      if (existing) throw new TRPCError({ code: "CONFLICT", message: "Un compte existe déjà avec cet e-mail." });
+      await db.insert(adminUsers).values({
+        name: input.name,
+        email,
+        passwordHash: await bcrypt.hash(input.password, 12),
+        role: "interview_admin",
+        isActive: true,
+      });
+      return { success: true };
+    }),
+
+  setInterviewAdminActive: superAdminQuery
+    .input(z.object({ id: z.number().int().positive(), isActive: z.boolean() }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      await db.update(adminUsers).set({ isActive: input.isActive }).where(eq(adminUsers.id, input.id));
+      return { success: true };
+    }),
+
   stats: adminQuery.query(async () => {
     const db = getDb();
     const [allCandidates, allMessages, allAmbassadorMessages, allEditions, allNewUsers, allUsers] = await Promise.all([
@@ -292,6 +332,23 @@ export const adminRouter = createRouter({
     .mutation(async ({ input }) => {
       const db = getDb();
       await db.delete(ambassadorMessages).where(eq(ambassadorMessages.id, input.id));
+      return { success: true };
+    }),
+
+  setCandidateAmbassador: adminQuery
+    .input(z.object({ candidateId: z.number().int().positive(), isAmbassador: z.boolean() }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const [candidate] = await db
+        .select({ newUserId: candidates.newUserId })
+        .from(candidates)
+        .where(eq(candidates.id, input.candidateId))
+        .limit(1);
+      if (!candidate) throw new TRPCError({ code: "NOT_FOUND", message: "Candidat introuvable." });
+      await Promise.all([
+        db.update(candidates).set({ isAmbassador: input.isAmbassador }).where(eq(candidates.id, input.candidateId)),
+        db.update(newUsers).set({ isAmbassador: input.isAmbassador }).where(eq(newUsers.id, candidate.newUserId)),
+      ]);
       return { success: true };
     }),
 

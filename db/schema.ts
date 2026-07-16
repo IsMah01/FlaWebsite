@@ -111,9 +111,17 @@ export const interviewSlots = mysqlTable("interview_slots", {
   startTime: timestamp("startTime").notNull(),
   endTime: timestamp("endTime").notNull(),
   meetingUrl: text("meetingUrl").notNull(),
+  googleEventId: varchar("googleEventId", { length: 255 }),
   interviewerName: varchar("interviewerName", { length: 255 }),
   notes: text("notes"),
-  status: mysqlEnum("status", ["active", "cancelled"]).default("active").notNull(),
+  calendarSyncStatus: mysqlEnum("calendarSyncStatus", ["synced", "failed"])
+    .default("synced")
+    .notNull(),
+  calendarSyncError: text("calendarSyncError"),
+  createdByAdminId: int("createdByAdminId"),
+  status: mysqlEnum("status", ["scheduled", "completed", "absent", "cancelled"])
+    .default("scheduled")
+    .notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt")
     .defaultNow()
@@ -131,6 +139,14 @@ export const interviewBookings = mysqlTable(
     slotId: int("slotId").notNull(),
     candidateId: int("candidateId").notNull(),
     bookedAt: timestamp("bookedAt").defaultNow().notNull(),
+    communicationScore: int("communicationScore"),
+    motivationScore: int("motivationScore"),
+    leadershipScore: int("leadershipScore"),
+    recommendation: mysqlEnum("recommendation", ["pending", "accepted", "rejected"])
+      .default("pending")
+      .notNull(),
+    evaluationNotes: text("evaluationNotes"),
+    evaluatedAt: timestamp("evaluatedAt"),
   },
   (table) => [
     uniqueIndex("interview_bookings_slot_unique").on(table.slotId),
@@ -140,6 +156,42 @@ export const interviewBookings = mysqlTable(
 
 export type InterviewBooking = typeof interviewBookings.$inferSelect;
 export type InsertInterviewBooking = typeof interviewBookings.$inferInsert;
+
+export const interviewReminderEmails = mysqlTable(
+  "interview_reminder_emails",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    bookingId: int("bookingId").notNull(),
+    reminderType: mysqlEnum("reminderType", ["24h", "1h"]).notNull(),
+    email: varchar("email", { length: 320 }).notNull(),
+    status: mysqlEnum("status", ["pending", "sent", "failed"]).default("pending").notNull(),
+    errorMessage: text("errorMessage"),
+    attemptCount: int("attemptCount").default(0).notNull(),
+    nextAttemptAt: timestamp("nextAttemptAt"),
+    sentAt: timestamp("sentAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt")
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    uniqueIndex("interview_reminder_booking_type_unique").on(table.bookingId, table.reminderType),
+  ],
+);
+
+export const googleCalendarConnections = mysqlTable("google_calendar_connections", {
+  id: int("id").primaryKey(),
+  encryptedRefreshToken: text("encryptedRefreshToken").notNull(),
+  connectedByAdminId: int("connectedByAdminId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt")
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
+});
+
+export type GoogleCalendarConnection = typeof googleCalendarConnections.$inferSelect;
 
 export const candidateReminderEmails = mysqlTable("candidate_reminder_emails", {
   id: int("id").autoincrement().primaryKey(),
@@ -252,7 +304,7 @@ export const adminUsers = mysqlTable("admin_users", {
   passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
   passwordResetToken: varchar("passwordResetToken", { length: 64 }),
   passwordResetExpiresAt: timestamp("passwordResetExpiresAt"),
-  role: mysqlEnum("role", ["admin", "super_admin"]).default("admin").notNull(),
+  role: mysqlEnum("role", ["admin", "super_admin", "interview_admin"]).default("admin").notNull(),
   isActive: boolean("isActive").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt")

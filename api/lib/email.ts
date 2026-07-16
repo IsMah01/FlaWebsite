@@ -253,6 +253,55 @@ export async function sendCandidateQuestionnaireReminderEmail(
   }
 }
 
+export async function sendInterviewReminderEmail(
+  to: string,
+  firstName: string,
+  startTime: Date,
+  meetingUrl: string,
+  reminderType: "24h" | "1h",
+) {
+  if (!SMTP_HOST || !SMTP_USER) {
+    console.warn("[Email] SMTP not configured. Skipping interview reminder email.");
+    return { success: false, reason: "SMTP_NOT_CONFIGURED" };
+  }
+
+  const logo = getEmailLogo();
+  const dateLabel = new Intl.DateTimeFormat("fr-FR", {
+    timeZone: "Africa/Casablanca",
+    dateStyle: "full",
+    timeStyle: "short",
+  }).format(startTime);
+  const delayLabel = reminderType === "24h" ? "24 heures" : "1 heure";
+  const html = `
+    <div dir="rtl" style="font-family:Arial,Tahoma,sans-serif;max-width:620px;margin:auto;padding:24px;background:#f3f7f6;color:#173f39">
+      <div style="background:#fff;border-radius:16px;padding:28px;text-align:right">
+        <img src="${logo.src}" width="170" alt="Future Leaders Foundation" style="display:block;margin:0 0 20px auto">
+        <h1 style="color:#2d6f64;font-size:24px">تذكير بموعد المقابلة الشفوية</h1>
+        <p>مرحباً ${firstName || ""}،</p>
+        <p style="line-height:1.9">نذكّركم بأن موعد مقابلتكم الشفوية سيكون بعد ${delayLabel}.</p>
+        <p style="font-weight:bold;line-height:1.8">${dateLabel} (توقيت المغرب)</p>
+        <div style="text-align:center;margin:28px 0">
+          <a href="${meetingUrl}" style="display:inline-block;background:#4A9B8E;color:#fff;padding:13px 28px;border-radius:9px;text-decoration:none;font-weight:bold">الدخول إلى Google Meet</a>
+        </div>
+        <p style="font-size:12px;color:#74837f;word-break:break-all;direction:ltr;text-align:center">${meetingUrl}</p>
+      </div>
+    </div>`;
+
+  try {
+    await transporter.sendMail({
+      from: `"${AR_ORG}" <${SMTP_FROM}>`,
+      to,
+      subject: `تذكير: موعد المقابلة بعد ${delayLabel} - ${AR_ORG}`,
+      html,
+      attachments: logo.attachments,
+    });
+    return { success: true };
+  } catch (error) {
+    console.error("[Email] Failed to send interview reminder:", error);
+    return { success: false, reason: "SEND_FAILED" };
+  }
+}
+
 export async function sendNewsletterEmail(
   to: string,
   subject: string,

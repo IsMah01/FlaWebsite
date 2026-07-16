@@ -17,6 +17,14 @@ import { adminUsers } from "@db/schema";
 import { eq } from "drizzle-orm";
 import { ensureDatabaseSchema } from "./lib/migrate";
 import { startCandidateQuestionnaireReminderScheduler } from "./lib/candidate-reminders";
+import { startInterviewReminderScheduler } from "./lib/interview-reminders";
+import crypto from "node:crypto";
+import {
+  buildGoogleAuthorizationUrl,
+  exchangeGoogleAuthorizationCode,
+  isGoogleCalendarConfigured,
+  saveGoogleCalendarConnection,
+} from "./lib/google-calendar";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
@@ -36,14 +44,14 @@ function readCookie(cookieHeader: string | null | undefined, name: string) {
   return match ? decodeURIComponent(match.slice(name.length + 1)) : null;
 }
 
-async function isInternalAdminRequest(req: Request) {
+async function getInternalAdminId(req: Request) {
   const token = readCookie(req.headers.get("cookie"), "admin_token");
   const secret = process.env.APP_SECRET;
-  if (!token || !secret) return false;
+  if (!token || !secret) return null;
 
   try {
     const payload = jwt.verify(token, secret) as { type?: string; id?: number };
-    if (payload.type !== "admin" || !payload.id) return false;
+    if (payload.type !== "admin" || !payload.id) return null;
 
     const db = getDb();
     const [admin] = await db
@@ -52,9 +60,9 @@ async function isInternalAdminRequest(req: Request) {
       .where(eq(adminUsers.id, payload.id))
       .limit(1);
 
-    return !!admin?.isActive;
+    return admin?.isActive && admin.role !== "interview_admin" ? admin.id : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -88,10 +96,60 @@ app.get("/api/db-health", async (c) => {
 
 app.get(Paths.oauthCallback, createOAuthCallbackHandler());
 
+app.get("/api/google/calendar/connect", async (c) => {
+  const adminId = await getInternalAdminId(c.req.raw);
+  if (!adminId) return c.json({ error: "Forbidden" }, 403);
+  if (!isGoogleCalendarConfigured()) {
+    return c.json({ error: "Google Calendar OAuth is not configured" }, 503);
+  }
+  const secret = process.env.APP_SECRET;
+  if (!secret) return c.json({ error: "Server configuration error" }, 500);
+  const state = jwt.sign(
+    { type: "google_calendar_oauth", adminId, nonce: crypto.randomBytes(16).toString("hex") },
+    secret,
+    { expiresIn: "10m" },
+  );
+  return c.redirect(buildGoogleAuthorizationUrl(state), 302);
+});
+
+app.get("/api/google/calendar/callback", async (c) => {
+  const code = c.req.query("code");
+  const state = c.req.query("state");
+  const oauthError = c.req.query("error");
+  const secret = process.env.APP_SECRET;
+  if (oauthError) return c.redirect("/admin/interviews?google=denied", 302);
+  if (!code || !state || !secret) return c.redirect("/admin/interviews?google=invalid", 302);
+
+  try {
+    const payload = jwt.verify(state, secret) as {
+      type?: string;
+      adminId?: number;
+      nonce?: string;
+    };
+    if (payload.type !== "google_calendar_oauth" || !payload.adminId || !payload.nonce) {
+      throw new Error("Invalid OAuth state");
+    }
+    const db = getDb();
+    const [admin] = await db
+      .select({ id: adminUsers.id, isActive: adminUsers.isActive, role: adminUsers.role })
+      .from(adminUsers)
+      .where(eq(adminUsers.id, payload.adminId))
+      .limit(1);
+    if (!admin?.isActive || admin.role === "interview_admin") throw new Error("Unauthorized admin");
+
+    const refreshToken = await exchangeGoogleAuthorizationCode(code);
+    await saveGoogleCalendarConnection(refreshToken, admin.id);
+    return c.redirect("/admin/interviews?google=connected", 302);
+  } catch (error) {
+    console.error("[google-calendar] OAuth callback failed", error instanceof Error ? error.message : error);
+    return c.redirect("/admin/interviews?google=error", 302);
+  }
+});
+
 app.get("/api/private-files/:fileName", async (c) => {
   const [legacyAdmin, internalAdmin] = await Promise.all([
     authenticateRequest(c.req.raw.headers).catch(() => null),
-    isInternalAdminRequest(c.req.raw),
+    getInternalAdminId(c.req.raw),
   ]);
 
   if ((!legacyAdmin || legacyAdmin.role !== "admin") && !internalAdmin) {
@@ -140,7 +198,8 @@ export default app;
 
 if (env.isProduction) {
   await ensureDatabaseSchema();
-  startCandidateQuestionnaireReminderScheduler();
+startCandidateQuestionnaireReminderScheduler();
+startInterviewReminderScheduler();
 
   const { serve } = await import("@hono/node-server");
   const { serveStaticFiles } = await import("./lib/vite");

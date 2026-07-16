@@ -9,7 +9,7 @@ import { adminUsers } from "@db/schema";
 export type TrpcContext = {
   req: Request;
   resHeaders: Headers;
-  user?: User;
+  user?: User & { adminRole?: AdminUser["role"] };
   adminUser?: AdminUser;
 };
 
@@ -20,7 +20,8 @@ export async function createContext(
   const internalAdmin = await getInternalAdminFromRequest(opts.req);
   if (internalAdmin) {
     return {
-      user: internalAdmin,
+      user: internalAdmin.user,
+      adminUser: internalAdmin.adminUser,
       resHeaders,
       req: opts.req,
     };
@@ -69,6 +70,8 @@ async function getInternalAdminFromRequest(req: Request) {
     if (!admin || !admin.isActive) return null;
 
     return {
+      adminUser: admin,
+      user: {
       id: admin.id,
       unionId: `internal-admin-${admin.id}`,
       name: admin.name,
@@ -76,10 +79,12 @@ async function getInternalAdminFromRequest(req: Request) {
       avatar: null,
       role: "admin" as const,
       status: "admin" as const,
+      adminRole: admin.role,
       createdAt: admin.createdAt,
       updatedAt: admin.updatedAt,
       lastSignInAt: new Date(),
       date: new Date(),
+      },
     };
   } catch {
     return null;

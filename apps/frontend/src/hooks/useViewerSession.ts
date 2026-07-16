@@ -30,6 +30,7 @@ export function useViewerSession() {
   });
 
   const authQuery = trpc.auth.me.useQuery(undefined, {
+    enabled: candidateQuery.isFetched && !candidateQuery.data,
     staleTime: 1000 * 60 * 5,
     retry: false,
   });

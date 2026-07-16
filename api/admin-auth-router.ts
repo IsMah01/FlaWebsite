@@ -9,6 +9,7 @@ import { getDb } from "./queries/connection";
 import { adminUsers } from "@db/schema";
 import { sendPasswordResetEmail } from "./lib/email";
 import { getClientIp, rateLimitOrThrow, securityLog } from "./lib/abuse-protection";
+import { secureCookieSuffix } from "./lib/cookie-security";
 
 const ADMIN_COOKIE_NAME = "admin_token";
 const ADMIN_TOKEN_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
@@ -25,13 +26,6 @@ function getJwtSecret() {
     throw new Error("APP_SECRET is required");
   }
   return secret;
-}
-
-function secureCookieSuffix() {
-  const mustUseSecureCookies =
-    process.env.NODE_ENV === "production" ||
-    process.env.APP_URL?.startsWith("https://");
-  return mustUseSecureCookies ? "; Secure" : "";
 }
 
 function buildAdminCookie(token: string) {
@@ -111,7 +105,7 @@ export const adminAuthRouter = createRouter({
           ip,
           email: normalizedEmail,
         });
-        return { success: true, accountExists: false, emailSent: false };
+        return { success: true };
       }
 
       const reset = createPasswordResetToken();
@@ -124,9 +118,9 @@ export const adminAuthRouter = createRouter({
         .where(eq(adminUsers.id, admin.id));
 
       const resetUrl = `${process.env.APP_URL || "http://localhost:3000"}/admin/reset-password?token=${reset.token}`;
-      const emailResult = await sendPasswordResetEmail(admin.email, admin.name, resetUrl);
+      await sendPasswordResetEmail(admin.email, admin.name, resetUrl);
 
-      return { success: true, accountExists: true, emailSent: emailResult.success };
+      return { success: true };
     }),
 
   resetPassword: publicQuery

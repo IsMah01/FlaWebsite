@@ -39,4 +39,29 @@ function requireRole(role: string) {
 }
 
 export const authedQuery = t.procedure.use(requireAuth);
-export const adminQuery = authedQuery.use(requireRole("admin"));
+export const adminQuery = authedQuery.use(
+  t.middleware(async ({ ctx, next }) => {
+    if (ctx.user.role !== "admin" || ctx.adminUser?.role === "interview_admin") {
+      throw new TRPCError({ code: "FORBIDDEN", message: ErrorMessages.insufficientRole });
+    }
+    return next({ ctx });
+  }),
+);
+
+export const interviewAdminQuery = authedQuery.use(
+  t.middleware(async ({ ctx, next }) => {
+    if (ctx.user.role !== "admin" || !ctx.adminUser || !["admin", "super_admin", "interview_admin"].includes(ctx.adminUser.role)) {
+      throw new TRPCError({ code: "FORBIDDEN", message: ErrorMessages.insufficientRole });
+    }
+    return next({ ctx: { ...ctx, adminUser: ctx.adminUser } });
+  }),
+);
+
+export const superAdminQuery = adminQuery.use(
+  t.middleware(async ({ ctx, next }) => {
+    if (ctx.adminUser?.role !== "super_admin") {
+      throw new TRPCError({ code: "FORBIDDEN", message: ErrorMessages.insufficientRole });
+    }
+    return next({ ctx: { ...ctx, adminUser: ctx.adminUser } });
+  }),
+);

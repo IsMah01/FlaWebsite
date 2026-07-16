@@ -17,12 +17,12 @@ export default function AdminLogin() {
 
   const candidateLogout = trpc.candidateAuth.logout.useMutation();
   const login = trpc.adminAuth.login.useMutation({
-    onSuccess: async () => {
+    onSuccess: async (data) => {
       rateLimit.clearBlock();
       utils.candidateAuth.me.setData(undefined, undefined);
       await utils.auth.me.invalidate();
       toast.success("تسجيل دخول الإدارة ناجح!");
-      navigate("/admin");
+      navigate(data.admin.role === "interview_admin" ? "/admin/interviews" : "/admin");
     },
     onError: (err) => toast.error(rateLimit.blockFromError(err) || err.message || "Email ou mot de passe incorrect."),
   });

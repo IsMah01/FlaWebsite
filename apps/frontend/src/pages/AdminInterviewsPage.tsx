@@ -10,6 +10,7 @@ export default function AdminInterviewsPage() {
     redirectPath: "/admin/login",
   });
   const isAdmin = user?.role === "admin";
+  const isInterviewAdmin = user?.adminRole === "interview_admin";
 
   if (isLoading) {
     return (
@@ -36,18 +37,18 @@ export default function AdminInterviewsPage() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link to="/admin">
+            {!isInterviewAdmin ? <Link to="/admin">
               <Button variant="outline">
                 <ArrowRight className="ml-2 h-4 w-4" /> العودة إلى لوحة الإدارة
               </Button>
-            </Link>
+            </Link> : null}
             <Button variant="outline" onClick={logout} className="text-red-600 hover:text-red-700">
               <LogOut className="ml-2 h-4 w-4" /> تسجيل الخروج
             </Button>
           </div>
         </header>
 
-        <AdminInterviews enabled={isAdmin} />
+        <AdminInterviews enabled={isAdmin} adminRole={user?.adminRole} adminName={user?.name} />
       </div>
     </div>
   );

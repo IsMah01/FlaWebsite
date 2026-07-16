@@ -11,37 +11,21 @@ import { formatBlockedSeconds, useRateLimitBlock } from "@/hooks/useRateLimitBlo
 import { trpc } from "@/providers/trpc";
 
 type AccountType = "candidate" | "admin";
-type ResetRequestResult = {
-  accountExists?: boolean;
-  emailSent?: boolean;
-};
-
 export default function ForgotPassword({ accountType }: { accountType: AccountType }) {
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
-  const [emailWasSent, setEmailWasSent] = useState(true);
   const isAdmin = accountType === "admin";
   const rateLimit = useRateLimitBlock();
   const requestCandidateReset = trpc.candidateAuth.requestPasswordReset.useMutation({
-    onSuccess: (result: ResetRequestResult) => {
+    onSuccess: () => {
       rateLimit.clearBlock();
-      if (!result.accountExists) {
-        toast.error("Aucun compte n'existe avec cet email.");
-        return;
-      }
-      setEmailWasSent(!!result.emailSent);
       setSubmitted(true);
     },
     onError: (err) => toast.error(rateLimit.blockFromError(err) || err.message || "Impossible d'envoyer le lien"),
   });
   const requestAdminReset = trpc.adminAuth.requestPasswordReset.useMutation({
-    onSuccess: (result: ResetRequestResult) => {
+    onSuccess: () => {
       rateLimit.clearBlock();
-      if (!result.accountExists) {
-        toast.error("Aucun compte n'existe avec cet email.");
-        return;
-      }
-      setEmailWasSent(!!result.emailSent);
       setSubmitted(true);
     },
     onError: (err) => toast.error(rateLimit.blockFromError(err) || err.message || "Impossible d'envoyer le lien"),
@@ -84,12 +68,10 @@ export default function ForgotPassword({ accountType }: { accountType: AccountTy
               <div className="rounded-lg border border-[#4A9B8E]/20 bg-[#4A9B8E]/5 p-5 text-center">
                 <Mail className="mx-auto mb-3 h-8 w-8 text-[#4A9B8E]" />
                 <h2 className="text-lg font-semibold text-gray-900">
-                  {emailWasSent ? "Vérifiez votre email" : "Email non envoyé"}
+                  Vérifiez votre e-mail
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-gray-600">
-                  {emailWasSent
-                    ? "Un lien de réinitialisation vient d'être envoyé. Il expire dans 1 heure. Vérifiez aussi votre dossier spam."
-                    : "Le compte existe, mais l'email n'a pas pu être envoyé. Vérifiez la configuration SMTP puis réessayez."}
+                  Si un compte correspond à cette adresse, un lien valable une heure sera envoyé. Vérifiez également le dossier spam.
                 </p>
               </div>
               <Link to={backPath} className="block">

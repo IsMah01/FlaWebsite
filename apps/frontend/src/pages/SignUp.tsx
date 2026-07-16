@@ -23,7 +23,6 @@ export default function SignUp() {
     studyStatus: "",
     phoneNumber: "",
     email: "",
-    isAmbassador: false,
     password: "",
     confirmPassword: "",
     newsletterConsent: false,
@@ -104,7 +103,6 @@ export default function SignUp() {
       attestationUrl: formData.attestationUrl || undefined,
       phoneNumber: formData.phoneNumber,
       email: formData.email.trim().toLowerCase(),
-      isAmbassador: formData.isAmbassador,
       password: formData.password,
       confirmPassword: formData.confirmPassword,
       newsletterConsent: formData.newsletterConsent,
@@ -181,20 +179,6 @@ export default function SignUp() {
                 <div>
                   <Label htmlFor="email">البريد الإلكتروني *</Label>
                   <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="example@email.com" required className="text-right mt-1" />
-                </div>
-              </div>
-
-              <div className="p-4 bg-[#F8FAF9] rounded-xl">
-                <Label className="mb-3 block">هل أنت سفير إحدى دورات أكاديمية أطر الغد؟</Label>
-                <div className="flex flex-wrap gap-6">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" name="ambassador" checked={formData.isAmbassador} onChange={() => setFormData({ ...formData, isAmbassador: true })} className="w-4 h-4 text-[#4A9B8E]" />
-                    <span className="text-sm">نعم</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" name="ambassador" checked={!formData.isAmbassador} onChange={() => setFormData({ ...formData, isAmbassador: false })} className="w-4 h-4 text-[#4A9B8E]" />
-                    <span className="text-sm">لا</span>
-                  </label>
                 </div>
               </div>
 

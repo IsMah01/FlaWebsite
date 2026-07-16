@@ -10,6 +10,7 @@ import { candidates, newUsers } from "@db/schema";
 import { sendConfirmationEmail, sendPasswordResetEmail } from "./lib/email";
 import { upsertUser } from "./queries/users";
 import { getClientIp, rateLimitOrThrow, securityLog } from "./lib/abuse-protection";
+import { secureCookieSuffix } from "./lib/cookie-security";
 
 const JWT_SECRET = process.env.APP_SECRET;
 
@@ -22,13 +23,6 @@ function readCandidateToken(cookieHeader: string) {
     .split(";")
     .find((c) => c.trim().startsWith("candidate_token="))
     ?.split("=")[1];
-}
-
-function secureCookieSuffix() {
-  const mustUseSecureCookies =
-    process.env.NODE_ENV === "production" ||
-    process.env.APP_URL?.startsWith("https://");
-  return mustUseSecureCookies ? "; Secure" : "";
 }
 
 function buildCandidateCookie(token: string) {
@@ -153,7 +147,6 @@ export const candidateAuthRouter = createRouter({
             .optional(),
           phoneNumber: z.string().min(1, "رقم الهاتف مطلوب"),
           email: z.string().email("بريد إلكتروني غير صالح"),
-          isAmbassador: z.boolean().default(false),
           password: strongPasswordSchema,
           confirmPassword: z.string(),
           newsletterConsent: z.boolean().default(false),
@@ -199,7 +192,8 @@ export const candidateAuthRouter = createRouter({
         attestationUrl: input.attestationUrl || null,
         phoneNumber: input.phoneNumber,
         email: normalizedEmail,
-        isAmbassador: input.isAmbassador,
+        // Privileged flags must never come from a public registration request.
+        isAmbassador: false,
         password: hashedPassword,
         emailConfirmed: false,
         confirmationToken: confirmation.tokenHash,
@@ -343,7 +337,7 @@ export const candidateAuthRouter = createRouter({
           ip,
           email: normalizedEmail,
         });
-        return { success: true, accountExists: false, emailSent: false };
+        return { success: true };
       }
 
       const reset = createPasswordResetToken();
@@ -364,9 +358,9 @@ export const candidateAuthRouter = createRouter({
         .where(eq(candidates.newUserId, account.id));
 
       const resetUrl = `${process.env.APP_URL || "http://localhost:3000"}/reset-password?token=${reset.token}`;
-      const emailResult = await sendPasswordResetEmail(account.email, account.firstName, resetUrl);
+      await sendPasswordResetEmail(account.email, account.firstName, resetUrl);
 
-      return { success: true, accountExists: true, emailSent: emailResult.success };
+      return { success: true };
     }),
 
   resetPassword: publicQuery
