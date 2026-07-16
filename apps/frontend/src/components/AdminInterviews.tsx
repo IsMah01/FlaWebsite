@@ -227,8 +227,24 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
           <div><Label htmlFor="gap-minutes">Pause entre les créneaux (minutes)</Label><Input id="gap-minutes" type="number" min={0} max={240} value={gapMinutes} onChange={(event) => setGapMinutes(Number(event.target.value))} /></div>
           <div><Label htmlFor="interview-notes">Notes internes</Label><Input id="interview-notes" value={notes} onChange={(event) => setNotes(event.target.value)} /></div>
         </div>
-        <Button type="submit" disabled={createSlot.isPending || !googleStatus.data?.connected} className="mt-5 bg-[#4A9B8E] hover:bg-[#3D7A6F]">
-          {createSlot.isPending ? "Création des liens Meet..." : `Créer ${repeatCount} créneau(x)`}
+        {!googleStatus.isLoading && !googleStatus.data?.connected ? (
+          <div className="mt-5 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            {isInterviewAdmin
+              ? "Création temporairement indisponible : l’administrateur principal doit d’abord connecter le compte Google Calendar central."
+              : "Connectez Google Calendar ci-dessus pour activer la création des créneaux et des liens Meet."}
+          </div>
+        ) : null}
+        <Button
+          type="submit"
+          disabled={createSlot.isPending || googleStatus.isLoading || !googleStatus.data?.connected}
+          title={!googleStatus.data?.connected ? "Google Calendar central n’est pas connecté" : undefined}
+          className="mt-5 bg-[#4A9B8E] hover:bg-[#3D7A6F]"
+        >
+          {createSlot.isPending
+            ? "Création des liens Meet..."
+            : !googleStatus.data?.connected
+              ? "Google Calendar non connecté"
+              : `Créer ${repeatCount} créneau(x)`}
         </Button>
       </form>
 
