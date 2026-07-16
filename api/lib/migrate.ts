@@ -351,6 +351,13 @@ export async function ensureDatabaseSchema() {
           await bcrypt.hash(adminPassword, 12),
         ],
       );
+    } else {
+      // The account selected through server configuration is the owner account.
+      // Upgrade legacy installations where it predates the super_admin role.
+      await connection.execute(
+        "UPDATE admin_users SET role = 'super_admin' WHERE id = ? AND role = 'admin'",
+        [adminRows[0].id],
+      );
     }
 
     console.log("[db] Schema is ready.");
