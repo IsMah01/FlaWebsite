@@ -22,6 +22,7 @@ type CandidateFilterField =
   | "adminNote"
   | "dates";
 type AccountFilterField = "all" | "name" | "email" | "phone" | "studyStatus" | "role" | "emailConfirmed" | "date";
+type UserFilterField = "all" | "name" | "email" | "phone" | "role" | "status" | "date";
 
 function fileUrl(ref?: string | null) {
   if (!ref?.startsWith("private://")) return null;
@@ -268,6 +269,8 @@ export default function AdminDashboard() {
   const [candidateFilterField, setCandidateFilterField] = useState<CandidateFilterField>("all");
   const [accountSearch, setAccountSearch] = useState("");
   const [accountFilterField, setAccountFilterField] = useState<AccountFilterField>("all");
+  const [userSearch, setUserSearch] = useState("");
+  const [userFilterField, setUserFilterField] = useState<UserFilterField>("all");
   const [ambassadorMessageAuthorFilter, setAmbassadorMessageAuthorFilter] = useState("");
   const [ambassadorMessageDateFilter, setAmbassadorMessageDateFilter] = useState("");
   const isAdmin = user?.role === "admin";
@@ -423,6 +426,26 @@ export default function AdminDashboard() {
       return fields[accountFilterField].toLowerCase().includes(q);
     });
   }, [newUsers.data, accountSearch, accountFilterField]);
+
+  const filteredPlatformUsers = useMemo(() => {
+    const q = userSearch.trim().toLowerCase();
+    const list = platformUsers.data ?? [];
+    if (!q) return list;
+
+    return list.filter((entry) => {
+      const fields: Record<UserFilterField, string> = {
+        all: "",
+        name: entry.name || "",
+        email: entry.email || "",
+        phone: entry.phone || "",
+        role: `${entry.role || ""} ${mapUserRole(entry.role)}`,
+        status: entry.status || "",
+        date: `${formatDateDMYH(entry.lastLoginAt)} ${formatDateYMDH(entry.lastLoginAt)}`,
+      };
+      fields.all = Object.values(fields).join(" ");
+      return fields[userFilterField].toLowerCase().includes(q);
+    });
+  }, [platformUsers.data, userSearch, userFilterField]);
 
   const filteredAmbassadorMessages = useMemo(() => {
     const authorQuery = ambassadorMessageAuthorFilter.trim().toLowerCase();
@@ -867,6 +890,34 @@ export default function AdminDashboard() {
 
         {tab === "users" && (
           <section className="overflow-x-auto rounded-2xl border bg-white p-4 shadow-sm">
+            <div className="mb-3 flex min-w-[900px] flex-col gap-2 md:flex-row md:items-center">
+              <select
+                value={userFilterField}
+                onChange={(event) => setUserFilterField(event.target.value as UserFilterField)}
+                className="h-10 w-56 rounded-md border border-input bg-background px-3 text-sm"
+                aria-label="Champ de filtrage des utilisateurs"
+              >
+                <option value="all">جميع الحقول</option>
+                <option value="name">الاسم</option>
+                <option value="email">البريد الإلكتروني</option>
+                <option value="phone">الهاتف</option>
+                <option value="role">الدور</option>
+                <option value="status">الحالة</option>
+                <option value="date">تاريخ آخر دخول</option>
+              </select>
+              <Input
+                placeholder="ابحث في المستخدمين..."
+                value={userSearch}
+                onChange={(event) => setUserSearch(event.target.value)}
+                className="max-w-md"
+              />
+              {(userSearch || userFilterField !== "all") ? (
+                <Button type="button" variant="outline" onClick={() => { setUserSearch(""); setUserFilterField("all"); }}>
+                  إعادة الضبط
+                </Button>
+              ) : null}
+              <span className="text-sm text-slate-500">{filteredPlatformUsers.length} نتيجة</span>
+            </div>
             <div className="mb-4 flex justify-end">
               <Button variant="outline" onClick={() => downloadCsv("users.csv", usersCsvRows)}>
                 <Download className="ml-2 h-4 w-4" /> csv تصدير user
@@ -883,7 +934,7 @@ export default function AdminDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {(platformUsers.data ?? []).map((entry) => (
+                {filteredPlatformUsers.map((entry) => (
                   <tr key={entry.id} className="border-b last:border-b-0">
                     <td className="p-3">{entry.name || "-"}</td>
                     <td className="p-3">{entry.email || "-"}</td>
