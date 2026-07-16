@@ -1,6 +1,6 @@
-export const REGISTRATION_DEADLINE = "2026-07-17";
-export const REGISTRATION_DEADLINE_LABEL = "17/07/2026";
-export const REGISTRATION_DEADLINE_AR = "17 يوليوز 2026";
+export const REGISTRATION_DEADLINE = "2026-07-20";
+export const REGISTRATION_DEADLINE_LABEL = "20/07/2026";
+export const REGISTRATION_DEADLINE_AR = "20 يوليوز 2026";
 
 export function getRegistrationCountdownDays() {
   const target = new Date(`${REGISTRATION_DEADLINE}T00:00:00`);

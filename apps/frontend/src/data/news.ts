@@ -31,11 +31,11 @@ export const upcomingEvents: EventItem[] = [
   },
   {
     id: "academy-deadline",
-    title: "إغلاق استمارة الترشح لأكاديمية أطر الغد",
+    title: "تمديد أجل الترشح لأكاديمية أطر الغد",
     date: REGISTRATION_DEADLINE,
     location: "عن بعد",
     summary:
-      `آخر أجل للتسجيل هو ${REGISTRATION_DEADLINE_AR}. لا تفوت الفرصة، املأ الاستمارة وانضم إلينا في تجربة تعاش ولا تحكى`,
+      `تم تمديد أجل التسجيل استثنائيا إلى ${REGISTRATION_DEADLINE_AR}. إنها فرصة إضافية وأخيرة، فلا تفوتها وأكمل استمارتك الآن`,
     cta: "املأ الاستمارة",
   },
 ];

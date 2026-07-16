@@ -5,7 +5,8 @@ import { getSqlPool } from "../queries/connection";
 import { sendCandidateQuestionnaireReminderEmail, sendConfirmationEmail } from "./email";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
-const DEFAULT_DEADLINE = "2026-07-17";
+const DEFAULT_DEADLINE = "2026-07-20";
+const EXTENSION_START_DATE = "2026-07-17";
 const DEFAULT_SEND_HOUR = 11;
 const CONFIRMATION_REMINDER_SEND_HOUR = 13;
 const DEFAULT_TIMEZONE = "Africa/Casablanca";
@@ -233,6 +234,7 @@ export async function runCandidateQuestionnaireReminderJob(now = new Date()) {
       user.firstName,
       daysLeft,
       deadlineLabel,
+      zonedNow.dateKey >= EXTENSION_START_DATE,
     );
 
     if (result.success) {
