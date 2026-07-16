@@ -1,4 +1,4 @@
-import { REGISTRATION_DEADLINE, REGISTRATION_DEADLINE_AR } from "./registration";
+import { IS_REGISTRATION_EXTENSION_ACTIVE, REGISTRATION_DEADLINE, REGISTRATION_DEADLINE_AR } from "./registration";
 
 export type NewsItem = {
   id: string;
@@ -31,11 +31,15 @@ export const upcomingEvents: EventItem[] = [
   },
   {
     id: "academy-deadline",
-    title: "تمديد أجل الترشح لأكاديمية أطر الغد",
+    title: IS_REGISTRATION_EXTENSION_ACTIVE
+      ? "تمديد أجل الترشح لأكاديمية أطر الغد"
+      : "إغلاق استمارة الترشح لأكاديمية أطر الغد",
     date: REGISTRATION_DEADLINE,
     location: "عن بعد",
     summary:
-      `تم تمديد أجل التسجيل استثنائيا إلى ${REGISTRATION_DEADLINE_AR}. إنها فرصة إضافية وأخيرة، فلا تفوتها وأكمل استمارتك الآن`,
+      IS_REGISTRATION_EXTENSION_ACTIVE
+        ? `تم تمديد أجل التسجيل استثنائيا إلى ${REGISTRATION_DEADLINE_AR}. إنها فرصة إضافية وأخيرة، فلا تفوتها وأكمل استمارتك الآن`
+        : `آخر أجل للتسجيل هو ${REGISTRATION_DEADLINE_AR}. لا تفوت الفرصة، املأ الاستمارة وأرسل ترشحك الآن`,
     cta: "املأ الاستمارة",
   },
 ];

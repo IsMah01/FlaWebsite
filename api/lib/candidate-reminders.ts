@@ -7,6 +7,7 @@ import { sendCandidateQuestionnaireReminderEmail, sendConfirmationEmail } from "
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const DEFAULT_DEADLINE = "2026-07-20";
 const EXTENSION_START_DATE = "2026-07-17";
+const ORIGINAL_DEADLINE = "2026-07-17";
 const DEFAULT_SEND_HOUR = 11;
 const CONFIRMATION_REMINDER_SEND_HOUR = 13;
 const DEFAULT_TIMEZONE = "Africa/Casablanca";
@@ -75,6 +76,10 @@ function daysUntil(deadline: string, today: string) {
 function formatDeadlineLabel(deadline: string) {
   const { year, month, day } = parseDateKey(deadline);
   return `${String(day).padStart(2, "0")}/${String(month).padStart(2, "0")}/${year}`;
+}
+
+function getEffectiveDeadline(configuredDeadline: string, dateKey: string) {
+  return dateKey >= EXTENSION_START_DATE ? configuredDeadline : ORIGINAL_DEADLINE;
 }
 
 async function reserveDailyReminder(
@@ -210,14 +215,15 @@ export async function runCandidateQuestionnaireReminderJob(now = new Date()) {
   }
 
   const zonedNow = getZonedNow(config.timezone, now);
-  const daysLeft = daysUntil(config.deadline, zonedNow.dateKey);
+  const effectiveDeadline = getEffectiveDeadline(config.deadline, zonedNow.dateKey);
+  const daysLeft = daysUntil(effectiveDeadline, zonedNow.dateKey);
 
   if (daysLeft <= 0) {
     return { skipped: true, reason: "deadline_reached", date: zonedNow.dateKey };
   }
 
   const users = await getPendingQuestionnaireUsers();
-  const deadlineLabel = formatDeadlineLabel(config.deadline);
+  const deadlineLabel = formatDeadlineLabel(effectiveDeadline);
   let sent = 0;
   let failed = 0;
   let skippedAlreadyReserved = 0;
@@ -264,7 +270,8 @@ export async function runCandidateConfirmationReminderJob(now = new Date()) {
   }
 
   const zonedNow = getZonedNow(config.timezone, now);
-  const daysLeft = daysUntil(config.deadline, zonedNow.dateKey);
+  const effectiveDeadline = getEffectiveDeadline(config.deadline, zonedNow.dateKey);
+  const daysLeft = daysUntil(effectiveDeadline, zonedNow.dateKey);
 
   if (daysLeft <= 0) {
     return { skipped: true, reason: "deadline_reached", date: zonedNow.dateKey };
