@@ -6,7 +6,7 @@ import { sendCandidateQuestionnaireReminderEmail, sendConfirmationEmail } from "
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const DEFAULT_DEADLINE = "2026-07-20";
-const EXTENSION_START_DATE = "2026-07-17";
+const EXTENSION_START_DATE = "2026-07-18";
 const ORIGINAL_DEADLINE = "2026-07-17";
 const DEFAULT_SEND_HOUR = 11;
 const CONFIRMATION_REMINDER_SEND_HOUR = 13;

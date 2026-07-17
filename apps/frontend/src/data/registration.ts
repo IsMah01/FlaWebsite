@@ -1,6 +1,6 @@
 const ORIGINAL_DEADLINE = "2026-07-17";
 const EXTENDED_DEADLINE = "2026-07-20";
-const EXTENSION_ANNOUNCEMENT_DATE = "2026-07-17";
+const EXTENSION_ANNOUNCEMENT_DATE = "2026-07-18";
 
 function getMoroccoDateKey() {
   const parts = new Intl.DateTimeFormat("en-CA", {
