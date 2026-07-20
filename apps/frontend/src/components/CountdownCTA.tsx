@@ -2,7 +2,7 @@ import { useNavigate } from "react-router";
 import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { REGISTRATION_DEADLINE_LABEL, getRegistrationCountdownDays } from "@/data/registration";
+import { REGISTRATION_DEADLINE_LABEL, getRegistrationCountdownDays, isRegistrationClosed } from "@/data/registration";
 import { useViewerSession } from "@/hooks/useViewerSession";
 
 type CountdownCTAProps = {
@@ -14,7 +14,7 @@ export default function CountdownCTA({ compact = false, className = "" }: Countd
   const navigate = useNavigate();
   const { viewer, isCandidateAccount, isCandidate, hasAmbassadorView } = useViewerSession();
   const daysLeft = getRegistrationCountdownDays();
-  const isClosed = daysLeft <= 0;
+  const isClosed = isRegistrationClosed();
   const isAmbassadorNotice = hasAmbassadorView && !isCandidate;
   const isAdmin = viewer?.kind === "site-user" && viewer.role === "admin";
 

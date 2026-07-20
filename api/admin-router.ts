@@ -285,6 +285,36 @@ export const adminRouter = createRouter({
       .map((account) => ({ ...account, questionnaireDraft: account.questionnaireDraft! }));
   }),
 
+  listRegistrationsToFollowUp: adminQuery.query(async () => {
+    const db = getDb();
+    const [accounts, submittedCandidates] = await Promise.all([
+      db
+        .select({
+          id: newUsers.id,
+          firstName: newUsers.firstName,
+          lastName: newUsers.lastName,
+          email: newUsers.email,
+          phoneNumber: newUsers.phoneNumber,
+          emailConfirmed: newUsers.emailConfirmed,
+          questionnaireDraft: newUsers.questionnaireDraft,
+          createdAt: newUsers.createdAt,
+          updatedAt: newUsers.updatedAt,
+          lastLoginAt: newUsers.lastLoginAt,
+        })
+        .from(newUsers)
+        .orderBy(desc(newUsers.createdAt)),
+      db.select({ newUserId: candidates.newUserId }).from(candidates),
+    ]);
+
+    const submittedIds = new Set(submittedCandidates.map((candidate) => candidate.newUserId));
+    return accounts
+      .filter((account) => !account.emailConfirmed || (!account.questionnaireDraft && !submittedIds.has(account.id)))
+      .map((account) => ({
+        ...account,
+        hasStartedQuestionnaire: Boolean(account.questionnaireDraft) || submittedIds.has(account.id),
+      }));
+  }),
+
   updateCandidateStatus: adminQuery
     .input(
       z.object({

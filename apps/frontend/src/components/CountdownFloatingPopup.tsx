@@ -3,7 +3,7 @@ import { useNavigate } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Bell, ChevronLeft, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { REGISTRATION_DEADLINE_LABEL, getRegistrationCountdownDays } from "@/data/registration";
+import { REGISTRATION_DEADLINE_LABEL, getRegistrationCountdownDays, isRegistrationClosed } from "@/data/registration";
 import { useViewerSession } from "@/hooks/useViewerSession";
 
 const REOPEN_INTERVAL_MS = 8 * 60 * 1000;
@@ -13,7 +13,7 @@ export default function CountdownFloatingPopup() {
   const { viewer, isCandidateAccount, isCandidate, hasAmbassadorView } = useViewerSession();
   const [isOpen, setIsOpen] = useState(true);
   const daysLeft = getRegistrationCountdownDays();
-  const isClosed = daysLeft <= 0;
+  const isClosed = isRegistrationClosed();
   const isAmbassadorNotice = hasAmbassadorView && !isCandidate;
   const isAdmin = viewer?.kind === "site-user" && viewer.role === "admin";
 

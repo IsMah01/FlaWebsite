@@ -18,10 +18,12 @@ export const REGISTRATION_DEADLINE = IS_REGISTRATION_EXTENSION_ACTIVE ? EXTENDED
 export const REGISTRATION_DEADLINE_LABEL = IS_REGISTRATION_EXTENSION_ACTIVE ? "20/07/2026" : "17/07/2026";
 export const REGISTRATION_DEADLINE_AR = IS_REGISTRATION_EXTENSION_ACTIVE ? "20 يوليوز 2026" : "17 يوليوز 2026";
 
+export function isRegistrationClosed() {
+  return getMoroccoDateKey() > REGISTRATION_DEADLINE;
+}
+
 export function getRegistrationCountdownDays() {
-  const target = new Date(`${REGISTRATION_DEADLINE}T00:00:00`);
-  const now = new Date();
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const diff = target.getTime() - startOfToday.getTime();
-  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+  const deadline = new Date(`${REGISTRATION_DEADLINE}T00:00:00Z`).getTime();
+  const today = new Date(`${getMoroccoDateKey()}T00:00:00Z`).getTime();
+  return Math.max(0, Math.round((deadline - today) / (1000 * 60 * 60 * 24)) + 1);
 }

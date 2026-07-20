@@ -8,7 +8,7 @@ import { candidateQuestionnaireFields } from "@/data/candidate-questionnaire";
 import { useAuth } from "@/hooks/useAuth";
 import { trpc } from "@/providers/trpc";
 
-type Tab = "newUsers" | "users" | "candidates" | "incomplete" | "messages" | "subscribers" | "interviewAdmins";
+type Tab = "newUsers" | "users" | "candidates" | "followUp" | "incomplete" | "messages" | "subscribers" | "interviewAdmins";
 type CandidateFilterField =
   | "all"
   | "name"
@@ -292,6 +292,10 @@ export default function AdminDashboard() {
     retry: false,
     enabled: isAdmin,
   });
+  const registrationsToFollowUp = trpc.admin.listRegistrationsToFollowUp.useQuery(undefined, {
+    retry: false,
+    enabled: isAdmin,
+  });
   const newUsers = trpc.admin.listNewUsers.useQuery(undefined, {
     retry: false,
     enabled: isAdmin,
@@ -552,6 +556,24 @@ export default function AdminDashboard() {
         };
       }),
     [incompleteQuestionnaires.data],
+  );
+
+  const registrationsToFollowUpCsvRows = useMemo(
+    () =>
+      (registrationsToFollowUp.data ?? []).map((account) => ({
+        "Nom complet": `${account.firstName} ${account.lastName}`,
+        "E-mail": account.email,
+        "Telephone": asExcelText(account.phoneNumber),
+        "E-mail confirme": account.emailConfirmed ? "Oui" : "Non",
+        "Formulaire commence": account.hasStartedQuestionnaire ? "Oui" : "Non",
+        "Motif du suivi": [
+          !account.emailConfirmed ? "E-mail non confirme" : null,
+          !account.hasStartedQuestionnaire ? "Formulaire non commence" : null,
+        ].filter(Boolean).join(" + "),
+        "Date d'inscription": asExcelText(formatDateYMDH(account.createdAt)),
+        "Derniere activite": asExcelText(formatDateYMDH(account.updatedAt ?? account.lastLoginAt ?? account.createdAt)),
+      })),
+    [registrationsToFollowUp.data],
   );
 
   const messagesCsvRows = useMemo(
@@ -815,6 +837,9 @@ export default function AdminDashboard() {
           </Button>
           <Button variant={tab === "candidates" ? "default" : "outline"} onClick={() => setTab("candidates")}>
             المترشحون
+          </Button>
+          <Button variant={tab === "followUp" ? "default" : "outline"} onClick={() => setTab("followUp")}>
+            Inscriptions à relancer ({registrationsToFollowUp.data?.length ?? 0})
           </Button>
           <Button variant={tab === "incomplete" ? "default" : "outline"} onClick={() => setTab("incomplete")}>
             استمارات غير مكتملة ({incompleteQuestionnaires.data?.length ?? 0})
@@ -1155,6 +1180,50 @@ export default function AdminDashboard() {
                 </tbody>
               </table>
             </div>
+          </section>
+        )}
+
+        {tab === "followUp" && (
+          <section className="overflow-x-auto rounded-2xl border bg-white p-4 shadow-sm">
+            <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold">Inscriptions à relancer</h2>
+                <p className="text-sm text-slate-500">Comptes sans e-mail confirmé ou dont le formulaire n'a pas été commencé.</p>
+              </div>
+              <Button variant="outline" onClick={() => downloadCsv("inscriptions-a-relancer.csv", registrationsToFollowUpCsvRows)}>
+                <Download className="ml-2 h-4 w-4" /> Télécharger la liste CSV
+              </Button>
+            </div>
+            <table className="w-full min-w-[950px] text-sm">
+              <thead className="bg-slate-100">
+                <tr>
+                  <th className="p-3 text-left">Nom</th><th className="p-3 text-left">E-mail</th>
+                  <th className="p-3 text-left">Téléphone</th><th className="p-3 text-left">E-mail confirmé</th>
+                  <th className="p-3 text-left">Formulaire commencé</th><th className="p-3 text-left">Motif du suivi</th>
+                  <th className="p-3 text-left">Inscription</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(registrationsToFollowUp.data ?? []).map((account) => {
+                  const reasons = [
+                    !account.emailConfirmed ? "E-mail non confirmé" : null,
+                    !account.hasStartedQuestionnaire ? "Formulaire non commencé" : null,
+                  ].filter(Boolean).join(" + ");
+                  return (
+                    <tr key={account.id} className="border-b last:border-b-0 hover:bg-slate-50">
+                      <td className="p-3 font-medium">{account.firstName} {account.lastName}</td>
+                      <td className="p-3">{account.email}</td><td className="p-3">{account.phoneNumber}</td>
+                      <td className="p-3">{account.emailConfirmed ? "Oui" : "Non"}</td>
+                      <td className="p-3">{account.hasStartedQuestionnaire ? "Oui" : "Non"}</td>
+                      <td className="p-3">{reasons}</td><td className="p-3">{formatDateDMYH(account.createdAt)}</td>
+                    </tr>
+                  );
+                })}
+                {!registrationsToFollowUp.isLoading && !(registrationsToFollowUp.data?.length) ? (
+                  <tr><td colSpan={7} className="p-8 text-center text-slate-500">Aucune inscription à relancer.</td></tr>
+                ) : null}
+              </tbody>
+            </table>
           </section>
         )}
 
