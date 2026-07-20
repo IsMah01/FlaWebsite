@@ -55,6 +55,35 @@ function downloadCsv(filename: string, rows: Record<string, unknown>[]) {
   URL.revokeObjectURL(url);
 }
 
+function excelEscape(value: unknown) {
+  return (value === null || value === undefined ? "" : String(value))
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function downloadExcel(filename: string, rows: Record<string, unknown>[]) {
+  if (!rows.length) {
+    toast.info("لا توجد بيانات للتصدير");
+    return;
+  }
+
+  const headers = Object.keys(rows[0]);
+  const table = [
+    `<tr>${headers.map((header) => `<th>${excelEscape(header)}</th>`).join("")}</tr>`,
+    ...rows.map((row) => `<tr>${headers.map((header) => `<td>${excelEscape(row[header])}</td>`).join("")}</tr>`),
+  ].join("");
+  const workbook = `<!doctype html><html><head><meta charset="utf-8"></head><body><table>${table}</table></body></html>`;
+  const blob = new Blob([workbook], { type: "application/vnd.ms-excel;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 function formatDateDMYH(value?: string | Date | null) {
   if (!value) return "-";
   return new Intl.DateTimeFormat("fr-CA", {
@@ -1190,9 +1219,14 @@ export default function AdminDashboard() {
                 <h2 className="text-lg font-semibold">Inscriptions à relancer</h2>
                 <p className="text-sm text-slate-500">Comptes sans e-mail confirmé ou dont le formulaire n'a pas été commencé.</p>
               </div>
-              <Button variant="outline" onClick={() => downloadCsv("inscriptions-a-relancer.csv", registrationsToFollowUpCsvRows)}>
-                <Download className="ml-2 h-4 w-4" /> Télécharger la liste CSV
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" onClick={() => downloadCsv("inscriptions-a-relancer.csv", registrationsToFollowUpCsvRows)}>
+                  <Download className="ml-2 h-4 w-4" /> Télécharger CSV
+                </Button>
+                <Button variant="outline" onClick={() => downloadExcel("inscriptions-a-relancer.xls", registrationsToFollowUpCsvRows)}>
+                  <FileText className="ml-2 h-4 w-4" /> Télécharger Excel
+                </Button>
+              </div>
             </div>
             <table className="w-full min-w-[950px] text-sm">
               <thead className="bg-slate-100">
