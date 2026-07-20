@@ -296,6 +296,7 @@ export default function AdminDashboard() {
   const [tab, setTab] = useState<Tab>("newUsers");
   const [search, setSearch] = useState("");
   const [candidateFilterField, setCandidateFilterField] = useState<CandidateFilterField>("all");
+  const [candidateFromDate, setCandidateFromDate] = useState("2026-07-17");
   const [accountSearch, setAccountSearch] = useState("");
   const [accountFilterField, setAccountFilterField] = useState<AccountFilterField>("all");
   const [userSearch, setUserSearch] = useState("");
@@ -438,7 +439,10 @@ export default function AdminDashboard() {
 
   const filteredCandidates = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const list = candidates.data ?? [];
+    const fromDate = candidateFromDate ? new Date(`${candidateFromDate}T00:00:00`).getTime() : null;
+    const list = (candidates.data ?? []).filter((candidate) => (
+      fromDate === null || new Date(candidate.createdAt).getTime() >= fromDate
+    ));
     if (!q) return list;
 
     return list.filter((candidate) => {
@@ -467,7 +471,7 @@ export default function AdminDashboard() {
       fields.all = Object.values(fields).join(" ");
       return fields[candidateFilterField].toLowerCase().includes(q);
     });
-  }, [candidates.data, search, candidateFilterField]);
+  }, [candidates.data, search, candidateFilterField, candidateFromDate]);
 
   const filteredNewUsers = useMemo(() => {
     const q = accountSearch.trim().toLowerCase();
@@ -1079,6 +1083,16 @@ export default function AdminDashboard() {
           <section className="overflow-hidden rounded-2xl border bg-white p-4 shadow-sm">
             <div className="mb-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
               <div className="flex flex-1 flex-col gap-2 md:flex-row">
+                <label className="flex h-10 items-center gap-2 rounded-md border border-input bg-background px-3 text-sm">
+                  <span className="whitespace-nowrap">À partir du</span>
+                  <input
+                    type="date"
+                    value={candidateFromDate}
+                    onChange={(event) => setCandidateFromDate(event.target.value)}
+                    className="bg-transparent outline-none"
+                    aria-label="Afficher les candidats à partir de cette date"
+                  />
+                </label>
                 <select
                   value={candidateFilterField}
                   onChange={(event) => setCandidateFilterField(event.target.value as CandidateFilterField)}
@@ -1103,8 +1117,8 @@ export default function AdminDashboard() {
                   onChange={(e) => setSearch(e.target.value)}
                   className="md:max-w-md"
                 />
-                {(search || candidateFilterField !== "all") ? (
-                  <Button type="button" variant="outline" onClick={() => { setSearch(""); setCandidateFilterField("all"); }}>
+                {(search || candidateFilterField !== "all" || candidateFromDate) ? (
+                  <Button type="button" variant="outline" onClick={() => { setSearch(""); setCandidateFilterField("all"); setCandidateFromDate(""); }}>
                     إعادة الضبط
                   </Button>
                 ) : null}
