@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import { CalendarPlus, ExternalLink, Link2, Save, Trash2, UserRound } from "lucide-react";
+import { CalendarPlus, ExternalLink, Link2, Save, Trash2, UserCheck, UserRound, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { trpc } from "@/providers/trpc";
@@ -99,10 +100,12 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
   const [repeatCount, setRepeatCount] = useState(1);
   const [gapMinutes, setGapMinutes] = useState(0);
   const [candidateSearch, setCandidateSearch] = useState("");
+  const [candidateView, setCandidateView] = useState<"available" | "mine">("available");
+  const [selectedCandidateIds, setSelectedCandidateIds] = useState<number[]>([]);
   const [slotFilter, setSlotFilter] = useState<"all" | "mine" | "booked" | "available">("all");
   const utils = trpc.useUtils();
   const slots = trpc.interview.adminList.useQuery(undefined, { enabled, retry: false });
-  const acceptedCandidates = trpc.interview.acceptedCandidates.useQuery(undefined, { enabled, retry: false });
+  const assignmentCandidates = trpc.interview.assignmentCandidates.useQuery(undefined, { enabled, retry: false });
   const googleStatus = trpc.interview.adminGoogleStatus.useQuery(undefined, { enabled, retry: false });
 
   const createSlot = trpc.interview.createSlot.useMutation({
@@ -148,14 +151,45 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
     },
     onError: (error) => toast.error(error.message || "Impossible de supprimer le créneau"),
   });
+  const assignCandidates = trpc.interview.assignCandidates.useMutation({
+    onSuccess: async (result) => {
+      toast.success(`${result.assignedCount} candidat(s) ajouté(s) à votre liste`);
+      setSelectedCandidateIds([]);
+      setCandidateView("mine");
+      await utils.interview.assignmentCandidates.invalidate();
+    },
+    onError: async (error) => {
+      toast.error(error.message || "Impossible d’affecter les candidats");
+      setSelectedCandidateIds([]);
+      await utils.interview.assignmentCandidates.invalidate();
+    },
+  });
+  const releaseCandidate = trpc.interview.releaseCandidate.useMutation({
+    onSuccess: async () => {
+      toast.success("Candidat remis dans la liste disponible");
+      await utils.interview.assignmentCandidates.invalidate();
+    },
+    onError: (error) => toast.error(error.message || "Impossible de libérer ce candidat"),
+  });
 
+  const availableCandidates = useMemo(
+    () => (assignmentCandidates.data ?? []).filter((candidate) => !candidate.assignedAdminId),
+    [assignmentCandidates.data],
+  );
+  const myCandidates = useMemo(
+    () => (assignmentCandidates.data ?? []).filter((candidate) => candidate.assignedAdminId),
+    [assignmentCandidates.data],
+  );
   const visibleCandidates = useMemo(() => {
     const query = candidateSearch.trim().toLowerCase();
-    if (!query) return acceptedCandidates.data ?? [];
-    return (acceptedCandidates.data ?? []).filter((candidate) =>
+    const candidates = isInterviewAdmin
+      ? candidateView === "available" ? availableCandidates : myCandidates
+      : assignmentCandidates.data ?? [];
+    if (!query) return candidates;
+    return candidates.filter((candidate) =>
       `${candidate.firstName} ${candidate.lastName} ${candidate.email} ${candidate.phoneNumber || ""}`.toLowerCase().includes(query),
     );
-  }, [acceptedCandidates.data, candidateSearch]);
+  }, [assignmentCandidates.data, availableCandidates, candidateSearch, candidateView, isInterviewAdmin, myCandidates]);
 
   const visibleSlots = useMemo(() => (slots.data ?? []).filter((slot) => {
     if (slotFilter === "mine") return slot.isOwn;
@@ -208,7 +242,7 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
       </section>
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border bg-white p-4"><p className="text-sm text-slate-500">Candidats acceptés</p><p className="mt-1 text-2xl font-bold">{acceptedCandidates.data?.length ?? 0}</p></div>
+        <div className="rounded-xl border bg-white p-4"><p className="text-sm text-slate-500">{isInterviewAdmin ? "Mes candidats" : "Candidats acceptés"}</p><p className="mt-1 text-2xl font-bold">{isInterviewAdmin ? myCandidates.length : assignmentCandidates.data?.length ?? 0}</p></div>
         <div className="rounded-xl border bg-white p-4"><p className="text-sm text-slate-500">Créneaux planifiés</p><p className="mt-1 text-2xl font-bold">{(slots.data ?? []).filter((slot) => slot.status === "scheduled").length}</p></div>
         <div className="rounded-xl border bg-white p-4"><p className="text-sm text-slate-500">Réservés</p><p className="mt-1 text-2xl font-bold">{(slots.data ?? []).filter((slot) => slot.bookingId).length}</p></div>
         <div className="rounded-xl border bg-white p-4"><p className="text-sm text-slate-500">Disponibles</p><p className="mt-1 text-2xl font-bold">{(slots.data ?? []).filter((slot) => !slot.bookingId && slot.status === "scheduled").length}</p></div>
@@ -248,23 +282,121 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
         </Button>
       </form>
 
-      <section className="overflow-x-auto rounded-2xl border bg-white p-4 shadow-sm">
-        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-lg font-bold">Candidats acceptés</h2>
+      <section className="rounded-2xl border bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-4 border-b pb-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 className="flex items-center gap-2 text-lg font-bold"><Users className="h-5 w-5 text-[#4A9B8E]" /> Gestion des candidats</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              {isInterviewAdmin ? "Choisissez les candidats que vous prendrez en entretien." : "Vue globale des affectations aux mini-admins."}
+            </p>
+          </div>
           <Input className="max-w-sm" placeholder="Rechercher par nom, e-mail ou téléphone" value={candidateSearch} onChange={(event) => setCandidateSearch(event.target.value)} />
         </div>
-        <table className="w-full min-w-[650px] text-sm">
-          <thead className="bg-slate-100"><tr><th className="p-3 text-left">Nom</th><th className="p-3 text-left">E-mail</th><th className="p-3 text-left">Téléphone</th></tr></thead>
-          <tbody>
-            {visibleCandidates.map((candidate) => (
-              <tr key={candidate.id} className="border-b last:border-b-0">
-                <td className="p-3 font-medium">{candidate.firstName} {candidate.lastName}</td>
-                <td className="p-3">{candidate.email}</td>
-                <td className="p-3">{candidate.phoneNumber || "-"}</td>
+
+        {isInterviewAdmin ? (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="inline-flex rounded-md border bg-slate-50 p-1">
+              <Button type="button" size="sm" variant={candidateView === "available" ? "default" : "ghost"} onClick={() => setCandidateView("available")}>
+                Disponibles ({availableCandidates.length})
+              </Button>
+              <Button type="button" size="sm" variant={candidateView === "mine" ? "default" : "ghost"} onClick={() => setCandidateView("mine")}>
+                Mes candidats ({myCandidates.length})
+              </Button>
+            </div>
+            {candidateView === "available" && selectedCandidateIds.length > 0 ? (
+              <Button
+                type="button"
+                disabled={assignCandidates.isPending}
+                onClick={() => assignCandidates.mutate({ candidateIds: selectedCandidateIds })}
+                className="bg-[#4A9B8E] hover:bg-[#3D7A6F]"
+              >
+                <UserCheck className="mr-2 h-4 w-4" />
+                Confirmer {selectedCandidateIds.length} sélection(s)
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full min-w-[760px] text-sm">
+            <thead className="bg-slate-100">
+              <tr>
+                {isInterviewAdmin && candidateView === "available" ? (
+                  <th className="w-12 p-3 text-left">
+                    <Checkbox
+                      checked={visibleCandidates.length > 0 && visibleCandidates.every((candidate) => selectedCandidateIds.includes(candidate.id))}
+                      aria-label="Sélectionner tous les candidats affichés"
+                      onCheckedChange={(checked) => {
+                        const visibleIds = visibleCandidates.map((candidate) => candidate.id);
+                        setSelectedCandidateIds((current) => checked
+                          ? Array.from(new Set([...current, ...visibleIds]))
+                          : current.filter((id) => !visibleIds.includes(id)));
+                      }}
+                    />
+                  </th>
+                ) : null}
+                <th className="p-3 text-left">Nom</th>
+                <th className="p-3 text-left">E-mail</th>
+                <th className="p-3 text-left">Téléphone</th>
+                {(!isInterviewAdmin || candidateView === "mine") ? <th className="p-3 text-left">Affectation</th> : null}
+                {isInterviewAdmin && candidateView === "mine" ? <th className="p-3 text-right">Action</th> : null}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {visibleCandidates.map((candidate) => {
+                const selected = selectedCandidateIds.includes(candidate.id);
+                return (
+                  <tr key={candidate.id} className={`border-b last:border-b-0 ${selected ? "bg-emerald-50" : ""}`}>
+                    {isInterviewAdmin && candidateView === "available" ? (
+                      <td className="p-3">
+                        <Checkbox
+                          checked={selected}
+                          aria-label={`Sélectionner ${candidate.firstName} ${candidate.lastName}`}
+                          onCheckedChange={(checked) => setSelectedCandidateIds((current) =>
+                            checked ? [...current, candidate.id] : current.filter((id) => id !== candidate.id),
+                          )}
+                        />
+                      </td>
+                    ) : null}
+                    <td className="p-3 font-medium">{candidate.firstName} {candidate.lastName}</td>
+                    <td className="p-3">{candidate.email}</td>
+                    <td className="p-3">{candidate.phoneNumber || "-"}</td>
+                    {(!isInterviewAdmin || candidateView === "mine") ? (
+                      <td className="p-3">
+                        {candidate.assignedAdminName
+                          ? <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-800">{candidate.assignedAdminName}</span>
+                          : <span className="text-slate-400">Non affecté</span>}
+                      </td>
+                    ) : null}
+                    {isInterviewAdmin && candidateView === "mine" ? (
+                      <td className="p-3 text-right">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={!!candidate.bookingId || releaseCandidate.isPending}
+                          title={candidate.bookingId ? "Ce candidat a déjà réservé un créneau" : "Remettre ce candidat dans la liste disponible"}
+                          onClick={() => {
+                            if (window.confirm(`Libérer ${candidate.firstName} ${candidate.lastName} ?`)) {
+                              releaseCandidate.mutate({ candidateId: candidate.id });
+                            }
+                          }}
+                        >
+                          {candidate.bookingId ? "Créneau réservé" : "Libérer"}
+                        </Button>
+                      </td>
+                    ) : null}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {!assignmentCandidates.isLoading && visibleCandidates.length === 0 ? (
+            <div className="p-8 text-center text-sm text-slate-500">
+              {candidateView === "available" ? "Aucun candidat disponible." : "Aucun candidat dans votre liste."}
+            </div>
+          ) : null}
+        </div>
       </section>
 
       <section className="overflow-x-auto rounded-2xl border bg-white p-4 shadow-sm">
@@ -289,7 +421,7 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
                 </td>
                 <td className="p-3"><a href={slot.meetingUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[#4A9B8E] underline">Ouvrir <ExternalLink className="h-3 w-3" /></a></td>
                 <td className="p-3">
-                  {!isInterviewAdmin ? <select className="h-9 rounded-md border bg-white px-2" value={slot.status} disabled={updateStatus.isPending} onChange={(event) => {
+                  <select className="h-9 rounded-md border bg-white px-2" value={slot.status} disabled={updateStatus.isPending} onChange={(event) => {
                     const status = event.target.value as "scheduled" | "completed" | "absent" | "cancelled";
                     if (status === "cancelled" && !window.confirm("Annuler ce créneau et prévenir le candidat ?")) return;
                     updateStatus.mutate({ slotId: slot.id, status });
@@ -298,7 +430,7 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
                     <option value="completed" disabled={!slot.candidateId}>Terminé</option>
                     <option value="absent" disabled={!slot.candidateId}>Absent</option>
                     <option value="cancelled">Annulé</option>
-                  </select> : null}
+                  </select>
                   <p className="mt-1 text-xs text-slate-500">{statusLabels[slot.status]}</p>
                   {slot.calendarSyncStatus === "failed" ? (
                     <div className="mt-2 max-w-64 rounded-md border border-red-200 bg-red-50 p-2 text-xs text-red-700">
@@ -318,7 +450,7 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
                   ) : null}
                 </td>
                 <td className="p-3">
-                  {!isInterviewAdmin && slot.bookingId && slot.status === "completed" ? <EvaluationForm slot={slot} /> : <span className="text-xs text-slate-500">{slot.bookingId ? "Candidat réservé" : "En attente de réservation"}</span>}
+                  {slot.bookingId && slot.status === "completed" ? <EvaluationForm slot={slot} /> : <span className="text-xs text-slate-500">{slot.bookingId ? "Candidat réservé" : "En attente de réservation"}</span>}
                   {slot.canDelete && slot.status !== "cancelled" ? (
                     <Button type="button" size="sm" variant="destructive" className="mt-2" disabled={deleteOwnSlot.isPending} onClick={() => {
                       if (window.confirm("Supprimer ce créneau et prévenir le candidat réservé ?")) deleteOwnSlot.mutate({ slotId: slot.id });

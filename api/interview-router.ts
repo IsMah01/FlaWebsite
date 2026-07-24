@@ -1,7 +1,13 @@
 import { z } from "zod";
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, or } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { adminUsers, candidates, interviewBookings, interviewSlots } from "@db/schema";
+import {
+  adminUsers,
+  candidates,
+  interviewBookings,
+  interviewCandidateAssignments,
+  interviewSlots,
+} from "@db/schema";
 import { createRouter, adminQuery, interviewAdminQuery, publicQuery } from "./middleware";
 import { getDb, getSqlPool } from "./queries/connection";
 import { requireCandidateSession } from "./candidate-auth-router";
@@ -67,19 +73,12 @@ export const interviewRouter = createRouter({
     const candidate = await requireAcceptedCandidate(ctx.req);
     const db = getDb();
     const now = new Date();
-
-    const [slots, bookings, ownBookings] = await Promise.all([
+    const [assignments, ownBookings] = await Promise.all([
       db
-        .select({
-          id: interviewSlots.id,
-          startTime: interviewSlots.startTime,
-          endTime: interviewSlots.endTime,
-          interviewerName: interviewSlots.interviewerName,
-        })
-        .from(interviewSlots)
-        .where(eq(interviewSlots.status, "scheduled"))
-        .orderBy(asc(interviewSlots.startTime)),
-      db.select({ slotId: interviewBookings.slotId }).from(interviewBookings),
+        .select({ adminId: interviewCandidateAssignments.adminId })
+        .from(interviewCandidateAssignments)
+        .where(eq(interviewCandidateAssignments.candidateId, candidate.id))
+        .limit(1),
       db
         .select({
           bookingId: interviewBookings.id,
@@ -95,14 +94,36 @@ export const interviewRouter = createRouter({
         .where(eq(interviewBookings.candidateId, candidate.id))
         .limit(1),
     ]);
+    const assignment = assignments[0];
+    const ownBooking = ownBookings[0] ?? null;
+
+    if (!assignment) {
+      return { availableSlots: [], booking: ownBooking, awaitingAssignment: !ownBooking };
+    }
+
+    const [slots, bookings] = await Promise.all([
+      db
+        .select({
+          id: interviewSlots.id,
+          startTime: interviewSlots.startTime,
+          endTime: interviewSlots.endTime,
+          interviewerName: interviewSlots.interviewerName,
+        })
+        .from(interviewSlots)
+        .where(and(
+          eq(interviewSlots.status, "scheduled"),
+          eq(interviewSlots.createdByAdminId, assignment.adminId),
+        ))
+        .orderBy(asc(interviewSlots.startTime)),
+      db.select({ slotId: interviewBookings.slotId }).from(interviewBookings),
+    ]);
 
     const bookedSlotIds = new Set(bookings.map((booking) => booking.slotId));
-    const ownBooking = ownBookings[0] ?? null;
     const availableSlots = slots.filter(
       (slot) => slot.startTime > now && (!bookedSlotIds.has(slot.id) || slot.id === ownBooking?.slotId),
     );
 
-    return { availableSlots, booking: ownBooking };
+    return { availableSlots, booking: ownBooking, awaitingAssignment: false };
   }),
 
   bookSlot: publicQuery
@@ -134,13 +155,31 @@ export const interviewRouter = createRouter({
         }
         candidateEmail = candidate.email;
 
+        const [assignmentRows] = await connection.query<any[]>(
+          "SELECT adminId FROM interview_candidate_assignments WHERE candidateId = ? LIMIT 1 FOR UPDATE",
+          [candidate.id],
+        );
+        const assignment = assignmentRows[0];
+        if (!assignment) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "Aucun responsable d'entretien ne vous a encore ete attribue.",
+          });
+        }
+
         const [slotRows] = await connection.query<any[]>(
-          "SELECT id, startTime, status, googleEventId FROM interview_slots WHERE id = ? LIMIT 1 FOR UPDATE",
+          "SELECT id, startTime, status, googleEventId, createdByAdminId FROM interview_slots WHERE id = ? LIMIT 1 FOR UPDATE",
           [input.slotId],
         );
         const slot = slotRows[0];
         if (!slot || slot.status !== "scheduled" || new Date(slot.startTime).getTime() <= Date.now()) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Ce créneau n’est plus disponible." });
+        }
+        if (slot.createdByAdminId !== assignment.adminId) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Ce creneau n'appartient pas a votre responsable d'entretien.",
+          });
         }
 
         const [targetBookings] = await connection.query<any[]>(
@@ -219,7 +258,7 @@ export const interviewRouter = createRouter({
 
   adminDisconnectGoogle: adminQuery.mutation(async () => disconnectGoogleCalendarConnection()),
 
-  acceptedCandidates: interviewAdminQuery.query(async () => {
+  assignmentCandidates: interviewAdminQuery.query(async ({ ctx }) => {
     const db = getDb();
     return db
       .select({
@@ -228,11 +267,134 @@ export const interviewRouter = createRouter({
         lastName: candidates.lastName,
         email: candidates.email,
         phoneNumber: candidates.phoneNumber,
+        assignedAdminId: interviewCandidateAssignments.adminId,
+        assignedAdminName: adminUsers.name,
+        assignedAt: interviewCandidateAssignments.assignedAt,
+        bookingId: interviewBookings.id,
       })
       .from(candidates)
-      .where(eq(candidates.applicationStatus, "accepted"))
+      .leftJoin(
+        interviewCandidateAssignments,
+        eq(interviewCandidateAssignments.candidateId, candidates.id),
+      )
+      .leftJoin(adminUsers, eq(interviewCandidateAssignments.adminId, adminUsers.id))
+      .leftJoin(interviewBookings, eq(interviewBookings.candidateId, candidates.id))
+      .where(and(
+        eq(candidates.applicationStatus, "accepted"),
+        ctx.adminUser.role === "interview_admin"
+          ? or(
+            isNull(interviewCandidateAssignments.adminId),
+            eq(interviewCandidateAssignments.adminId, ctx.adminUser.id),
+          )
+          : undefined,
+      ))
       .orderBy(asc(candidates.firstName), asc(candidates.lastName));
   }),
+
+  assignCandidates: interviewAdminQuery
+    .input(z.object({
+      candidateIds: z.array(z.number().int().positive()).min(1).max(100)
+        .refine((ids) => new Set(ids).size === ids.length, "La selection contient des doublons."),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.adminUser.role !== "interview_admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Cette action est reservee aux mini-admins." });
+      }
+
+      const connection = await getSqlPool().getConnection();
+      const placeholders = input.candidateIds.map(() => "?").join(",");
+      try {
+        await connection.beginTransaction();
+        const [candidateRows] = await connection.query<any[]>(
+          `SELECT id FROM candidates
+           WHERE applicationStatus = 'accepted' AND id IN (${placeholders})
+           FOR UPDATE`,
+          input.candidateIds,
+        );
+        if (candidateRows.length !== input.candidateIds.length) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Un ou plusieurs candidats ne sont plus acceptes.",
+          });
+        }
+
+        const [assignedRows] = await connection.query<any[]>(
+          `SELECT candidateId FROM interview_candidate_assignments
+           WHERE candidateId IN (${placeholders})
+           FOR UPDATE`,
+          input.candidateIds,
+        );
+        if (assignedRows.length) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "Un candidat vient d'etre attribue a un autre mini-admin. Actualisez la liste.",
+          });
+        }
+
+        const values = input.candidateIds.map(() => "(?, ?)").join(",");
+        const params = input.candidateIds.flatMap((candidateId) => [candidateId, ctx.adminUser.id]);
+        await connection.query(
+          `INSERT INTO interview_candidate_assignments (candidateId, adminId) VALUES ${values}`,
+          params,
+        );
+        await connection.commit();
+        return { success: true, assignedCount: input.candidateIds.length };
+      } catch (error) {
+        await connection.rollback();
+        if (error instanceof TRPCError) throw error;
+        if ((error as { code?: string }).code === "ER_DUP_ENTRY") {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "Un candidat vient d'etre attribue a un autre mini-admin. Actualisez la liste.",
+          });
+        }
+        throw error;
+      } finally {
+        connection.release();
+      }
+    }),
+
+  releaseCandidate: interviewAdminQuery
+    .input(z.object({ candidateId: z.number().int().positive() }))
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.adminUser.role !== "interview_admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Cette action est reservee aux mini-admins." });
+      }
+
+      const connection = await getSqlPool().getConnection();
+      try {
+        await connection.beginTransaction();
+        const [assignmentRows] = await connection.query<any[]>(
+          `SELECT id, adminId FROM interview_candidate_assignments
+           WHERE candidateId = ? LIMIT 1 FOR UPDATE`,
+          [input.candidateId],
+        );
+        const assignment = assignmentRows[0];
+        if (!assignment || assignment.adminId !== ctx.adminUser.id) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Cette affectation n'existe plus." });
+        }
+
+        const [bookingRows] = await connection.query<any[]>(
+          "SELECT id FROM interview_bookings WHERE candidateId = ? LIMIT 1 FOR UPDATE",
+          [input.candidateId],
+        );
+        if (bookingRows.length) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "Ce candidat a deja reserve un creneau et ne peut plus etre libere.",
+          });
+        }
+
+        await connection.query("DELETE FROM interview_candidate_assignments WHERE id = ?", [assignment.id]);
+        await connection.commit();
+        return { success: true };
+      } catch (error) {
+        await connection.rollback();
+        throw error;
+      } finally {
+        connection.release();
+      }
+    }),
 
   adminList: interviewAdminQuery.query(async ({ ctx }) => {
     const db = getDb();
@@ -267,6 +429,11 @@ export const interviewRouter = createRouter({
       .leftJoin(interviewBookings, eq(interviewSlots.id, interviewBookings.slotId))
       .leftJoin(candidates, eq(interviewBookings.candidateId, candidates.id))
       .leftJoin(adminUsers, eq(interviewSlots.createdByAdminId, adminUsers.id))
+      .where(
+        ctx.adminUser.role === "interview_admin"
+          ? eq(interviewSlots.createdByAdminId, ctx.adminUser.id)
+          : undefined,
+      )
       .orderBy(desc(interviewSlots.startTime));
     return rows.map((slot) => ({
       ...slot,
@@ -313,9 +480,17 @@ export const interviewRouter = createRouter({
         for (const slot of planned) {
           const [overlaps] = await connection.query<any[]>(
             `SELECT id FROM interview_slots
-             WHERE status = 'scheduled' AND startTime < ? AND endTime > ?
+             WHERE status = 'scheduled'
+               AND startTime < ?
+               AND endTime > ?
+               AND (? = 0 OR createdByAdminId = ?)
              LIMIT 1 FOR UPDATE`,
-            [slot.endTime, slot.startTime],
+            [
+              slot.endTime,
+              slot.startTime,
+              ctx.adminUser.role === "interview_admin" ? 1 : 0,
+              ctx.adminUser.id,
+            ],
           );
           if (overlaps.length) {
             throw new TRPCError({ code: "CONFLICT", message: "Un créneau existe déjà sur cette période." });
@@ -343,25 +518,32 @@ export const interviewRouter = createRouter({
       return { success: true, createdCount: planned.length };
     }),
 
-  updateSlotStatus: adminQuery
+  updateSlotStatus: interviewAdminQuery
     .input(z.object({
       slotId: z.number().int().positive(),
       status: z.enum(["scheduled", "completed", "absent", "cancelled"]),
     }))
-    .mutation(async ({ input }) => {
-      if (input.status === "cancelled") return cancelInterviewSlot(input.slotId);
+    .mutation(async ({ input, ctx }) => {
       const db = getDb();
       const [slot] = await db
-        .select({ googleEventId: interviewSlots.googleEventId, status: interviewSlots.status })
+        .select({
+          googleEventId: interviewSlots.googleEventId,
+          status: interviewSlots.status,
+          createdByAdminId: interviewSlots.createdByAdminId,
+        })
         .from(interviewSlots)
         .where(eq(interviewSlots.id, input.slotId))
         .limit(1);
       if (!slot) throw new TRPCError({ code: "NOT_FOUND", message: "Créneau introuvable." });
+      if (ctx.adminUser.role === "interview_admin" && slot.createdByAdminId !== ctx.adminUser.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Vous pouvez modifier uniquement vos propres creneaux." });
+      }
+      if (input.status === "cancelled") return cancelInterviewSlot(input.slotId);
       await db.update(interviewSlots).set({ status: input.status }).where(eq(interviewSlots.id, input.slotId));
       return { success: true, calendarSynced: true };
     }),
 
-  saveEvaluation: adminQuery
+  saveEvaluation: interviewAdminQuery
     .input(z.object({
       bookingId: z.number().int().positive(),
       communicationScore: z.number().int().min(1).max(5),
@@ -370,8 +552,18 @@ export const interviewRouter = createRouter({
       recommendation: z.enum(["pending", "accepted", "rejected"]),
       evaluationNotes: z.string().trim().max(5000).optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const db = getDb();
+      const [booking] = await db
+        .select({ createdByAdminId: interviewSlots.createdByAdminId })
+        .from(interviewBookings)
+        .innerJoin(interviewSlots, eq(interviewBookings.slotId, interviewSlots.id))
+        .where(eq(interviewBookings.id, input.bookingId))
+        .limit(1);
+      if (!booking) throw new TRPCError({ code: "NOT_FOUND", message: "Reservation introuvable." });
+      if (ctx.adminUser.role === "interview_admin" && booking.createdByAdminId !== ctx.adminUser.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Vous pouvez evaluer uniquement vos propres entretiens." });
+      }
       await db.update(interviewBookings).set({
         communicationScore: input.communicationScore,
         motivationScore: input.motivationScore,

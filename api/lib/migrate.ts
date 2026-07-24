@@ -251,6 +251,26 @@ export async function ensureDatabaseSchema() {
     await addColumnIfMissing(connection, "interview_bookings", "evaluatedAt", "evaluatedAt TIMESTAMP NULL");
 
     await connection.query(`
+      CREATE TABLE IF NOT EXISTS interview_candidate_assignments (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        candidateId INT NOT NULL,
+        adminId INT NOT NULL,
+        assignedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY interview_candidate_assignments_candidate_unique (candidateId),
+        INDEX interview_candidate_assignments_admin_index (adminId)
+      )
+    `);
+    await connection.query(`
+      INSERT IGNORE INTO interview_candidate_assignments (candidateId, adminId)
+      SELECT bookings.candidateId, slots.createdByAdminId
+      FROM interview_bookings bookings
+      INNER JOIN interview_slots slots ON slots.id = bookings.slotId
+      INNER JOIN admin_users admins ON admins.id = slots.createdByAdminId
+      WHERE slots.createdByAdminId IS NOT NULL
+        AND admins.role = 'interview_admin'
+    `);
+
+    await connection.query(`
       CREATE TABLE IF NOT EXISTS interview_reminder_emails (
         id INT AUTO_INCREMENT PRIMARY KEY,
         bookingId INT NOT NULL,

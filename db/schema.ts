@@ -157,6 +157,22 @@ export const interviewBookings = mysqlTable(
 export type InterviewBooking = typeof interviewBookings.$inferSelect;
 export type InsertInterviewBooking = typeof interviewBookings.$inferInsert;
 
+export const interviewCandidateAssignments = mysqlTable(
+  "interview_candidate_assignments",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    candidateId: int("candidateId").notNull(),
+    adminId: int("adminId").notNull(),
+    assignedAt: timestamp("assignedAt").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("interview_candidate_assignments_candidate_unique").on(table.candidateId),
+  ],
+);
+
+export type InterviewCandidateAssignment = typeof interviewCandidateAssignments.$inferSelect;
+export type InsertInterviewCandidateAssignment = typeof interviewCandidateAssignments.$inferInsert;
+
 export const interviewReminderEmails = mysqlTable(
   "interview_reminder_emails",
   {

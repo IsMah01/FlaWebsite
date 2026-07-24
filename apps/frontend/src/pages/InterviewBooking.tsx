@@ -307,7 +307,9 @@ export default function InterviewBooking() {
               ) : null}
               {availableSlots.length === 0 ? (
                 <div className="mt-4 rounded-2xl border border-dashed bg-white p-8 text-center text-gray-500">
-                  لا توجد مواعيد متاحة حاليًا. يرجى المحاولة لاحقًا.
+                  {overview.data?.awaitingAssignment
+                    ? "تم قبول ترشحكم. سيظهر جدول المواعيد فور تعيين مسؤول المقابلة الخاص بكم."
+                    : "لا توجد مواعيد متاحة حاليًا. يرجى المحاولة لاحقًا."}
                 </div>
               ) : null}
             </section>
