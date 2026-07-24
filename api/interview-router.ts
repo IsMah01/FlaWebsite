@@ -96,8 +96,14 @@ export const interviewRouter = createRouter({
     const now = new Date();
     const [assignments, ownBookings] = await Promise.all([
       db
-        .select({ adminId: interviewCandidateAssignments.adminId })
+        .select({
+          adminId: interviewCandidateAssignments.adminId,
+          name: adminUsers.name,
+          imageUrl: adminUsers.profileImageRef,
+          description: adminUsers.profileDescription,
+        })
         .from(interviewCandidateAssignments)
+        .innerJoin(adminUsers, eq(interviewCandidateAssignments.adminId, adminUsers.id))
         .where(eq(interviewCandidateAssignments.candidateId, candidate.id))
         .limit(1),
       db
@@ -117,9 +123,14 @@ export const interviewRouter = createRouter({
     ]);
     const assignment = assignments[0];
     const ownBooking = ownBookings[0] ?? null;
+    const interviewer = assignment ? {
+      name: assignment.name,
+      imageUrl: assignment.imageUrl,
+      description: assignment.description,
+    } : null;
 
     if (!assignment) {
-      return { availableSlots: [], booking: ownBooking, awaitingAssignment: !ownBooking };
+      return { availableSlots: [], booking: ownBooking, awaitingAssignment: !ownBooking, interviewer };
     }
 
     const [slots, bookings] = await Promise.all([
@@ -144,7 +155,7 @@ export const interviewRouter = createRouter({
       (slot) => slot.startTime > now && (!bookedSlotIds.has(slot.id) || slot.id === ownBooking?.slotId),
     );
 
-    return { availableSlots, booking: ownBooking, awaitingAssignment: false };
+    return { availableSlots, booking: ownBooking, awaitingAssignment: false, interviewer };
   }),
 
   bookSlot: publicQuery
@@ -278,6 +289,39 @@ export const interviewRouter = createRouter({
   adminGoogleStatus: interviewAdminQuery.query(async () => getGoogleCalendarConnectionStatus()),
 
   adminDisconnectGoogle: adminQuery.mutation(async () => disconnectGoogleCalendarConnection()),
+
+  myProfile: interviewAdminQuery.query(async ({ ctx }) => ({
+    name: ctx.adminUser.name,
+    imageUrl: ctx.adminUser.profileImageRef,
+    description: ctx.adminUser.profileDescription,
+  })),
+
+  updateMyProfile: interviewAdminQuery
+    .input(z.object({
+      imageUrl: z.string().trim().max(500).nullable(),
+      description: z.string().trim().max(1000),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.adminUser.role !== "interview_admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Cette action est reservee aux mini-admins." });
+      }
+      if (input.imageUrl && (
+        !/^\/api\/interviewer-images\/interviewer-\d+-[a-f0-9-]+\.(jpg|jpeg|png)$/i.test(input.imageUrl)
+        || !input.imageUrl.startsWith(`/api/interviewer-images/interviewer-${ctx.adminUser.id}-`)
+      )) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Reference d'image invalide." });
+      }
+      await getDb().update(adminUsers).set({
+        profileImageRef: input.imageUrl,
+        profileDescription: input.description || null,
+      }).where(eq(adminUsers.id, ctx.adminUser.id));
+      await logInterviewAction({
+        actorAdminId: ctx.adminUser.id,
+        action: "profile_updated",
+        targetAdminId: ctx.adminUser.id,
+      });
+      return { success: true };
+    }),
 
   assignmentCandidates: interviewAdminQuery.query(async ({ ctx }) => {
     const db = getDb();

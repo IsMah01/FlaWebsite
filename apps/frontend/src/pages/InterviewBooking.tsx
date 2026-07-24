@@ -195,6 +195,22 @@ export default function InterviewBooking() {
           <div className="mt-8 rounded-2xl border border-red-200 bg-red-50 p-6 text-red-700">{overview.error.message}</div>
         ) : (
           <>
+            {overview.data?.interviewer ? (
+              <section className="mt-8 border border-emerald-200 bg-white p-5 shadow-sm sm:p-6" aria-label="مسؤول المقابلة">
+                <div className="flex flex-col items-center gap-5 text-center sm:flex-row sm:text-right">
+                  {overview.data.interviewer.imageUrl ? (
+                    <img src={overview.data.interviewer.imageUrl} alt={overview.data.interviewer.name} className="h-28 w-28 shrink-0 rounded-full border-4 border-emerald-100 object-cover" />
+                  ) : (
+                    <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><UserRound className="h-12 w-12" /></div>
+                  )}
+                  <div>
+                    <p className="text-sm font-semibold text-[#4A9B8E]">مسؤول مقابلتكم</p>
+                    <h2 className="mt-1 text-xl font-bold text-gray-900">{overview.data.interviewer.name}</h2>
+                    {overview.data.interviewer.description ? <p className="mt-2 max-w-3xl whitespace-pre-line leading-7 text-gray-600">{overview.data.interviewer.description}</p> : null}
+                  </div>
+                </div>
+              </section>
+            ) : null}
             {booking ? (
               <section className={`sticky top-20 z-10 mt-8 rounded-2xl border p-5 shadow-md backdrop-blur sm:p-6 ${booking.status === "scheduled" ? "border-emerald-200 bg-emerald-50/95" : "border-amber-200 bg-amber-50/95"}`} aria-label="ملخص موعد المقابلة">
                 <div className="flex flex-col justify-between gap-5 md:flex-row md:items-center">

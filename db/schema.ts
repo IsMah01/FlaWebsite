@@ -333,6 +333,8 @@ export const adminUsers = mysqlTable("admin_users", {
   passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
   passwordResetToken: varchar("passwordResetToken", { length: 64 }),
   passwordResetExpiresAt: timestamp("passwordResetExpiresAt"),
+  profileImageRef: text("profileImageRef"),
+  profileDescription: text("profileDescription"),
   role: mysqlEnum("role", ["admin", "super_admin", "interview_admin"]).default("admin").notNull(),
   isActive: boolean("isActive").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

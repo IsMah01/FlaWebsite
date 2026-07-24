@@ -8,7 +8,7 @@ import { env } from "./lib/env";
 import { createOAuthCallbackHandler } from "./kimi/auth";
 import { Paths } from "@contracts/constants";
 import { authenticateRequest } from "./kimi/auth";
-import { PRIVATE_UPLOAD_DIR } from "./upload-router";
+import { INTERVIEWER_UPLOAD_DIR, PRIVATE_UPLOAD_DIR } from "./upload-router";
 import { readFile } from "fs/promises";
 import path from "path";
 import jwt from "jsonwebtoken";
@@ -176,6 +176,30 @@ app.get("/api/private-files/:fileName", async (c) => {
         "Content-Type": contentType,
         "Content-Disposition": `inline; filename="${fileName}"`,
         "Cache-Control": "private, no-store",
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
+  } catch {
+    return c.json({ error: "File not found" }, 404);
+  }
+});
+
+app.get("/api/interviewer-images/:fileName", async (c) => {
+  const fileName = c.req.param("fileName");
+  if (!/^interviewer-\d+-[a-f0-9-]+\.(jpg|jpeg|png)$/i.test(fileName)) {
+    return c.json({ error: "Invalid file name" }, 400);
+  }
+  const filePath = path.join(INTERVIEWER_UPLOAD_DIR, fileName);
+  if (!filePath.startsWith(INTERVIEWER_UPLOAD_DIR + path.sep)) {
+    return c.json({ error: "Invalid file path" }, 400);
+  }
+  try {
+    const data = await readFile(filePath);
+    const contentType = path.extname(fileName).toLowerCase() === ".png" ? "image/png" : "image/jpeg";
+    return new Response(data, {
+      headers: {
+        "Content-Type": contentType,
+        "Cache-Control": "public, max-age=86400",
         "X-Content-Type-Options": "nosniff",
       },
     });

@@ -9,7 +9,7 @@ import {
   rateLimitOrThrow,
   securityLog,
 } from "./lib/abuse-protection";
-import { createRouter, publicQuery } from "./middleware";
+import { createRouter, interviewAdminQuery, publicQuery } from "./middleware";
 
 // Sensitive candidate documents stay outside the public web root.
 export const PRIVATE_UPLOAD_DIR = path.resolve(
@@ -18,6 +18,7 @@ export const PRIVATE_UPLOAD_DIR = path.resolve(
   "private",
   "uploads",
 );
+export const INTERVIEWER_UPLOAD_DIR = path.join(PRIVATE_UPLOAD_DIR, "interviewers");
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = new Set(["application/pdf", "image/jpeg", "image/png"]);
@@ -68,6 +69,39 @@ function validateMagicBytes(buffer: Buffer, mimeType: string, ext: AllowedExt) {
 }
 
 export const uploadRouter = createRouter({
+  interviewerImage: interviewAdminQuery
+    .input(z.object({
+      fileName: z.string().min(1).max(255),
+      mimeType: z.enum(["image/jpeg", "image/png"]),
+      data: z.string().min(1),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.adminUser.role !== "interview_admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Cette action est reservee aux mini-admins." });
+      }
+      await rateLimitOrThrow({
+        key: `interviewer-image:${ctx.adminUser.id}`,
+        limit: 10,
+        windowMs: 60 * 60 * 1000,
+        message: "Trop d'images importees. Reessayez plus tard.",
+      });
+      const ext = normalizeExtension(input.fileName);
+      if (ext === ".pdf") throw new TRPCError({ code: "BAD_REQUEST", message: "Choisissez une image JPG ou PNG." });
+      const buffer = Buffer.from(input.data, "base64");
+      if (buffer.length === 0 || buffer.length > 2 * 1024 * 1024) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "L'image doit peser moins de 2 Mo." });
+      }
+      validateMagicBytes(buffer, input.mimeType, ext);
+      await mkdir(INTERVIEWER_UPLOAD_DIR, { recursive: true, mode: 0o700 });
+      const safeName = `interviewer-${ctx.adminUser.id}-${randomUUID()}${ext}`;
+      const filePath = path.join(INTERVIEWER_UPLOAD_DIR, safeName);
+      if (!filePath.startsWith(INTERVIEWER_UPLOAD_DIR + path.sep)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Chemin de fichier invalide." });
+      }
+      await writeFile(filePath, buffer, { mode: 0o600 });
+      return { success: true, imageUrl: `/api/interviewer-images/${safeName}` };
+    }),
+
   upload: publicQuery
     .input(
       z.object({

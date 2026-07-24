@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
-import { AlertCircle, CalendarPlus, Clock3, Coffee, ExternalLink, Link2, Save, Trash2, UserCheck, UserRound, Users } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { AlertCircle, CalendarPlus, Camera, Clock3, Coffee, ExternalLink, Link2, Save, Trash2, UserCheck, UserRound, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/providers/trpc";
 
 function formatDate(value: Date | string) {
@@ -143,12 +144,27 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
   const [slotFilter, setSlotFilter] = useState<"all" | "mine" | "booked" | "available">("all");
   const [slotView, setSlotView] = useState<"list" | "planning">("list");
   const [selectedSlotIds, setSelectedSlotIds] = useState<number[]>([]);
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+  const [profileDescription, setProfileDescription] = useState("");
+  const [profileInitialized, setProfileInitialized] = useState(false);
+  const profileImageInput = useRef<HTMLInputElement>(null);
   const utils = trpc.useUtils();
   const slots = trpc.interview.adminList.useQuery(undefined, { enabled, retry: false });
   const assignmentCandidates = trpc.interview.assignmentCandidates.useQuery(undefined, { enabled, retry: false });
   const assignmentAdmins = trpc.interview.assignmentAdmins.useQuery(undefined, { enabled: enabled && isSuperAdmin, retry: false });
   const assignmentAdminStats = trpc.interview.assignmentAdminStats.useQuery(undefined, { enabled: enabled && isSuperAdmin, retry: false });
   const recentAudit = trpc.interview.recentAudit.useQuery(undefined, { enabled, retry: false });
+  const myProfile = trpc.interview.myProfile.useQuery(undefined, {
+    enabled: enabled && isInterviewAdmin,
+    retry: false,
+  });
+  useEffect(() => {
+    if (isInterviewAdmin && myProfile.data && !profileInitialized) {
+      setProfileImageUrl(myProfile.data.imageUrl);
+      setProfileDescription(myProfile.data.description || "");
+      setProfileInitialized(true);
+    }
+  }, [isInterviewAdmin, myProfile.data, profileInitialized]);
   const googleStatus = trpc.interview.adminGoogleStatus.useQuery(undefined, { enabled, retry: false });
 
   const createSlot = trpc.interview.createSlot.useMutation({
@@ -246,6 +262,42 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
     },
     onError: (error) => toast.error(error.message || "Impossible de retirer les créneaux"),
   });
+  const uploadProfileImage = trpc.upload.interviewerImage.useMutation({
+    onError: (error) => toast.error(error.message || "Impossible d’importer l’image"),
+  });
+  const updateProfile = trpc.interview.updateMyProfile.useMutation({
+    onSuccess: async () => {
+      toast.success("Profil d’entretien enregistré");
+      await Promise.all([
+        utils.interview.myProfile.invalidate(),
+        utils.interview.recentAudit.invalidate(),
+      ]);
+    },
+    onError: (error) => toast.error(error.message || "Impossible d’enregistrer le profil"),
+  });
+
+  async function handleProfileImage(file?: File) {
+    if (!file) return;
+    if (!["image/jpeg", "image/png"].includes(file.type)) return toast.error("Choisissez une image JPG ou PNG");
+    if (file.size > 2 * 1024 * 1024) return toast.error("L’image doit peser moins de 2 Mo");
+    const data = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(",")[1] || "");
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    try {
+      const result = await uploadProfileImage.mutateAsync({
+        fileName: file.name,
+        mimeType: file.type as "image/jpeg" | "image/png",
+        data,
+      });
+      setProfileImageUrl(result.imageUrl);
+      toast.success("Image importée");
+    } catch {
+      // The mutation displays the server error.
+    }
+  }
 
   const availableCandidates = useMemo(
     () => (assignmentCandidates.data ?? []).filter((candidate) => !candidate.assignedAdminId),
@@ -375,6 +427,35 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
           </div> : null}
         </div>
       </section>
+
+      {isInterviewAdmin ? (
+        <section className="border bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-3">
+            <Camera className="h-6 w-6 text-[#4A9B8E]" />
+            <div><h2 className="text-lg font-bold">Mon profil d’intervieweur</h2><p className="text-sm text-slate-500">Ces informations seront visibles par vos candidats.</p></div>
+          </div>
+          <div className="mt-5 grid gap-5 md:grid-cols-[160px_1fr]">
+            <div>
+              <button type="button" className="group relative flex aspect-square w-40 items-center justify-center overflow-hidden border bg-slate-100" onClick={() => profileImageInput.current?.click()}>
+                {profileImageUrl ? <img src={profileImageUrl} alt="Photo de profil" className="h-full w-full object-cover" /> : <Camera className="h-10 w-10 text-slate-400" />}
+                <span className="absolute inset-x-0 bottom-0 bg-black/65 px-2 py-2 text-xs text-white">{uploadProfileImage.isPending ? "Import..." : "Changer l’image"}</span>
+              </button>
+              <input ref={profileImageInput} className="sr-only" type="file" accept="image/jpeg,image/png" onChange={(event) => void handleProfileImage(event.target.files?.[0])} />
+              <p className="mt-2 text-xs text-slate-500">JPG ou PNG, 2 Mo maximum.</p>
+            </div>
+            <div className="flex flex-col">
+              <Label htmlFor="profile-description">Présentation</Label>
+              <Textarea id="profile-description" className="mt-1 min-h-32 flex-1 resize-y" maxLength={1000} value={profileDescription} onChange={(event) => setProfileDescription(event.target.value)} placeholder="Votre rôle, votre parcours et quelques mots pour accueillir les candidats." />
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <span className="text-xs text-slate-500">{profileDescription.length}/1000</span>
+                <Button type="button" disabled={updateProfile.isPending || uploadProfileImage.isPending} onClick={() => updateProfile.mutate({ imageUrl: profileImageUrl, description: profileDescription })}>
+                  <Save className="mr-2 h-4 w-4" />Enregistrer le profil
+                </Button>
+              </div>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border bg-white p-4"><p className="text-sm text-slate-500">{isInterviewAdmin ? "Mes candidats" : "Candidats acceptés"}</p><p className="mt-1 text-2xl font-bold">{isInterviewAdmin ? myCandidates.length : assignmentCandidates.data?.length ?? 0}</p></div>
