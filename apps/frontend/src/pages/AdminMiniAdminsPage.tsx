@@ -264,8 +264,8 @@ export default function AdminMiniAdminsPage() {
                     </div>
                   </div>
                   <div className="flex min-w-48 items-center justify-between gap-3 lg:pb-0.5">
-                    <div className="flex items-center gap-2">
-                      <Switch
+                    <div>
+                      <div className="flex items-center gap-2"><Switch
                         checked={entry.isActive}
                         disabled={
                           setActive.isPending &&
@@ -286,6 +286,8 @@ export default function AdminMiniAdminsPage() {
                       <span className="text-sm">
                         {entry.isActive ? "Actif" : "Inactif"}
                       </span>
+                      </div>
+                      <p className="mt-1 text-xs text-slate-500">{entry.assignedCandidates} candidat(s) · {entry.scheduledSlots} créneau(x)</p>
                     </div>
                     <Button
                       size="icon"

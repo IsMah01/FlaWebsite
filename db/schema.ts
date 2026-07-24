@@ -173,6 +173,19 @@ export const interviewCandidateAssignments = mysqlTable(
 export type InterviewCandidateAssignment = typeof interviewCandidateAssignments.$inferSelect;
 export type InsertInterviewCandidateAssignment = typeof interviewCandidateAssignments.$inferInsert;
 
+export const interviewAuditLogs = mysqlTable("interview_audit_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  actorAdminId: int("actorAdminId").notNull(),
+  action: varchar("action", { length: 80 }).notNull(),
+  candidateId: int("candidateId"),
+  targetAdminId: int("targetAdminId"),
+  slotId: int("slotId"),
+  details: text("details"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type InterviewAuditLog = typeof interviewAuditLogs.$inferSelect;
+
 export const interviewReminderEmails = mysqlTable(
   "interview_reminder_emails",
   {

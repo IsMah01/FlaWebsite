@@ -269,6 +269,20 @@ export async function ensureDatabaseSchema() {
       WHERE slots.createdByAdminId IS NOT NULL
         AND admins.role = 'interview_admin'
     `);
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS interview_audit_logs (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        actorAdminId INT NOT NULL,
+        action VARCHAR(80) NOT NULL,
+        candidateId INT NULL,
+        targetAdminId INT NULL,
+        slotId INT NULL,
+        details TEXT NULL,
+        createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX interview_audit_actor_index (actorAdminId),
+        INDEX interview_audit_created_index (createdAt)
+      )
+    `);
 
     await connection.query(`
       CREATE TABLE IF NOT EXISTS interview_reminder_emails (

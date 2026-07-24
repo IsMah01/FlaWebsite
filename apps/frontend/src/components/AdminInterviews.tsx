@@ -129,6 +129,7 @@ function EvaluationForm({ slot }: { slot: any }) {
 
 export default function AdminInterviews({ enabled, adminRole, adminName }: { enabled: boolean; adminRole?: string; adminName?: string | null }) {
   const isInterviewAdmin = adminRole === "interview_admin";
+  const isSuperAdmin = adminRole === "super_admin";
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [interviewerName, setInterviewerName] = useState(isInterviewAdmin ? adminName || "" : "");
@@ -137,11 +138,17 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
   const [gapMinutes, setGapMinutes] = useState(0);
   const [candidateSearch, setCandidateSearch] = useState("");
   const [candidateView, setCandidateView] = useState<"available" | "mine">("available");
+  const [candidateStatusFilter, setCandidateStatusFilter] = useState<"all" | "unassigned" | "assigned" | "unbooked" | "booked">("all");
   const [selectedCandidateIds, setSelectedCandidateIds] = useState<number[]>([]);
   const [slotFilter, setSlotFilter] = useState<"all" | "mine" | "booked" | "available">("all");
+  const [slotView, setSlotView] = useState<"list" | "planning">("list");
+  const [selectedSlotIds, setSelectedSlotIds] = useState<number[]>([]);
   const utils = trpc.useUtils();
   const slots = trpc.interview.adminList.useQuery(undefined, { enabled, retry: false });
   const assignmentCandidates = trpc.interview.assignmentCandidates.useQuery(undefined, { enabled, retry: false });
+  const assignmentAdmins = trpc.interview.assignmentAdmins.useQuery(undefined, { enabled: enabled && isSuperAdmin, retry: false });
+  const assignmentAdminStats = trpc.interview.assignmentAdminStats.useQuery(undefined, { enabled: enabled && isSuperAdmin, retry: false });
+  const recentAudit = trpc.interview.recentAudit.useQuery(undefined, { enabled, retry: false });
   const googleStatus = trpc.interview.adminGoogleStatus.useQuery(undefined, { enabled, retry: false });
 
   const createSlot = trpc.interview.createSlot.useMutation({
@@ -150,7 +157,10 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
       setStartTime("");
       setEndTime("");
       setNotes("");
-      await utils.interview.adminList.invalidate();
+      await Promise.all([
+        utils.interview.adminList.invalidate(),
+        utils.interview.recentAudit.invalidate(),
+      ]);
     },
     onError: (error) => toast.error(error.message || "Impossible d’ajouter les créneaux"),
   });
@@ -192,7 +202,10 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
       toast.success(`${result.assignedCount} candidat(s) ajouté(s) à votre liste`);
       setSelectedCandidateIds([]);
       setCandidateView("mine");
-      await utils.interview.assignmentCandidates.invalidate();
+      await Promise.all([
+        utils.interview.assignmentCandidates.invalidate(),
+        utils.interview.recentAudit.invalidate(),
+      ]);
     },
     onError: async (error) => {
       toast.error(error.message || "Impossible d’affecter les candidats");
@@ -203,9 +216,35 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
   const releaseCandidate = trpc.interview.releaseCandidate.useMutation({
     onSuccess: async () => {
       toast.success("Candidat remis dans la liste disponible");
-      await utils.interview.assignmentCandidates.invalidate();
+      await Promise.all([
+        utils.interview.assignmentCandidates.invalidate(),
+        utils.interview.recentAudit.invalidate(),
+      ]);
     },
     onError: (error) => toast.error(error.message || "Impossible de libérer ce candidat"),
+  });
+  const reassignCandidate = trpc.interview.reassignCandidate.useMutation({
+    onSuccess: async () => {
+      toast.success("Affectation mise à jour");
+      await Promise.all([
+        utils.interview.assignmentCandidates.invalidate(),
+        utils.interview.assignmentAdminStats.invalidate(),
+        utils.interview.recentAudit.invalidate(),
+      ]);
+    },
+    onError: (error) => toast.error(error.message || "Impossible de réattribuer ce candidat"),
+  });
+  const bulkRemoveSlots = trpc.interview.bulkRemoveSlots.useMutation({
+    onSuccess: async (result) => {
+      toast.success(`${result.deletedCount} supprimé(s), ${result.cancelledCount} annulé(s)`);
+      setSelectedSlotIds([]);
+      await Promise.all([
+        utils.interview.adminList.invalidate(),
+        utils.interview.assignmentAdminStats.invalidate(),
+        utils.interview.recentAudit.invalidate(),
+      ]);
+    },
+    onError: (error) => toast.error(error.message || "Impossible de retirer les créneaux"),
   });
 
   const availableCandidates = useMemo(
@@ -221,11 +260,18 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
     const candidates = isInterviewAdmin
       ? candidateView === "available" ? availableCandidates : myCandidates
       : assignmentCandidates.data ?? [];
-    if (!query) return candidates;
-    return candidates.filter((candidate) =>
+    const statusFiltered = candidates.filter((candidate) => {
+      if (candidateStatusFilter === "unassigned") return !candidate.assignedAdminId;
+      if (candidateStatusFilter === "assigned") return !!candidate.assignedAdminId;
+      if (candidateStatusFilter === "unbooked") return !candidate.bookingId;
+      if (candidateStatusFilter === "booked") return !!candidate.bookingId;
+      return true;
+    });
+    if (!query) return statusFiltered;
+    return statusFiltered.filter((candidate) =>
       `${candidate.firstName} ${candidate.lastName} ${candidate.email} ${candidate.phoneNumber || ""}`.toLowerCase().includes(query),
     );
-  }, [assignmentCandidates.data, availableCandidates, candidateSearch, candidateView, isInterviewAdmin, myCandidates]);
+  }, [assignmentCandidates.data, availableCandidates, candidateSearch, candidateStatusFilter, candidateView, isInterviewAdmin, myCandidates]);
 
   const visibleSlots = useMemo(() => (slots.data ?? []).filter((slot) => {
     if (slotFilter === "mine") return slot.isOwn;
@@ -233,6 +279,22 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
     if (slotFilter === "available") return !slot.bookingId && slot.status === "scheduled";
     return true;
   }), [slots.data, slotFilter]);
+  const planningDays = useMemo(() => {
+    const groups = new Map<string, typeof visibleSlots>();
+    for (const slot of visibleSlots) {
+      const key = new Intl.DateTimeFormat("fr-CA", {
+        timeZone: "Africa/Casablanca",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date(slot.startTime));
+      groups.set(key, [...(groups.get(key) ?? []), slot]);
+    }
+    return Array.from(groups.entries());
+  }, [visibleSlots]);
+  const candidatesNeedingSlot = myCandidates.filter((candidate) => !candidate.bookingId).length;
+  const openSlotCount = (slots.data ?? []).filter((slot) => slot.status === "scheduled" && !slot.bookingId).length;
+  const missingSlotCount = Math.max(0, candidatesNeedingSlot - openSlotCount);
 
   const availabilitySlots = useMemo(() => {
     if (!isInterviewAdmin || !startTime || !endTime) return [];
@@ -320,6 +382,33 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
         <div className="rounded-xl border bg-white p-4"><p className="text-sm text-slate-500">Réservés</p><p className="mt-1 text-2xl font-bold">{(slots.data ?? []).filter((slot) => slot.bookingId).length}</p></div>
         <div className="rounded-xl border bg-white p-4"><p className="text-sm text-slate-500">Disponibles</p><p className="mt-1 text-2xl font-bold">{(slots.data ?? []).filter((slot) => !slot.bookingId && slot.status === "scheduled").length}</p></div>
       </section>
+      {isInterviewAdmin ? (
+        <section className={`border p-4 ${missingSlotCount > 0 ? "border-amber-300 bg-amber-50" : "border-emerald-200 bg-emerald-50"}`}>
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            <div>
+              <p className="font-semibold text-slate-900">Capacité de réservation</p>
+              <p className="mt-1 text-sm text-slate-600">{candidatesNeedingSlot} candidat(s) sans réservation pour {openSlotCount} créneau(x) libre(s).</p>
+            </div>
+            <span className={`text-sm font-bold ${missingSlotCount > 0 ? "text-amber-800" : "text-emerald-800"}`}>
+              {missingSlotCount > 0 ? `${missingSlotCount} créneau(x) manquant(s)` : "Capacité suffisante"}
+            </span>
+          </div>
+        </section>
+      ) : null}
+
+      {isSuperAdmin && (assignmentAdminStats.data?.length ?? 0) > 0 ? (
+        <section className="overflow-x-auto border bg-white p-4 shadow-sm">
+          <h2 className="mb-3 text-lg font-bold">Activité par mini-admin</h2>
+          <table className="w-full min-w-[850px] text-sm">
+            <thead className="bg-slate-100"><tr><th className="p-3 text-left">Mini-admin</th><th className="p-3 text-right">Candidats</th><th className="p-3 text-right">Réservés</th><th className="p-3 text-right">Créneaux libres</th><th className="p-3 text-right">Terminés</th><th className="p-3 text-right">Absents</th><th className="p-3 text-right">Évaluations restantes</th></tr></thead>
+            <tbody>{assignmentAdminStats.data?.map((stat) => (
+              <tr key={stat.id} className="border-b last:border-0">
+                <td className="p-3 font-medium">{stat.name}</td><td className="p-3 text-right">{stat.assignedCandidates}</td><td className="p-3 text-right">{stat.bookedCandidates}</td><td className="p-3 text-right">{stat.availableSlots}</td><td className="p-3 text-right">{stat.completedInterviews}</td><td className="p-3 text-right">{stat.absentInterviews}</td><td className="p-3 text-right">{stat.pendingEvaluations}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </section>
+      ) : null}
 
       <form onSubmit={submit} className="rounded-2xl border bg-white p-5 shadow-sm">
         <div className="flex items-center gap-3">
@@ -438,7 +527,16 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
               {isInterviewAdmin ? "Choisissez les candidats que vous prendrez en entretien." : "Vue globale des affectations aux mini-admins."}
             </p>
           </div>
-          <Input className="max-w-sm" placeholder="Rechercher par nom, e-mail ou téléphone" value={candidateSearch} onChange={(event) => setCandidateSearch(event.target.value)} />
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <select className="h-10 rounded-md border bg-white px-3 text-sm" value={candidateStatusFilter} onChange={(event) => setCandidateStatusFilter(event.target.value as typeof candidateStatusFilter)}>
+              <option value="all">Tous les états</option>
+              <option value="unassigned">Non affectés</option>
+              <option value="assigned">Affectés</option>
+              <option value="unbooked">Sans réservation</option>
+              <option value="booked">Réservés</option>
+            </select>
+            <Input className="max-w-sm" placeholder="Rechercher par nom, e-mail ou téléphone" value={candidateSearch} onChange={(event) => setCandidateSearch(event.target.value)} />
+          </div>
         </div>
 
         {isInterviewAdmin ? (
@@ -511,7 +609,23 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
                     <td className="p-3">{candidate.phoneNumber || "-"}</td>
                     {(!isInterviewAdmin || candidateView === "mine") ? (
                       <td className="p-3">
-                        {candidate.assignedAdminName
+                        {isSuperAdmin ? (
+                          <select
+                            className="h-9 min-w-44 rounded-md border bg-white px-2 text-sm"
+                            value={candidate.assignedAdminId || ""}
+                            disabled={!!candidate.bookingId || reassignCandidate.isPending}
+                            title={candidate.bookingId ? "Réattribution impossible après réservation" : undefined}
+                            onChange={(event) => {
+                              const targetAdminId = Number(event.target.value);
+                              if (targetAdminId && window.confirm(`Affecter ${candidate.firstName} ${candidate.lastName} à ce mini-admin ?`)) {
+                                reassignCandidate.mutate({ candidateId: candidate.id, targetAdminId });
+                              }
+                            }}
+                          >
+                            <option value="">Non affecté</option>
+                            {(assignmentAdmins.data ?? []).filter((admin) => admin.isActive).map((admin) => <option key={admin.id} value={admin.id}>{admin.name}</option>)}
+                          </select>
+                        ) : candidate.assignedAdminName
                           ? <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-800">{candidate.assignedAdminName}</span>
                           : <span className="text-slate-400">Non affecté</span>}
                       </td>
@@ -550,18 +664,47 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
       <section className="overflow-x-auto rounded-2xl border bg-white p-4 shadow-sm">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-bold">Tous les créneaux et réservations</h2>
-          <select className="h-10 rounded-md border bg-white px-3 text-sm" value={slotFilter} onChange={(event) => setSlotFilter(event.target.value as typeof slotFilter)}>
-            <option value="all">Tous les créneaux</option>
-            <option value="mine">Mes créneaux</option>
-            <option value="booked">Créneaux réservés</option>
-            <option value="available">Créneaux disponibles</option>
-          </select>
+          <div className="flex flex-wrap gap-2">
+            {selectedSlotIds.length > 0 ? <Button type="button" variant="destructive" disabled={bulkRemoveSlots.isPending} onClick={() => {
+              if (window.confirm(`Retirer ${selectedSlotIds.length} créneau(x) ? Les candidats réservés seront prévenus.`)) {
+                bulkRemoveSlots.mutate({ slotIds: selectedSlotIds });
+              }
+            }}><Trash2 className="mr-2 h-4 w-4" />Retirer ({selectedSlotIds.length})</Button> : null}
+            <div className="inline-flex rounded-md border bg-slate-50 p-1">
+              <Button type="button" size="sm" variant={slotView === "list" ? "default" : "ghost"} onClick={() => setSlotView("list")}>Liste</Button>
+              <Button type="button" size="sm" variant={slotView === "planning" ? "default" : "ghost"} onClick={() => setSlotView("planning")}>Planning</Button>
+            </div>
+            <select className="h-10 rounded-md border bg-white px-3 text-sm" value={slotFilter} onChange={(event) => setSlotFilter(event.target.value as typeof slotFilter)}>
+              <option value="all">Tous les créneaux</option>
+              <option value="mine">Mes créneaux</option>
+              <option value="booked">Créneaux réservés</option>
+              <option value="available">Créneaux disponibles</option>
+            </select>
+          </div>
         </div>
-        <table className="w-full min-w-[1100px] text-sm">
-          <thead className="bg-slate-100"><tr><th className="p-3 text-left">Date</th><th className="p-3 text-left">Jury</th><th className="p-3 text-left">Candidat</th><th className="p-3 text-left">Meet</th><th className="p-3 text-left">État</th><th className="p-3 text-left">Suivi</th></tr></thead>
+        {slotView === "planning" ? (
+          <div className="grid gap-4 py-2 lg:grid-cols-2">
+            {planningDays.map(([day, daySlots]) => (
+              <div key={day} className="border bg-slate-50">
+                <h3 className="border-b bg-white p-3 font-semibold">{new Intl.DateTimeFormat("fr-FR", { timeZone: "Africa/Casablanca", dateStyle: "full" }).format(new Date(daySlots[0].startTime))}</h3>
+                <div className="divide-y">{daySlots.map((slot) => (
+                  <div key={slot.id} className="flex items-center justify-between gap-3 p-3">
+                    <div><p className="font-medium">{new Intl.DateTimeFormat("fr-FR", { timeZone: "Africa/Casablanca", hour: "2-digit", minute: "2-digit" }).format(new Date(slot.startTime))} – {new Intl.DateTimeFormat("fr-FR", { timeZone: "Africa/Casablanca", hour: "2-digit", minute: "2-digit" }).format(new Date(slot.endTime))}</p><p className="text-xs text-slate-500">{slot.candidateId ? `${slot.candidateFirstName} ${slot.candidateLastName}` : "Disponible"} · {slot.interviewerName || "-"}</p></div>
+                    <span className={`h-2.5 w-2.5 rounded-full ${slot.status === "completed" ? "bg-emerald-500" : slot.status === "absent" ? "bg-red-500" : slot.bookingId ? "bg-blue-500" : "bg-slate-300"}`} />
+                  </div>
+                ))}</div>
+              </div>
+            ))}
+          </div>
+        ) : <table className="w-full min-w-[1150px] text-sm">
+          <thead className="bg-slate-100"><tr><th className="w-12 p-3 text-left"><Checkbox checked={visibleSlots.length > 0 && visibleSlots.filter((slot) => slot.status === "scheduled").every((slot) => selectedSlotIds.includes(slot.id))} aria-label="Sélectionner tous les créneaux planifiés" onCheckedChange={(checked) => {
+            const ids = visibleSlots.filter((slot) => slot.status === "scheduled").map((slot) => slot.id);
+            setSelectedSlotIds((current) => checked ? Array.from(new Set([...current, ...ids])) : current.filter((id) => !ids.includes(id)));
+          }} /></th><th className="p-3 text-left">Date</th><th className="p-3 text-left">Jury</th><th className="p-3 text-left">Candidat</th><th className="p-3 text-left">Meet</th><th className="p-3 text-left">État</th><th className="p-3 text-left">Suivi</th></tr></thead>
           <tbody>
             {visibleSlots.map((slot) => (
               <tr key={slot.id} className="border-b align-top last:border-b-0">
+                <td className="p-3"><Checkbox checked={selectedSlotIds.includes(slot.id)} disabled={slot.status !== "scheduled"} aria-label={`Sélectionner le créneau ${formatDate(slot.startTime)}`} onCheckedChange={(checked) => setSelectedSlotIds((current) => checked ? [...current, slot.id] : current.filter((id) => id !== slot.id))} /></td>
                 <td className="p-3 font-medium">{formatDate(slot.startTime)} – {formatDate(slot.endTime)}</td>
                 <td className="p-3"><p>{slot.interviewerName || "-"}</p><p className="text-xs text-slate-500">Créé par : {slot.createdByAdminName || "ancien compte"}</p></td>
                 <td className="p-3">
@@ -610,8 +753,33 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
               </tr>
             ))}
           </tbody>
-        </table>
+        </table>}
         {!slots.isLoading && (slots.data?.length ?? 0) === 0 ? <p className="p-8 text-center text-slate-500">Aucun créneau créé.</p> : null}
+      </section>
+
+      <section className="border bg-white p-4 shadow-sm">
+        <h2 className="text-lg font-bold">Activité récente</h2>
+        <div className="mt-3 divide-y">
+          {(recentAudit.data ?? []).slice(0, 12).map((entry) => (
+            <div key={entry.id} className="flex flex-col justify-between gap-1 py-3 sm:flex-row sm:items-center">
+              <p className="text-sm text-slate-700">
+                <span className="font-medium">{entry.actorName || "Administrateur"}</span>
+                {" · "}
+                {entry.action === "candidate_assigned" ? "candidat affecté"
+                  : entry.action === "candidate_reassigned" ? "candidat réattribué"
+                    : entry.action === "candidate_released" ? "candidat libéré"
+                      : entry.action === "slots_created" ? "créneaux créés"
+                        : entry.action === "slot_cancelled" ? "créneau annulé"
+                          : entry.action === "slot_deleted" ? "créneau supprimé"
+                            : entry.action}
+                {entry.candidateName ? ` · ${entry.candidateName}` : ""}
+                {entry.targetAdminName ? ` · ${entry.targetAdminName}` : ""}
+              </p>
+              <time className="text-xs text-slate-500">{formatDate(entry.createdAt)}</time>
+            </div>
+          ))}
+          {!recentAudit.isLoading && !recentAudit.data?.length ? <p className="py-6 text-center text-sm text-slate-500">Aucune activité enregistrée.</p> : null}
+        </div>
       </section>
     </div>
   );

@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { and, desc, eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createRouter, adminQuery, superAdminQuery } from "./middleware";
-import { getDb } from "./queries/connection";
+import { getDb, getSqlPool } from "./queries/connection";
 import {
   candidates,
   adminUsers,
@@ -21,12 +21,22 @@ const adminPasswordSchema = z.string()
 
 export const adminRouter = createRouter({
   listInterviewAdmins: superAdminQuery.query(async () => {
-    const db = getDb();
-    return db
-      .select({ id: adminUsers.id, name: adminUsers.name, email: adminUsers.email, isActive: adminUsers.isActive, createdAt: adminUsers.createdAt })
-      .from(adminUsers)
-      .where(eq(adminUsers.role, "interview_admin"))
-      .orderBy(desc(adminUsers.createdAt));
+    const [rows] = await getSqlPool().query<any[]>(`
+      SELECT admins.id, admins.name, admins.email, admins.isActive, admins.createdAt,
+        COUNT(DISTINCT assignments.candidateId) AS assignedCandidates,
+        COUNT(DISTINCT CASE WHEN slots.status = 'scheduled' THEN slots.id END) AS scheduledSlots
+      FROM admin_users admins
+      LEFT JOIN interview_candidate_assignments assignments ON assignments.adminId = admins.id
+      LEFT JOIN interview_slots slots ON slots.createdByAdminId = admins.id
+      WHERE admins.role = 'interview_admin'
+      GROUP BY admins.id, admins.name, admins.email, admins.isActive, admins.createdAt
+      ORDER BY admins.createdAt DESC
+    `);
+    return rows.map((row) => ({
+      ...row,
+      assignedCandidates: Number(row.assignedCandidates),
+      scheduledSlots: Number(row.scheduledSlots),
+    }));
   }),
 
   createInterviewAdmin: superAdminQuery
@@ -57,6 +67,21 @@ export const adminRouter = createRouter({
       const [target] = await db.select({ id: adminUsers.id }).from(adminUsers)
         .where(and(eq(adminUsers.id, input.id), eq(adminUsers.role, "interview_admin"))).limit(1);
       if (!target) throw new TRPCError({ code: "NOT_FOUND", message: "Mini-admin introuvable." });
+      if (!input.isActive) {
+        const [workloadRows] = await getSqlPool().query<any[]>(
+          `SELECT
+             (SELECT COUNT(*) FROM interview_candidate_assignments WHERE adminId = ?) AS assignments,
+             (SELECT COUNT(*) FROM interview_slots WHERE createdByAdminId = ? AND status = 'scheduled') AS scheduledSlots`,
+          [target.id, target.id],
+        );
+        const workload = workloadRows[0];
+        if (Number(workload.assignments) > 0 || Number(workload.scheduledSlots) > 0) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: `Reattribuez d'abord ses ${workload.assignments} candidat(s) et traitez ses ${workload.scheduledSlots} creneau(x) planifie(s).`,
+          });
+        }
+      }
       await db.update(adminUsers).set({ isActive: input.isActive }).where(eq(adminUsers.id, target.id));
       return { success: true };
     }),

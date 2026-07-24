@@ -313,6 +313,60 @@ export async function sendInterviewReminderEmail(
   }
 }
 
+export async function sendInterviewUpdateEmail(
+  to: string,
+  firstName: string,
+  type: "assigned" | "slots_available" | "cancelled" | "reassigned",
+) {
+  if (!SMTP_HOST || !SMTP_USER) {
+    console.warn("[Email] SMTP not configured. Skipping interview update email.");
+    return { success: false, reason: "SMTP_NOT_CONFIGURED" };
+  }
+
+  const messages = {
+    assigned: {
+      subject: "Votre responsable d'entretien a ete attribue",
+      body: "Un responsable vient de vous etre attribue. Vous pourrez choisir un creneau des qu'il publiera ses disponibilites.",
+    },
+    slots_available: {
+      subject: "De nouveaux creneaux d'entretien sont disponibles",
+      body: "De nouveaux horaires sont disponibles pour votre entretien. Connectez-vous afin de choisir votre creneau.",
+    },
+    cancelled: {
+      subject: "Mise a jour de votre entretien",
+      body: "Votre creneau d'entretien a ete annule. Connectez-vous afin de consulter les prochains horaires disponibles.",
+    },
+    reassigned: {
+      subject: "Votre responsable d'entretien a change",
+      body: "Un nouveau responsable vient de vous etre attribue. Ses disponibilites seront affichees dans votre espace entretien.",
+    },
+  } as const;
+  const message = messages[type];
+  const interviewUrl = `${PUBLIC_APP_URL}/interview`;
+  const logo = getEmailLogo();
+
+  try {
+    await transporter.sendMail({
+      from: `"${AR_ORG}" <${SMTP_FROM}>`,
+      to,
+      subject: `${message.subject} - Future Leaders Foundation`,
+      html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:24px;background:#f3f7f6">
+        <div style="background:#fff;padding:28px">
+          <img src="${logo.src}" width="170" alt="Future Leaders Foundation">
+          <h1 style="color:#2d6f64;font-size:22px">Bonjour ${firstName || ""},</h1>
+          <p style="color:#3f5550;line-height:1.8">${message.body}</p>
+          <p style="text-align:center;margin-top:28px"><a href="${interviewUrl}" style="background:#4A9B8E;color:#fff;padding:12px 24px;text-decoration:none;border-radius:8px">Ouvrir mon espace entretien</a></p>
+        </div>
+      </div>`,
+      attachments: logo.attachments,
+    });
+    return { success: true };
+  } catch (error) {
+    console.error("[Email] Failed to send interview update:", error);
+    return { success: false, reason: "SEND_FAILED" };
+  }
+}
+
 export async function sendNewsletterEmail(
   to: string,
   subject: string,
