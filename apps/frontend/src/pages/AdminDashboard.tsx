@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
-import { CalendarClock, Download, FileText, LogOut, Mail, MessageSquareText, RefreshCw, ShieldCheck, Trash2, Users } from "lucide-react";
+import { CalendarClock, Download, FileText, LogOut, Mail, MessageSquareText, RefreshCw, ShieldCheck, Trash2, UserCog, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,7 @@ import { candidateQuestionnaireFields } from "@/data/candidate-questionnaire";
 import { useAuth } from "@/hooks/useAuth";
 import { trpc } from "@/providers/trpc";
 
-type Tab = "newUsers" | "users" | "candidates" | "followUp" | "incomplete" | "messages" | "subscribers" | "interviewAdmins";
+type Tab = "newUsers" | "users" | "candidates" | "followUp" | "incomplete" | "messages" | "subscribers";
 type CandidateFilterField =
   | "all"
   | "name"
@@ -303,9 +303,6 @@ export default function AdminDashboard() {
   const [userFilterField, setUserFilterField] = useState<UserFilterField>("all");
   const [ambassadorMessageAuthorFilter, setAmbassadorMessageAuthorFilter] = useState("");
   const [ambassadorMessageDateFilter, setAmbassadorMessageDateFilter] = useState("");
-  const [miniAdminName, setMiniAdminName] = useState("");
-  const [miniAdminEmail, setMiniAdminEmail] = useState("");
-  const [miniAdminPassword, setMiniAdminPassword] = useState("");
   const isAdmin = user?.role === "admin";
   const isSuperAdmin = user?.adminRole === "super_admin";
 
@@ -345,10 +342,6 @@ export default function AdminDashboard() {
   const subscribers = trpc.admin.listNewsletterSubscribers.useQuery(undefined, {
     retry: false,
     enabled: isAdmin,
-  });
-  const interviewAdmins = trpc.admin.listInterviewAdmins.useQuery(undefined, {
-    retry: false,
-    enabled: isSuperAdmin,
   });
   const utils = trpc.useUtils();
 
@@ -405,20 +398,6 @@ export default function AdminDashboard() {
       ]);
     },
     onError: (err) => toast.error(err.message || "Impossible de supprimer le message"),
-  });
-  const createInterviewAdmin = trpc.admin.createInterviewAdmin.useMutation({
-    onSuccess: async () => {
-      toast.success("Mini-admin entretien créé");
-      setMiniAdminName("");
-      setMiniAdminEmail("");
-      setMiniAdminPassword("");
-      await utils.admin.listInterviewAdmins.invalidate();
-    },
-    onError: (err) => toast.error(err.message || "Impossible de créer le mini-admin"),
-  });
-  const setInterviewAdminActive = trpc.admin.setInterviewAdminActive.useMutation({
-    onSuccess: async () => utils.admin.listInterviewAdmins.invalidate(),
-    onError: (err) => toast.error(err.message || "Impossible de modifier ce compte"),
   });
 
   function handleDeleteNewUser(id: number, label: string) {
@@ -884,40 +863,11 @@ export default function AdminDashboard() {
             المشتركين في النشرة
           </Button>
           {isSuperAdmin ? (
-            <Button variant={tab === "interviewAdmins" ? "default" : "outline"} onClick={() => setTab("interviewAdmins")}>
-              Mini-admins entretiens
-            </Button>
+            <Link to="/admin/mini-admins">
+              <Button variant="outline"><UserCog className="ml-2 h-4 w-4" /> Mini-admins entretiens</Button>
+            </Link>
           ) : null}
         </nav>
-
-        {tab === "interviewAdmins" && isSuperAdmin ? (
-          <section className="rounded-2xl border bg-white p-5 shadow-sm">
-            <h2 className="text-xl font-bold">Mini-admins des entretiens</h2>
-            <p className="mt-1 text-sm text-slate-500">Accès limité aux candidats acceptés et à la gestion de leurs propres créneaux.</p>
-            <form className="mt-5 grid gap-3 md:grid-cols-4" onSubmit={(event) => {
-              event.preventDefault();
-              createInterviewAdmin.mutate({ name: miniAdminName, email: miniAdminEmail, password: miniAdminPassword });
-            }}>
-              <Input placeholder="Nom" value={miniAdminName} onChange={(event) => setMiniAdminName(event.target.value)} required />
-              <Input type="email" placeholder="E-mail" value={miniAdminEmail} onChange={(event) => setMiniAdminEmail(event.target.value)} required />
-              <Input type="password" placeholder="Mot de passe (8 caractères, 1 majuscule)" value={miniAdminPassword} onChange={(event) => setMiniAdminPassword(event.target.value)} required />
-              <Button type="submit" disabled={createInterviewAdmin.isPending}>Créer le compte</Button>
-            </form>
-            <div className="mt-6 overflow-x-auto">
-              <table className="w-full min-w-[700px] text-sm">
-                <thead className="bg-slate-100"><tr><th className="p-3 text-left">Nom</th><th className="p-3 text-left">E-mail</th><th className="p-3 text-left">État</th><th className="p-3 text-left">Action</th></tr></thead>
-                <tbody>
-                  {(interviewAdmins.data ?? []).map((entry) => (
-                    <tr key={entry.id} className="border-b last:border-b-0">
-                      <td className="p-3">{entry.name}</td><td className="p-3">{entry.email}</td><td className="p-3">{entry.isActive ? "Actif" : "Désactivé"}</td>
-                      <td className="p-3"><Button type="button" size="sm" variant={entry.isActive ? "destructive" : "outline"} disabled={setInterviewAdminActive.isPending} onClick={() => setInterviewAdminActive.mutate({ id: entry.id, isActive: !entry.isActive })}>{entry.isActive ? "Désactiver" : "Activer"}</Button></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        ) : null}
 
         {tab === "newUsers" && (
           <section className="overflow-x-auto rounded-2xl border bg-white p-4 shadow-sm">

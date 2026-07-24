@@ -1,6 +1,6 @@
 import { z } from "zod";
 import bcrypt from "bcryptjs";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createRouter, adminQuery, superAdminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
@@ -13,6 +13,11 @@ import {
   newUsers,
   users,
 } from "@db/schema";
+
+const adminPasswordSchema = z.string()
+  .min(8, "Le mot de passe doit contenir au moins 8 caracteres.")
+  .max(128)
+  .regex(/[A-Z]/, "Le mot de passe doit contenir une majuscule.");
 
 export const adminRouter = createRouter({
   listInterviewAdmins: superAdminQuery.query(async () => {
@@ -28,7 +33,7 @@ export const adminRouter = createRouter({
     .input(z.object({
       name: z.string().trim().min(2).max(255),
       email: z.string().trim().email().max(320),
-      password: z.string().min(8).max(128).regex(/[A-Z]/, "Le mot de passe doit contenir une majuscule."),
+      password: adminPasswordSchema,
     }))
     .mutation(async ({ input }) => {
       const db = getDb();
@@ -49,7 +54,42 @@ export const adminRouter = createRouter({
     .input(z.object({ id: z.number().int().positive(), isActive: z.boolean() }))
     .mutation(async ({ input }) => {
       const db = getDb();
-      await db.update(adminUsers).set({ isActive: input.isActive }).where(eq(adminUsers.id, input.id));
+      const [target] = await db.select({ id: adminUsers.id }).from(adminUsers)
+        .where(and(eq(adminUsers.id, input.id), eq(adminUsers.role, "interview_admin"))).limit(1);
+      if (!target) throw new TRPCError({ code: "NOT_FOUND", message: "Mini-admin introuvable." });
+      await db.update(adminUsers).set({ isActive: input.isActive }).where(eq(adminUsers.id, target.id));
+      return { success: true };
+    }),
+
+  updateInterviewAdmin: superAdminQuery
+    .input(z.object({
+      id: z.number().int().positive(),
+      name: z.string().trim().min(2).max(255),
+      email: z.string().trim().email().max(320),
+      password: z.union([z.literal(""), adminPasswordSchema]),
+    }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const [target] = await db.select({ id: adminUsers.id }).from(adminUsers)
+        .where(and(eq(adminUsers.id, input.id), eq(adminUsers.role, "interview_admin"))).limit(1);
+      if (!target) throw new TRPCError({ code: "NOT_FOUND", message: "Mini-admin introuvable." });
+
+      const email = input.email.toLowerCase();
+      const [existing] = await db.select({ id: adminUsers.id }).from(adminUsers)
+        .where(eq(adminUsers.email, email)).limit(1);
+      if (existing && existing.id !== target.id) {
+        throw new TRPCError({ code: "CONFLICT", message: "Un compte existe deja avec cet e-mail." });
+      }
+
+      await db.update(adminUsers).set({
+        name: input.name,
+        email,
+        ...(input.password ? {
+          passwordHash: await bcrypt.hash(input.password, 12),
+          passwordResetToken: null,
+          passwordResetExpiresAt: null,
+        } : {}),
+      }).where(eq(adminUsers.id, target.id));
       return { success: true };
     }),
 

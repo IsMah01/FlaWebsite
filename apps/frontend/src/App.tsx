@@ -16,6 +16,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import InterviewBooking from "./pages/InterviewBooking";
 import AdminInterviewsPage from "./pages/AdminInterviewsPage";
+import AdminMiniAdminsPage from "./pages/AdminMiniAdminsPage";
 import ScrollManager from "./components/ScrollManager";
 import { useViewerSession } from "./hooks/useViewerSession";
 
@@ -55,6 +56,7 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/admin/interviews" element={<AdminInterviewsPage />} />
+        <Route path="/admin/mini-admins" element={<AdminMiniAdminsPage />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/admin/forgot-password" element={<ForgotPassword accountType="admin" />} />
         <Route path="/admin/reset-password" element={<ResetPassword accountType="admin" />} />
