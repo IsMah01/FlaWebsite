@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { CalendarPlus, ExternalLink, Link2, Save, Trash2, UserCheck, UserRound, Users } from "lucide-react";
+import { AlertCircle, CalendarPlus, Clock3, Coffee, ExternalLink, Link2, Save, Trash2, UserCheck, UserRound, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -17,6 +17,42 @@ function formatDate(value: Date | string) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
+}
+
+function parseMoroccoDateTime(value: string) {
+  const [datePart, timePart] = value.split("T");
+  const [year, month, day] = datePart.split("-").map(Number);
+  const [hour, minute] = timePart.split(":").map(Number);
+  const expectedUtc = Date.UTC(year, month - 1, day, hour, minute);
+  let instant = expectedUtc;
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Casablanca",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const parts = Object.fromEntries(
+      formatter.formatToParts(new Date(instant))
+        .filter((part) => part.type !== "literal")
+        .map((part) => [part.type, Number(part.value)]),
+    );
+    const representedUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute);
+    instant += expectedUtc - representedUtc;
+  }
+  return new Date(instant);
+}
+
+function addMinutesToWallTime(value: string, minutes: number) {
+  const [datePart, timePart] = value.split("T");
+  const [year, month, day] = datePart.split("-").map(Number);
+  const [hour, minute] = timePart.split(":").map(Number);
+  const result = new Date(Date.UTC(year, month - 1, day, hour, minute + minutes));
+  return `${result.getUTCFullYear()}-${String(result.getUTCMonth() + 1).padStart(2, "0")}-${String(result.getUTCDate()).padStart(2, "0")}T${String(result.getUTCHours()).padStart(2, "0")}:${String(result.getUTCMinutes()).padStart(2, "0")}`;
 }
 
 const statusLabels: Record<string, string> = {
@@ -198,17 +234,54 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
     return true;
   }), [slots.data, slotFilter]);
 
+  const availabilitySlots = useMemo(() => {
+    if (!isInterviewAdmin || !startTime || !endTime) return [];
+    const start = parseMoroccoDateTime(startTime);
+    const end = parseMoroccoDateTime(endTime);
+    if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end <= start) return [];
+
+    const durationMs = 30 * 60 * 1000;
+    const stepMs = durationMs + gapMinutes * 60 * 1000;
+    const generated: Array<{ start: Date; end: Date }> = [];
+    for (let slotStart = start.getTime(); slotStart + durationMs <= end.getTime() && generated.length < 31; slotStart += stepMs) {
+      generated.push({ start: new Date(slotStart), end: new Date(slotStart + durationMs) });
+    }
+    return generated;
+  }, [endTime, gapMinutes, isInterviewAdmin, startTime]);
+  const availabilityWindowMinutes = useMemo(() => {
+    if (!startTime || !endTime) return 0;
+    return Math.max(0, Math.round(
+      (parseMoroccoDateTime(endTime).getTime() - parseMoroccoDateTime(startTime).getTime()) / 60000,
+    ));
+  }, [endTime, startTime]);
+  const unusedAvailabilityMinutes = availabilitySlots.length > 0
+    ? Math.max(0, Math.round(
+      (parseMoroccoDateTime(endTime).getTime() - availabilitySlots.at(-1)!.end.getTime()) / 60000,
+    ))
+    : 0;
+  const availabilityError = isInterviewAdmin && startTime && endTime
+    ? availabilityWindowMinutes < 30
+      ? "La période doit contenir au moins 30 minutes."
+      : availabilityWindowMinutes > 12 * 60
+        ? "La période ne peut pas dépasser 12 heures."
+        : availabilitySlots.length > 30
+          ? "La période génère plus de 30 créneaux. Réduisez sa durée."
+          : null
+    : null;
+
   function submit(event: React.FormEvent) {
     event.preventDefault();
     if (!googleStatus.data?.connected) return toast.error("Connectez d’abord Google Calendar");
     if (!startTime || !endTime) return toast.error("La date et l’heure sont obligatoires");
+    if (availabilityError) return toast.error(availabilityError);
     createSlot.mutate({
-      startTime: new Date(startTime),
-      endTime: new Date(endTime),
+      startTime: parseMoroccoDateTime(startTime),
+      endTime: parseMoroccoDateTime(endTime),
       interviewerName: interviewerName || undefined,
       notes: notes || undefined,
       repeatCount,
       gapMinutes,
+      availabilityMode: isInterviewAdmin,
     });
   }
 
@@ -251,16 +324,78 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
       <form onSubmit={submit} className="rounded-2xl border bg-white p-5 shadow-sm">
         <div className="flex items-center gap-3">
           <CalendarPlus className="h-6 w-6 text-[#4A9B8E]" />
-          <div><h2 className="text-lg font-bold">Ajouter des créneaux d’entretien</h2><p className="text-sm text-slate-500">Chaque créneau reçoit son propre lien Google Meet. Fuseau : Maroc.</p></div>
+          <div><h2 className="text-lg font-bold">{isInterviewAdmin ? "Déclarer mes disponibilités" : "Ajouter des créneaux d’entretien"}</h2><p className="text-sm text-slate-500">{isInterviewAdmin ? "Entretiens de 30 minutes, fuseau horaire du Maroc." : "Chaque créneau reçoit son propre lien Google Meet. Fuseau : Maroc."}</p></div>
         </div>
         <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <div><Label htmlFor="interview-start">Début du premier créneau</Label><Input id="interview-start" type="datetime-local" value={startTime} onChange={(event) => setStartTime(event.target.value)} required /></div>
-          <div><Label htmlFor="interview-end">Fin du premier créneau</Label><Input id="interview-end" type="datetime-local" value={endTime} onChange={(event) => setEndTime(event.target.value)} required /></div>
-          <div><Label htmlFor="interviewer">Membre du jury</Label><Input id="interviewer" value={interviewerName} disabled={isInterviewAdmin} onChange={(event) => setInterviewerName(event.target.value)} placeholder="Nom du responsable" /></div>
-          <div><Label htmlFor="repeat-count">Nombre de créneaux</Label><Input id="repeat-count" type="number" min={1} max={30} value={repeatCount} onChange={(event) => setRepeatCount(Number(event.target.value))} /></div>
-          <div><Label htmlFor="gap-minutes">Pause entre les créneaux (minutes)</Label><Input id="gap-minutes" type="number" min={0} max={240} value={gapMinutes} onChange={(event) => setGapMinutes(Number(event.target.value))} /></div>
+          <div><Label htmlFor="interview-start">{isInterviewAdmin ? "Disponible à partir de" : "Début du premier créneau"}</Label><Input id="interview-start" type="datetime-local" value={startTime} onChange={(event) => {
+            const nextStart = event.target.value;
+            setStartTime(nextStart);
+            if (nextStart && (!endTime || endTime <= nextStart)) setEndTime(addMinutesToWallTime(nextStart, 120));
+          }} required /></div>
+          <div><Label htmlFor="interview-end">{isInterviewAdmin ? "Disponible jusqu’à" : "Fin du premier créneau"}</Label><Input id="interview-end" type="datetime-local" min={startTime || undefined} value={endTime} onChange={(event) => setEndTime(event.target.value)} required /></div>
+          {!isInterviewAdmin ? <div><Label htmlFor="interviewer">Membre du jury</Label><Input id="interviewer" value={interviewerName} onChange={(event) => setInterviewerName(event.target.value)} placeholder="Nom du responsable" /></div> : null}
+          {!isInterviewAdmin ? <div><Label htmlFor="repeat-count">Nombre de créneaux</Label><Input id="repeat-count" type="number" min={1} max={30} value={repeatCount} onChange={(event) => setRepeatCount(Number(event.target.value))} /></div> : null}
+          <div>
+            <Label htmlFor="gap-minutes">Pause entre les entretiens</Label>
+            {isInterviewAdmin ? (
+              <div className="mt-1 flex gap-2">
+                <div className="flex h-10 flex-1 overflow-hidden rounded-md border bg-white">
+                  {[0, 5, 10, 15].map((minutes) => (
+                    <button
+                      key={minutes}
+                      type="button"
+                      className={`flex-1 border-r px-2 text-sm font-medium last:border-r-0 ${gapMinutes === minutes ? "bg-[#4A9B8E] text-white" : "text-slate-600 hover:bg-slate-50"}`}
+                      onClick={() => setGapMinutes(minutes)}
+                      aria-pressed={gapMinutes === minutes}
+                    >
+                      {minutes}
+                    </button>
+                  ))}
+                </div>
+                <Input
+                  id="gap-minutes"
+                  className="w-24"
+                  type="number"
+                  min={0}
+                  max={240}
+                  value={gapMinutes}
+                  onChange={(event) => setGapMinutes(Math.max(0, Math.min(240, Number(event.target.value))))}
+                  aria-label="Pause personnalisée en minutes"
+                />
+              </div>
+            ) : (
+              <Input id="gap-minutes" type="number" min={0} max={240} value={gapMinutes} onChange={(event) => setGapMinutes(Math.max(0, Math.min(240, Number(event.target.value))))} />
+            )}
+          </div>
           <div><Label htmlFor="interview-notes">Notes internes</Label><Input id="interview-notes" value={notes} onChange={(event) => setNotes(event.target.value)} /></div>
         </div>
+        {isInterviewAdmin && availabilityError ? (
+          <div className="mt-5 flex items-start gap-2 border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{availabilityError}</span>
+          </div>
+        ) : null}
+        {isInterviewAdmin && availabilitySlots.length > 0 && !availabilityError ? (
+          <div className="mt-5 border bg-slate-50 p-4">
+            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+              <p className="font-semibold text-slate-900">Aperçu des créneaux</p>
+              <div className="flex flex-wrap gap-4 text-sm">
+                <span className="flex items-center gap-1.5 font-medium text-[#3D7A6F]"><Clock3 className="h-4 w-4" />{availabilitySlots.length} entretien(s)</span>
+                <span className="flex items-center gap-1.5 text-slate-600"><Coffee className="h-4 w-4" />Pause : {gapMinutes} min</span>
+                {unusedAvailabilityMinutes > 0 ? <span className="text-amber-700">{unusedAvailabilityMinutes} min non utilisée(s)</span> : null}
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {availabilitySlots.slice(0, 30).map((slot) => (
+                <span key={slot.start.toISOString()} className="border bg-white px-3 py-1.5 text-sm text-slate-700">
+                  {slot.start.toLocaleTimeString("fr-FR", { timeZone: "Africa/Casablanca", hour: "2-digit", minute: "2-digit" })}
+                  {" – "}
+                  {slot.end.toLocaleTimeString("fr-FR", { timeZone: "Africa/Casablanca", hour: "2-digit", minute: "2-digit" })}
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
         {!googleStatus.isLoading && !googleStatus.data?.connected ? (
           <div className="mt-5 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
             {isInterviewAdmin
@@ -270,15 +405,28 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
         ) : null}
         <Button
           type="submit"
-          disabled={createSlot.isPending || googleStatus.isLoading || !googleStatus.data?.connected}
-          title={!googleStatus.data?.connected ? "Google Calendar central n’est pas connecté" : undefined}
+          disabled={
+            createSlot.isPending
+            || googleStatus.isLoading
+            || !googleStatus.data?.connected
+            || (isInterviewAdmin && (availabilitySlots.length === 0 || !!availabilityError))
+          }
+          title={
+            !googleStatus.data?.connected
+              ? "Google Calendar central n’est pas connecté"
+              : isInterviewAdmin && (availabilitySlots.length === 0 || availabilityError)
+                ? availabilityError || "Sélectionnez une disponibilité d’au moins 30 minutes"
+                : undefined
+          }
           className="mt-5 bg-[#4A9B8E] hover:bg-[#3D7A6F]"
         >
           {createSlot.isPending
             ? "Création des liens Meet..."
             : !googleStatus.data?.connected
               ? "Google Calendar non connecté"
-              : `Créer ${repeatCount} créneau(x)`}
+              : isInterviewAdmin
+                ? `Confirmer ${availabilitySlots.length} entretien${availabilitySlots.length > 1 ? "s" : ""}`
+                : `Créer ${repeatCount} créneau(x)`}
         </Button>
       </form>
 

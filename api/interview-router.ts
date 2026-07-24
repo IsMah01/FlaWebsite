@@ -451,6 +451,7 @@ export const interviewRouter = createRouter({
         notes: z.string().trim().max(2000).optional(),
         repeatCount: z.number().int().min(1).max(30).default(1),
         gapMinutes: z.number().int().min(0).max(240).default(0),
+        availabilityMode: z.boolean().default(false),
       }).refine((value) => value.endTime > value.startTime, {
         message: "L’heure de fin doit être après l’heure de début.",
         path: ["endTime"],
@@ -460,15 +461,38 @@ export const interviewRouter = createRouter({
       if (input.startTime.getTime() <= Date.now()) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Le premier créneau doit être dans le futur." });
       }
-      const durationMs = input.endTime.getTime() - input.startTime.getTime();
-      if (durationMs < 5 * 60 * 1000 || durationMs > 4 * 60 * 60 * 1000) {
+      if (input.availabilityMode && ctx.adminUser.role !== "interview_admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Le mode disponibilite est reserve aux mini-admins." });
+      }
+
+      const availabilityDurationMs = input.endTime.getTime() - input.startTime.getTime();
+      if (input.availabilityMode && availabilityDurationMs > 12 * 60 * 60 * 1000) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Une disponibilite ne peut pas depasser 12 heures." });
+      }
+
+      const slotDurationMs = input.availabilityMode
+        ? 30 * 60 * 1000
+        : availabilityDurationMs;
+      if (slotDurationMs < 5 * 60 * 1000 || slotDurationMs > 4 * 60 * 60 * 1000) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "La durée doit être comprise entre 5 minutes et 4 heures." });
       }
-      const planned = Array.from({ length: input.repeatCount }, (_, index) => {
-        const offset = index * (durationMs + input.gapMinutes * 60 * 1000);
+
+      const stepMs = slotDurationMs + input.gapMinutes * 60 * 1000;
+      const generatedCount = input.availabilityMode
+        ? Math.floor((availabilityDurationMs + input.gapMinutes * 60 * 1000) / stepMs)
+        : input.repeatCount;
+      if (generatedCount < 1) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "La disponibilite doit contenir au moins un creneau de 30 minutes." });
+      }
+      if (generatedCount > 30) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Une disponibilite ne peut pas generer plus de 30 creneaux." });
+      }
+
+      const planned = Array.from({ length: generatedCount }, (_, index) => {
+        const offset = index * stepMs;
         return {
           startTime: new Date(input.startTime.getTime() + offset),
-          endTime: new Date(input.endTime.getTime() + offset),
+          endTime: new Date(input.startTime.getTime() + offset + slotDurationMs),
           interviewerName: ctx.adminUser.role === "interview_admin" ? ctx.adminUser.name : input.interviewerName,
           notes: input.notes,
         };
