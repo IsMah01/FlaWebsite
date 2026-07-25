@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FLA Interviews | Future Leaders Foundation</title>
+    <meta
+      name="description"
+      content="FLA Interviews is an interview management platform developed by Future Leaders Foundation for organizing candidate interviews, appointments, Google Calendar events and Google Meet sessions."
+    />
+    <link rel="canonical" href="https://flf.ma/fla-interviews" />
+    <link rel="icon" type="image/png" href="/images/favicon.png" />
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Arial, Tahoma, sans-serif;
+        color: #173f39;
+        background: #f3f8f7;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; line-height: 1.7; }
+      a { color: inherit; }
+      .hero {
+        padding: 72px 20px;
+        color: white;
+        background: linear-gradient(135deg, #173f39, #2f786d 55%, #75c8b8);
+      }
+      .container { width: min(960px, calc(100% - 32px)); margin: auto; }
+      .brand { width: 190px; max-width: 65%; height: auto; }
+      h1 { margin: 28px 0 8px; font-size: clamp(42px, 8vw, 72px); line-height: 1.05; }
+      h2 { margin-top: 0; font-size: clamp(25px, 5vw, 34px); }
+      .lead { max-width: 760px; font-size: 19px; }
+      .content { padding: 50px 0 70px; }
+      .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
+      .card {
+        padding: 25px;
+        border: 1px solid #cfe6e1;
+        border-radius: 16px;
+        background: white;
+        box-shadow: 0 5px 18px rgba(23, 63, 57, .06);
+      }
+      .card h3 { margin-top: 0; color: #245f56; }
+      .arabic {
+        margin-top: 32px;
+        padding: 26px;
+        border-right: 5px solid #4a9b8e;
+        background: #eaf7f4;
+        direction: rtl;
+        text-align: right;
+      }
+      .links { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
+      .links a {
+        padding: 11px 16px;
+        border-radius: 9px;
+        color: white;
+        background: #4a9b8e;
+        font-weight: bold;
+        text-decoration: none;
+      }
+      footer { padding: 24px; text-align: center; color: #dceae7; background: #173f39; }
+      @media (max-width: 680px) { .grid { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <header class="hero">
+      <div class="container">
+        <a href="/" aria-label="Future Leaders Foundation home">
+          <img class="brand" src="/images/logo.png" alt="Future Leaders Foundation logo" />
+        </a>
+        <h1>FLA Interviews</h1>
+        <h2>Interview management by Future Leaders Foundation</h2>
+        <p class="lead">
+          FLA Interviews is an interview management platform developed by
+          Future Leaders Foundation. It helps authorized staff organize candidate
+          interviews, assign interviewers, publish appointments and communicate
+          with selected candidates.
+        </p>
+      </div>
+    </header>
+
+    <main class="container content">
+      <section aria-labelledby="purpose">
+        <h2 id="purpose">Application purpose</h2>
+        <p>
+          The platform allows candidates selected for the oral interview stage to
+          view their assigned interviewer and choose or change an available
+          appointment. Authorized administrators can manage assignments,
+          availability, bookings and interview evaluations.
+        </p>
+      </section>
+
+      <section class="grid" aria-label="FLA Interviews features">
+        <article class="card">
+          <h3>Candidate interviews and appointments</h3>
+          <p>
+            Candidates can select an available interview slot displayed in
+            Morocco time. The platform sends booking confirmations, updates and
+            reminders related to the interview.
+          </p>
+        </article>
+        <article class="card">
+          <h3>Google Calendar and Google Meet</h3>
+          <p>
+            With authorization from a designated administrator, FLA Interviews
+            creates and updates Google Calendar events, generates Google Meet
+            links and manages candidate invitations when appointments change.
+          </p>
+        </article>
+        <article class="card">
+          <h3>Limited Google data use</h3>
+          <p>
+            Google Calendar access is used only to provide the requested
+            interview scheduling service. Google user data is not used for
+            advertising and is not sold.
+          </p>
+        </article>
+        <article class="card">
+          <h3>Security and access control</h3>
+          <p>
+            Administrative features are protected by role-based access. Stored
+            Google authorization tokens are encrypted and may be revoked by
+            disconnecting Calendar or through the Google Account permissions page.
+          </p>
+        </article>
+      </section>
+
+      <section class="arabic" lang="ar">
+        <h2>منصة تدبير المقابلات الشفوية لمؤسسة أطر الغد</h2>
+        <p>
+          تساعد منصة FLA Interviews المؤسسة على تعيين مسؤولي المقابلات، وعرض
+          المواعيد بتوقيت المغرب، وتمكين المرشحين من الحجز، وإنشاء أحداث
+          Google Calendar وروابط Google Meet، وإرسال التأكيدات والتذكيرات.
+        </p>
+      </section>
+
+      <nav class="links" aria-label="Legal and application links">
+        <a href="/">Future Leaders Foundation</a>
+        <a href="/privacy">Privacy Policy</a>
+        <a href="/terms">Terms of Service</a>
+        <a href="/signin">Candidate sign in</a>
+      </nav>
+    </main>
+
+    <footer>
+      © 2026 Future Leaders Foundation — FLA Interviews
+    </footer>
+  </body>
+</html>
