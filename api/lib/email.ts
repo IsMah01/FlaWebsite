@@ -812,6 +812,83 @@ export async function sendInterviewAdminBookingNotificationEmail(input: {
   });
 }
 
+export async function sendCandidateActivationInvitationEmail(input: {
+  to: string;
+  firstName: string;
+  activationToken: string;
+  expiresAt: Date;
+}) {
+  if (!SMTP_HOST || !SMTP_USER) {
+    console.warn("[Email] SMTP not configured. Skipping candidate activation invitation.");
+    return { success: false as const, attempts: 0, reason: "SMTP_NOT_CONFIGURED" };
+  }
+
+  const activationUrl = `${PUBLIC_APP_URL}/activate-candidate?token=${encodeURIComponent(input.activationToken)}`;
+  const safeUrl = escapeEmailHtml(activationUrl);
+  const safeFirstName = escapeEmailHtml(input.firstName);
+  const expiryLabel = new Intl.DateTimeFormat("ar-MA", {
+    timeZone: "Africa/Casablanca",
+    dateStyle: "full",
+    timeStyle: "short",
+  }).format(input.expiresAt);
+  const subject = `دعوة لتفعيل حسابكم والانتقال إلى المقابلة الشفوية - ${AR_ORG}`;
+  const logo = getEmailLogo();
+  const html = `
+    <!doctype html>
+    <html lang="ar" dir="rtl">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width,initial-scale=1">
+        <title>${subject}</title>
+      </head>
+      <body dir="rtl" style="margin:0;padding:0;background:#f2f7f6;font-family:Tahoma,Arial,sans-serif;color:#173f39;">
+        <div style="display:none;max-height:0;overflow:hidden;opacity:0;">فعّلوا حسابكم للانتقال إلى مرحلة المقابلة الشفوية.</div>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f2f7f6;width:100%;">
+          <tr><td align="center" style="padding:24px 12px;">
+            <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:600px;background:#fff;border-radius:16px;overflow:hidden;">
+              <tr><td align="center" style="padding:28px 24px 20px;border-bottom:1px solid #e5eeec;">
+                <img src="${logo.src}" width="190" alt="Future Leaders Foundation" style="display:block;width:190px;max-width:80%;height:auto;border:0;">
+              </td></tr>
+              <tr><td style="padding:32px;text-align:right;font-size:16px;line-height:2;">
+                <p style="margin:0 0 18px;">السلام عليكم ورحمة الله وبركاته،</p>
+                <p style="margin:0 0 18px;">مرحباً ${safeFirstName}،</p>
+                <p style="margin:0 0 18px;">يسرّنا إخباركم بأنه تم ترشيحكم للانتقال إلى <strong>مرحلة المقابلة الشفوية</strong> ضمن أكاديمية أطر الغد.</p>
+                <p style="margin:0 0 18px;">لإتمام قبولكم، يرجى تفعيل حسابكم واختيار كلمة مرور خاصة بكم. لن يظهر اسمكم لمسؤولي المقابلات، ولن تتمكنوا من حجز موعد، إلا بعد إتمام هذه الخطوة.</p>
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:28px auto;"><tr>
+                  <td bgcolor="#4A9B8E" style="border-radius:9px;">
+                    <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:14px 30px;color:#fff;text-decoration:none;font-weight:bold;">تفعيل الحساب واختيار كلمة المرور</a>
+                  </td>
+                </tr></table>
+                <p style="margin:0 0 8px;color:#647c77;font-size:13px;">ينتهي هذا الرابط في: ${expiryLabel} بتوقيت المغرب.</p>
+                <p style="margin:0 0 8px;color:#647c77;font-size:13px;">إذا لم يعمل الزر، انسخوا الرابط التالي:</p>
+                <p dir="ltr" style="margin:0;text-align:left;word-break:break-all;font-size:12px;"><a href="${safeUrl}" style="color:#4A9B8E;">${safeUrl}</a></p>
+              </td></tr>
+              <tr><td align="center" style="padding:20px;background:#173f39;color:#dceae7;font-size:12px;line-height:1.8;">${AR_ORG}<br>Future Leaders Foundation</td></tr>
+            </table>
+          </td></tr>
+        </table>
+      </body>
+    </html>`;
+  const text = [
+    "السلام عليكم ورحمة الله وبركاته،",
+    `مرحباً ${input.firstName}،`,
+    "تم ترشيحكم للانتقال إلى مرحلة المقابلة الشفوية.",
+    "لن يتم اعتمادكم كمرشح مقبول إلا بعد تفعيل الحساب واختيار كلمة المرور.",
+    `رابط التفعيل: ${activationUrl}`,
+    `ينتهي الرابط في ${expiryLabel} بتوقيت المغرب.`,
+    AR_ORG,
+  ].join("\n\n");
+
+  return sendMailWithRetry({
+    from: `"${AR_ORG}" <${SMTP_FROM}>`,
+    to: input.to,
+    subject,
+    html,
+    text,
+    attachments: logo.attachments,
+  });
+}
+
 export async function sendNewsletterEmail(
   to: string,
   subject: string,

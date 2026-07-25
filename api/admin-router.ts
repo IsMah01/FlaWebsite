@@ -1,5 +1,6 @@
 import { z } from "zod";
 import bcrypt from "bcryptjs";
+import crypto from "node:crypto";
 import { and, desc, eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createRouter, adminQuery, superAdminQuery } from "./middleware";
@@ -13,6 +14,34 @@ import {
   newUsers,
   users,
 } from "@db/schema";
+import { sendCandidateActivationInvitationEmail } from "./lib/email";
+
+const CANDIDATE_INVITATION_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000;
+
+function createCandidateInvitationToken() {
+  const token = crypto.randomBytes(32).toString("hex");
+  return {
+    token,
+    hash: crypto.createHash("sha256").update(token).digest("hex"),
+    expiresAt: new Date(Date.now() + CANDIDATE_INVITATION_LIFETIME_MS),
+  };
+}
+
+async function runWithConcurrency<T, R>(
+  values: T[],
+  concurrency: number,
+  worker: (value: T) => Promise<R>,
+) {
+  const results: R[] = new Array(values.length);
+  let cursor = 0;
+  await Promise.all(Array.from({ length: Math.min(concurrency, values.length) }, async () => {
+    while (cursor < values.length) {
+      const index = cursor++;
+      results[index] = await worker(values[index]);
+    }
+  }));
+  return results;
+}
 
 const adminPasswordSchema = z.string()
   .min(8, "Le mot de passe doit contenir au moins 8 caracteres.")
@@ -20,6 +49,247 @@ const adminPasswordSchema = z.string()
   .regex(/[A-Z]/, "Le mot de passe doit contenir une majuscule.");
 
 export const adminRouter = createRouter({
+  importCandidateInvitations: superAdminQuery
+    .input(z.object({
+      rows: z.array(z.object({
+        firstName: z.string().trim().min(1).max(255),
+        lastName: z.string().trim().min(1).max(255),
+        email: z.string().trim().email().max(320),
+        phoneNumber: z.string().trim().max(50).optional().default(""),
+      })).min(1).max(500),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const normalized = input.rows.map((row, index) => ({
+        ...row,
+        email: row.email.toLowerCase(),
+        rowNumber: index + 2,
+      }));
+      const seen = new Set<string>();
+      const results: Array<{
+        rowNumber: number;
+        email: string;
+        status: "created" | "duplicate_file" | "already_registered" | "already_invited" | "failed";
+        message: string;
+        invitationId?: number;
+        token?: string;
+        expiresAt?: Date;
+        firstName?: string;
+      }> = [];
+      const toNotify: Array<{
+        resultIndex: number;
+        invitationId: number;
+        email: string;
+        firstName: string;
+        token: string;
+        expiresAt: Date;
+      }> = [];
+      const pool = getSqlPool();
+
+      for (const row of normalized) {
+        if (seen.has(row.email)) {
+          results.push({
+            rowNumber: row.rowNumber,
+            email: row.email,
+            status: "duplicate_file",
+            message: "Adresse répétée dans le fichier.",
+          });
+          continue;
+        }
+        seen.add(row.email);
+        const [existingAccounts] = await pool.query<any[]>(
+          `SELECT
+             (SELECT id FROM new_users WHERE email = ? LIMIT 1) AS accountId,
+             (SELECT id FROM candidates WHERE email = ? LIMIT 1) AS candidateId,
+             (SELECT id FROM candidate_invitations WHERE email = ? LIMIT 1) AS invitationId,
+             (SELECT status FROM candidate_invitations WHERE email = ? LIMIT 1) AS invitationStatus`,
+          [row.email, row.email, row.email, row.email],
+        );
+        const existing = existingAccounts[0];
+        if (existing.accountId || existing.candidateId) {
+          results.push({
+            rowNumber: row.rowNumber,
+            email: row.email,
+            status: "already_registered",
+            message: "Un compte existe déjà avec cette adresse.",
+          });
+          continue;
+        }
+        if (existing.invitationId && existing.invitationStatus !== "revoked") {
+          results.push({
+            rowNumber: row.rowNumber,
+            email: row.email,
+            status: "already_invited",
+            message: "Une invitation en attente existe déjà.",
+            invitationId: Number(existing.invitationId),
+          });
+          continue;
+        }
+
+        const invitation = createCandidateInvitationToken();
+        try {
+          const [inserted] = existing.invitationStatus === "revoked"
+            ? await pool.execute<any>(
+                `UPDATE candidate_invitations
+                 SET firstName = ?, lastName = ?, phoneNumber = ?, tokenHash = ?,
+                     status = 'pending', expiresAt = ?, invitedByAdminId = ?,
+                     emailSentAt = NULL, emailError = NULL, activatedAt = NULL
+                 WHERE id = ? AND status = 'revoked'`,
+                [
+                  row.firstName,
+                  row.lastName,
+                  row.phoneNumber || "",
+                  invitation.hash,
+                  invitation.expiresAt,
+                  ctx.adminUser.id,
+                  existing.invitationId,
+                ],
+              )
+            : await pool.execute<any>(
+                `INSERT INTO candidate_invitations
+                   (firstName, lastName, email, phoneNumber, tokenHash, expiresAt, invitedByAdminId)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [
+                  row.firstName,
+                  row.lastName,
+                  row.email,
+                  row.phoneNumber || "",
+                  invitation.hash,
+                  invitation.expiresAt,
+                  ctx.adminUser.id,
+                ],
+              );
+          const invitationId = existing.invitationStatus === "revoked"
+            ? Number(existing.invitationId)
+            : inserted.insertId;
+          if (existing.invitationStatus === "revoked" && inserted.affectedRows !== 1) {
+            throw new Error("Invitation state changed during import.");
+          }
+          const resultIndex = results.length;
+          results.push({
+            rowNumber: row.rowNumber,
+            email: row.email,
+            status: "created",
+            message: "Invitation créée.",
+            invitationId,
+            token: invitation.token,
+            expiresAt: invitation.expiresAt,
+            firstName: row.firstName,
+          });
+          toNotify.push({
+            resultIndex,
+            invitationId,
+            email: row.email,
+            firstName: row.firstName,
+            token: invitation.token,
+            expiresAt: invitation.expiresAt,
+          });
+        } catch (error) {
+          results.push({
+            rowNumber: row.rowNumber,
+            email: row.email,
+            status: "failed",
+            message: (error as { code?: string }).code === "ER_DUP_ENTRY"
+              ? "Cette adresse existe déjà."
+              : "Impossible de créer l’invitation.",
+          });
+        }
+      }
+
+      await runWithConcurrency(toNotify, 5, async (entry) => {
+        const emailResult = await sendCandidateActivationInvitationEmail({
+          to: entry.email,
+          firstName: entry.firstName,
+          activationToken: entry.token,
+          expiresAt: entry.expiresAt,
+        });
+        await pool.execute(
+          `UPDATE candidate_invitations
+           SET emailSentAt = ?, emailError = ?
+           WHERE id = ?`,
+          [
+            emailResult.success ? new Date() : null,
+            emailResult.success ? null : (emailResult.reason || "Échec SMTP").slice(0, 2000),
+            entry.invitationId,
+          ],
+        );
+        results[entry.resultIndex].message = emailResult.success
+          ? "Invitation créée et e-mail envoyé."
+          : "Invitation créée, mais l’e-mail n’a pas pu être envoyé.";
+      });
+
+      return {
+        results: results.map(({ token: _token, expiresAt: _expiresAt, firstName: _firstName, ...result }) => result),
+        createdCount: results.filter((result) => result.status === "created").length,
+        emailSentCount: results.filter((result) => result.status === "created" && result.message.includes("envoyé")).length,
+      };
+    }),
+
+  listCandidateInvitations: superAdminQuery.query(async () => {
+    const [rows] = await getSqlPool().query<any[]>(
+      `SELECT id, firstName, lastName, email, phoneNumber, status, expiresAt,
+         emailSentAt, emailError, resendCount, activatedAt, createdAt
+       FROM candidate_invitations
+       ORDER BY createdAt DESC
+       LIMIT 1000`,
+    );
+    return rows;
+  }),
+
+  resendCandidateInvitation: superAdminQuery
+    .input(z.object({ invitationId: z.number().int().positive() }))
+    .mutation(async ({ input, ctx }) => {
+      const pool = getSqlPool();
+      const [rows] = await pool.query<any[]>(
+        `SELECT id, firstName, email, status
+         FROM candidate_invitations WHERE id = ? LIMIT 1`,
+        [input.invitationId],
+      );
+      const current = rows[0];
+      if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Invitation introuvable." });
+      if (current.status !== "pending") {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Cette invitation n’est plus en attente." });
+      }
+      const invitation = createCandidateInvitationToken();
+      const [updated] = await pool.execute<any>(
+        `UPDATE candidate_invitations
+         SET tokenHash = ?, expiresAt = ?, invitedByAdminId = ?,
+             emailSentAt = NULL, emailError = NULL, resendCount = resendCount + 1
+         WHERE id = ? AND status = 'pending'`,
+        [invitation.hash, invitation.expiresAt, ctx.adminUser.id, current.id],
+      );
+      if (updated.affectedRows !== 1) {
+        throw new TRPCError({ code: "CONFLICT", message: "Cette invitation vient d’être activée ou annulée." });
+      }
+      const result = await sendCandidateActivationInvitationEmail({
+        to: current.email,
+        firstName: current.firstName,
+        activationToken: invitation.token,
+        expiresAt: invitation.expiresAt,
+      });
+      await pool.execute(
+        "UPDATE candidate_invitations SET emailSentAt = ?, emailError = ? WHERE id = ?",
+        [
+          result.success ? new Date() : null,
+          result.success ? null : (result.reason || "Échec SMTP").slice(0, 2000),
+          current.id,
+        ],
+      );
+      return { success: true, emailSent: result.success };
+    }),
+
+  revokeCandidateInvitation: superAdminQuery
+    .input(z.object({ invitationId: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      const [result] = await getSqlPool().execute<any>(
+        "UPDATE candidate_invitations SET status = 'revoked' WHERE id = ? AND status = 'pending'",
+        [input.invitationId],
+      );
+      if (result.affectedRows !== 1) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Cette invitation n’est plus en attente." });
+      }
+      return { success: true };
+    }),
+
   createAcceptedTestCandidate: superAdminQuery
     .input(z.object({
       firstName: z.string().trim().min(1).max(255),

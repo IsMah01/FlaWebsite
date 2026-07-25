@@ -308,6 +308,30 @@ export async function ensureDatabaseSchema() {
     await addColumnIfMissing(connection, "interview_reminder_emails", "nextAttemptAt", "nextAttemptAt TIMESTAMP NULL");
 
     await connection.query(`
+      CREATE TABLE IF NOT EXISTS candidate_invitations (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        firstName VARCHAR(255) NOT NULL,
+        lastName VARCHAR(255) NOT NULL,
+        email VARCHAR(320) NOT NULL,
+        phoneNumber VARCHAR(50) NOT NULL DEFAULT '',
+        tokenHash VARCHAR(64) NOT NULL,
+        status ENUM('pending','activated','revoked') NOT NULL DEFAULT 'pending',
+        expiresAt TIMESTAMP NOT NULL,
+        invitedByAdminId INT NOT NULL,
+        emailSentAt TIMESTAMP NULL,
+        emailError TEXT NULL,
+        resendCount INT NOT NULL DEFAULT 0,
+        activatedAt TIMESTAMP NULL,
+        createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY candidate_invitations_email_unique (email),
+        UNIQUE KEY candidate_invitations_token_unique (tokenHash),
+        INDEX candidate_invitations_status_idx (status),
+        INDEX candidate_invitations_expiry_idx (expiresAt)
+      )
+    `);
+
+    await connection.query(`
       CREATE TABLE IF NOT EXISTS google_calendar_connections (
         id INT PRIMARY KEY,
         encryptedRefreshToken TEXT NOT NULL,

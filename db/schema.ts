@@ -106,6 +106,31 @@ export const candidates = mysqlTable("candidates", {
 export type Candidate = typeof candidates.$inferSelect;
 export type InsertCandidate = typeof candidates.$inferInsert;
 
+export const candidateInvitations = mysqlTable("candidate_invitations", {
+  id: int("id").autoincrement().primaryKey(),
+  firstName: varchar("firstName", { length: 255 }).notNull(),
+  lastName: varchar("lastName", { length: 255 }).notNull(),
+  email: varchar("email", { length: 320 }).notNull().unique(),
+  phoneNumber: varchar("phoneNumber", { length: 50 }).default("").notNull(),
+  tokenHash: varchar("tokenHash", { length: 64 }).notNull().unique(),
+  status: mysqlEnum("status", ["pending", "activated", "revoked"])
+    .default("pending")
+    .notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  invitedByAdminId: int("invitedByAdminId").notNull(),
+  emailSentAt: timestamp("emailSentAt"),
+  emailError: text("emailError"),
+  resendCount: int("resendCount").default(0).notNull(),
+  activatedAt: timestamp("activatedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt")
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
+});
+
+export type CandidateInvitation = typeof candidateInvitations.$inferSelect;
+
 export const interviewSlots = mysqlTable("interview_slots", {
   id: int("id").autoincrement().primaryKey(),
   startTime: timestamp("startTime").notNull(),

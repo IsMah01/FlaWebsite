@@ -863,9 +863,14 @@ export default function AdminDashboard() {
             المشتركين في النشرة
           </Button>
           {isSuperAdmin ? (
-            <Link to="/admin/mini-admins">
-              <Button variant="outline"><UserCog className="ml-2 h-4 w-4" /> Mini-admins entretiens</Button>
-            </Link>
+            <>
+              <Link to="/admin/candidate-invitations">
+                <Button variant="outline"><Users className="ml-2 h-4 w-4" /> Import et activation des candidats</Button>
+              </Link>
+              <Link to="/admin/mini-admins">
+                <Button variant="outline"><UserCog className="ml-2 h-4 w-4" /> Mini-admins entretiens</Button>
+              </Link>
+            </>
           ) : null}
         </nav>
 

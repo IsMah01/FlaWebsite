@@ -20,6 +20,8 @@ import AdminMiniAdminsPage from "./pages/AdminMiniAdminsPage";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import FlaInterviews from "./pages/FlaInterviews";
+import ActivateCandidate from "./pages/ActivateCandidate";
+import AdminCandidateInvitationsPage from "./pages/AdminCandidateInvitationsPage";
 import ScrollManager from "./components/ScrollManager";
 import { useViewerSession } from "./hooks/useViewerSession";
 
@@ -49,6 +51,7 @@ export default function App() {
           }
         />
         <Route path="/confirm-email" element={<ConfirmEmail />} />
+        <Route path="/activate-candidate" element={<ActivateCandidate />} />
         <Route path="/forgot-password" element={<ForgotPassword accountType="candidate" />} />
         <Route path="/reset-password" element={<ResetPassword accountType="candidate" />} />
         <Route path="/edition/:id" element={<EditionDetail />} />
@@ -63,6 +66,7 @@ export default function App() {
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/admin/interviews" element={<AdminInterviewsPage />} />
         <Route path="/admin/mini-admins" element={<AdminMiniAdminsPage />} />
+        <Route path="/admin/candidate-invitations" element={<AdminCandidateInvitationsPage />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/admin/forgot-password" element={<ForgotPassword accountType="admin" />} />
         <Route path="/admin/reset-password" element={<ResetPassword accountType="admin" />} />

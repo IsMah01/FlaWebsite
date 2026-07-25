@@ -47,7 +47,6 @@ export default function AdminMiniAdminsPage() {
     enabled: isSuperAdmin,
     retry: false,
   });
-
   const createAdmin = trpc.admin.createInterviewAdmin.useMutation({
     onSuccess: async () => {
       toast.success("Mini-admin créé");

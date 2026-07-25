@@ -2,11 +2,11 @@ import { z } from "zod";
 import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createRouter, publicQuery } from "./middleware";
-import { getDb } from "./queries/connection";
-import { candidates, newUsers } from "@db/schema";
+import { getDb, getSqlPool } from "./queries/connection";
+import { candidateInvitations, candidates, newUsers } from "@db/schema";
 import { sendConfirmationEmail, sendPasswordResetEmail } from "./lib/email";
 import { upsertUser } from "./queries/users";
 import { getClientIp, rateLimitOrThrow, securityLog } from "./lib/abuse-protection";
@@ -94,7 +94,10 @@ async function enforceAuthRateLimit(options: {
 }
 
 const passwordPolicyMessage = "يجب أن تتكون كلمة المرور من 8 أحرف على الأقل وأن تحتوي على حرف كبير واحد على الأقل.";
-const strongPasswordSchema = z.string().regex(/^(?=.*[A-Z]).{8,}$/, passwordPolicyMessage);
+const strongPasswordSchema = z.string()
+  .min(8, passwordPolicyMessage)
+  .max(128, passwordPolicyMessage)
+  .regex(/[A-Z]/, passwordPolicyMessage);
 
 export function requireCandidateSession(cookieHeader: string) {
   const token = readCandidateToken(cookieHeader);
@@ -134,6 +137,124 @@ const newUserBaseSelection = {
 };
 
 export const candidateAuthRouter = createRouter({
+  candidateInvitation: publicQuery
+    .input(z.object({ token: z.string().min(32).max(256) }))
+    .query(async ({ input }) => {
+      const tokenHash = crypto.createHash("sha256").update(input.token).digest("hex");
+      const [rows] = await getSqlPool().query<any[]>(
+        `SELECT firstName, lastName, email, status, expiresAt
+         FROM candidate_invitations
+         WHERE tokenHash = ?
+         LIMIT 1`,
+        [tokenHash],
+      );
+      const invitation = rows[0];
+      if (!invitation || invitation.status !== "pending") {
+        throw new TRPCError({ code: "NOT_FOUND", message: "رابط التفعيل غير صالح أو تم استعماله من قبل." });
+      }
+      if (new Date(invitation.expiresAt).getTime() <= Date.now()) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "انتهت صلاحية رابط التفعيل. يرجى طلب إعادة إرسال الدعوة." });
+      }
+      return {
+        firstName: invitation.firstName,
+        lastName: invitation.lastName,
+        email: invitation.email,
+        expiresAt: invitation.expiresAt,
+      };
+    }),
+
+  activateCandidateInvitation: publicQuery
+    .input(z.object({
+      token: z.string().min(32).max(256),
+      password: strongPasswordSchema,
+      confirmPassword: z.string(),
+    }).refine((value) => value.password === value.confirmPassword, {
+      message: "كلمتا المرور غير متطابقتين.",
+      path: ["confirmPassword"],
+    }))
+    .mutation(async ({ input }) => {
+      const tokenHash = crypto.createHash("sha256").update(input.token).digest("hex");
+      const connection = await getSqlPool().getConnection();
+      try {
+        await connection.beginTransaction();
+        const [rows] = await connection.query<any[]>(
+          `SELECT id, firstName, lastName, email, phoneNumber, status, expiresAt
+           FROM candidate_invitations
+           WHERE tokenHash = ?
+           LIMIT 1 FOR UPDATE`,
+          [tokenHash],
+        );
+        const invitation = rows[0];
+        if (!invitation || invitation.status !== "pending") {
+          throw new TRPCError({ code: "NOT_FOUND", message: "رابط التفعيل غير صالح أو تم استعماله من قبل." });
+        }
+        if (new Date(invitation.expiresAt).getTime() <= Date.now()) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "انتهت صلاحية رابط التفعيل. يرجى التواصل مع الإدارة." });
+        }
+        const [existing] = await connection.query<any[]>(
+          `SELECT
+             (SELECT id FROM new_users WHERE email = ? LIMIT 1) AS accountId,
+             (SELECT id FROM candidates WHERE email = ? LIMIT 1) AS candidateId`,
+          [invitation.email, invitation.email],
+        );
+        if (existing[0]?.accountId || existing[0]?.candidateId) {
+          throw new TRPCError({ code: "CONFLICT", message: "يوجد حساب مسجل مسبقاً بهذا البريد الإلكتروني." });
+        }
+
+        const passwordHash = await bcrypt.hash(input.password, 12);
+        const [accountResult] = await connection.execute<any>(
+          `INSERT INTO new_users
+             (firstName, lastName, studyStatus, phoneNumber, email, password,
+              emailConfirmed, newsletterConsent)
+           VALUES (?, ?, 'other', ?, ?, ?, true, false)`,
+          [
+            invitation.firstName,
+            invitation.lastName,
+            invitation.phoneNumber || "",
+            invitation.email,
+            passwordHash,
+          ],
+        );
+        await connection.execute(
+          `INSERT INTO candidates
+             (newUserId, firstName, lastName, studyStatus, phoneNumber, email,
+              password, emailConfirmed, newsletterConsent, applicationStatus,
+              questionnaireAnswers, adminNote)
+           VALUES (?, ?, ?, 'other', ?, ?, ?, true, false, 'accepted', ?, ?)`,
+          [
+            accountResult.insertId,
+            invitation.firstName,
+            invitation.lastName,
+            invitation.phoneNumber || "",
+            invitation.email,
+            passwordHash,
+            JSON.stringify([]),
+            "Candidat accepté après activation d’une invitation importée.",
+          ],
+        );
+        await connection.execute(
+          `UPDATE candidate_invitations
+           SET status = 'activated', activatedAt = CURRENT_TIMESTAMP, tokenHash = ?
+           WHERE id = ?`,
+          [crypto.randomBytes(32).toString("hex"), invitation.id],
+        );
+        await connection.commit();
+        return {
+          success: true,
+          email: invitation.email,
+          message: "تم تفعيل حسابكم وقبولكم بنجاح. يمكنكم الآن تسجيل الدخول.",
+        };
+      } catch (error) {
+        await connection.rollback().catch(() => null);
+        if ((error as { code?: string }).code === "ER_DUP_ENTRY") {
+          throw new TRPCError({ code: "CONFLICT", message: "يوجد حساب مسجل مسبقاً بهذا البريد الإلكتروني." });
+        }
+        throw error;
+      } finally {
+        connection.release();
+      }
+    }),
+
   register: publicQuery
     .input(
       z
@@ -392,6 +513,20 @@ export const candidateAuthRouter = createRouter({
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "رابط إعادة تعيين كلمة المرور غير صالح أو منتهي الصلاحية",
+        });
+      }
+      const pendingInvitation = await db
+        .select({ id: candidateInvitations.id })
+        .from(candidateInvitations)
+        .where(and(
+          eq(candidateInvitations.email, normalizedEmail),
+          eq(candidateInvitations.status, "pending"),
+        ))
+        .limit(1);
+      if (pendingInvitation.length > 0) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "تمت دعوتكم مسبقاً. يرجى استعمال رابط التفعيل المرسل إلى بريدكم الإلكتروني بدلاً من إنشاء حساب جديد.",
         });
       }
 
