@@ -6,6 +6,7 @@ import {
   Save,
   ShieldCheck,
   UserCog,
+  UserRoundCheck,
   UserPlus,
 } from "lucide-react";
 import { Link, Navigate } from "react-router";
@@ -29,6 +30,11 @@ export default function AdminMiniAdminsPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [candidateFirstName, setCandidateFirstName] = useState("");
+  const [candidateLastName, setCandidateLastName] = useState("");
+  const [candidateEmail, setCandidateEmail] = useState("");
+  const [candidatePhone, setCandidatePhone] = useState("");
+  const [candidatePassword, setCandidatePassword] = useState("");
   const [drafts, setDrafts] = useState<Record<number, AdminDraft>>({});
   const utils = trpc.useUtils();
   const admins = trpc.admin.listInterviewAdmins.useQuery(undefined, {
@@ -47,6 +53,19 @@ export default function AdminMiniAdminsPage() {
     onError: (error) =>
       toast.error(error.message || "Impossible de créer le mini-admin"),
   });
+  const createTestCandidate =
+    trpc.admin.createAcceptedTestCandidate.useMutation({
+      onSuccess: () => {
+        toast.success("Candidat de test créé et accepté");
+        setCandidateFirstName("");
+        setCandidateLastName("");
+        setCandidateEmail("");
+        setCandidatePhone("");
+        setCandidatePassword("");
+      },
+      onError: (error) =>
+        toast.error(error.message || "Impossible de créer ce candidat"),
+    });
   const updateAdmin = trpc.admin.updateInterviewAdmin.useMutation({
     onSuccess: async (_, variables) => {
       toast.success("Compte mis à jour");
@@ -182,6 +201,99 @@ export default function AdminMiniAdminsPage() {
               Créer le compte
             </Button>
           </form>
+        </section>
+
+        <section className="border bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-3">
+            <UserRoundCheck className="h-5 w-5 text-[#4A9B8E]" />
+            <div>
+              <h2 className="font-bold">Créer un candidat accepté</h2>
+              <p className="text-sm text-slate-500">
+                Compte de test immédiatement utilisable, sans formulaire ni
+                confirmation par e-mail.
+              </p>
+            </div>
+          </div>
+          <form
+            className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              createTestCandidate.mutate({
+                firstName: candidateFirstName,
+                lastName: candidateLastName,
+                email: candidateEmail,
+                phoneNumber: candidatePhone,
+                password: candidatePassword,
+              });
+            }}
+          >
+            <div className="space-y-2">
+              <Label htmlFor="candidate-first-name">Prénom</Label>
+              <Input
+                id="candidate-first-name"
+                value={candidateFirstName}
+                onChange={(event) => setCandidateFirstName(event.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="candidate-last-name">Nom</Label>
+              <Input
+                id="candidate-last-name"
+                value={candidateLastName}
+                onChange={(event) => setCandidateLastName(event.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="candidate-phone">Téléphone</Label>
+              <Input
+                id="candidate-phone"
+                type="tel"
+                value={candidatePhone}
+                onChange={(event) => setCandidatePhone(event.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="candidate-email">E-mail de connexion</Label>
+              <Input
+                id="candidate-email"
+                type="email"
+                value={candidateEmail}
+                onChange={(event) => setCandidateEmail(event.target.value)}
+                autoComplete="off"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="candidate-password">Mot de passe</Label>
+              <Input
+                id="candidate-password"
+                type="password"
+                value={candidatePassword}
+                onChange={(event) => setCandidatePassword(event.target.value)}
+                autoComplete="new-password"
+                minLength={8}
+                pattern="(?=.*[A-Z]).{8,}"
+                title="8 caractères minimum, dont une majuscule"
+                required
+              />
+            </div>
+            <Button
+              className="self-end bg-[#4A9B8E] hover:bg-[#3D7A6F]"
+              disabled={createTestCandidate.isPending}
+            >
+              <UserRoundCheck className="mr-2 h-4 w-4" />
+              {createTestCandidate.isPending
+                ? "Création..."
+                : "Créer et accepter"}
+            </Button>
+          </form>
+          <p className="mt-4 text-xs text-slate-500">
+            Le candidat pourra se connecter sur /signin avec ces identifiants
+            et accéder directement à son espace entretien.
+          </p>
         </section>
 
         <section className="border bg-white shadow-sm">

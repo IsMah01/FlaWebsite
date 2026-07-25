@@ -20,6 +20,67 @@ const adminPasswordSchema = z.string()
   .regex(/[A-Z]/, "Le mot de passe doit contenir une majuscule.");
 
 export const adminRouter = createRouter({
+  createAcceptedTestCandidate: superAdminQuery
+    .input(z.object({
+      firstName: z.string().trim().min(1).max(255),
+      lastName: z.string().trim().min(1).max(255),
+      email: z.string().trim().email().max(320),
+      phoneNumber: z.string().trim().min(1).max(50),
+      password: adminPasswordSchema,
+    }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const email = input.email.toLowerCase();
+      const [existingAccount] = await db
+        .select({ id: newUsers.id })
+        .from(newUsers)
+        .where(eq(newUsers.email, email))
+        .limit(1);
+      const [existingCandidate] = await db
+        .select({ id: candidates.id })
+        .from(candidates)
+        .where(eq(candidates.email, email))
+        .limit(1);
+
+      if (existingAccount || existingCandidate) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "Un compte candidat existe déjà avec cet e-mail.",
+        });
+      }
+
+      const passwordHash = await bcrypt.hash(input.password, 12);
+      const result = await db.transaction(async (tx) => {
+        const [account] = await tx.insert(newUsers).values({
+          firstName: input.firstName,
+          lastName: input.lastName,
+          studyStatus: "other",
+          phoneNumber: input.phoneNumber,
+          email,
+          password: passwordHash,
+          emailConfirmed: true,
+          newsletterConsent: false,
+        });
+        const [candidate] = await tx.insert(candidates).values({
+          newUserId: account.insertId,
+          firstName: input.firstName,
+          lastName: input.lastName,
+          studyStatus: "other",
+          phoneNumber: input.phoneNumber,
+          email,
+          password: passwordHash,
+          emailConfirmed: true,
+          newsletterConsent: false,
+          applicationStatus: "accepted",
+          questionnaireAnswers: JSON.stringify([]),
+          adminNote: "Compte de test créé par le super-admin.",
+        });
+        return { accountId: account.insertId, candidateId: candidate.insertId };
+      });
+
+      return { success: true, ...result };
+    }),
+
   listInterviewAdmins: superAdminQuery.query(async () => {
     const [rows] = await getSqlPool().query<any[]>(`
       SELECT admins.id, admins.name, admins.email, admins.isActive, admins.createdAt,
