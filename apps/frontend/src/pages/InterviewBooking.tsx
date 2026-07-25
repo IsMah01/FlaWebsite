@@ -150,20 +150,47 @@ export default function InterviewBooking() {
     setNow(Date.now());
   }, [overview.data?.serverNow]);
 
-  if (isLoading) return <div className="min-h-screen bg-[#F8FAF9]" />;
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#F8FAF9]">
+        <Loader2 className="h-10 w-10 animate-spin text-[#4A9B8E]" />
+      </div>
+    );
+  }
 
-  if (!viewer || !isAcceptedCandidate) {
+  if (!viewer) {
     return (
       <div className="min-h-screen bg-[#F8FAF9]" dir="rtl">
         <Navbar />
         <main className="mx-auto max-w-2xl px-4 pb-20 pt-32 text-center">
           <ShieldCheck className="mx-auto h-14 w-14 text-[#4A9B8E]" />
-          <h1 className="mt-5 text-2xl font-bold text-gray-900">فضاء المقابلات الشفوية</h1>
-          <p className="mt-3 leading-7 text-gray-600">هذه الصفحة متاحة فقط للمترشحين الذين تم قبول ملفاتهم.</p>
-          <Link to={viewer ? "/" : "/signin"}>
+          <h1 className="mt-5 text-2xl font-bold text-gray-900">تسجيل الدخول مطلوب</h1>
+          <p className="mt-3 leading-7 text-gray-600">
+            يرجى تسجيل الدخول بحساب المترشح لفتح فضاء المقابلة. بعد تسجيل الدخول ستعودون تلقائياً إلى هذه الصفحة.
+          </p>
+          <Link to="/signin?redirect=/interview">
             <Button className="mt-7 bg-[#4A9B8E] hover:bg-[#3D7A6F]">
-              {viewer ? "العودة إلى الرئيسية" : "تسجيل الدخول"}
+              تسجيل الدخول إلى حساب المترشح
             </Button>
+          </Link>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (!isAcceptedCandidate) {
+    return (
+      <div className="min-h-screen bg-[#F8FAF9]" dir="rtl">
+        <Navbar />
+        <main className="mx-auto max-w-2xl px-4 pb-20 pt-32 text-center">
+          <ShieldCheck className="mx-auto h-14 w-14 text-[#4A9B8E]" />
+          <h1 className="mt-5 text-2xl font-bold text-gray-900">فضاء خاص بالمترشحين المقبولين</h1>
+          <p className="mt-3 leading-7 text-gray-600">
+            هذه الصفحة مخصصة فقط للمترشحين الذين تم قبولهم للانتقال إلى مرحلة المقابلة الشفوية عبر الفيديو.
+          </p>
+          <Link to="/">
+            <Button className="mt-7 bg-[#4A9B8E] hover:bg-[#3D7A6F]">العودة إلى الصفحة الرئيسية</Button>
           </Link>
         </main>
         <Footer />
@@ -206,6 +233,9 @@ export default function InterviewBooking() {
           <h1 className="mt-4 text-3xl font-bold">اختيار موعد المقابلة الشفوية</h1>
           <p className="mt-3 max-w-3xl leading-8 text-white/90">
             تهانينا على قبول ملفكم. اختاروا الموعد المناسب، ويمكنكم تغييره لاحقًا ما دام الموعد الجديد متاحًا.
+          </p>
+          <p className="mt-2 max-w-3xl text-sm leading-7 text-white/80">
+            يجب حجز الموعد أو تغييره قبل بداية المقابلة بـ15 دقيقة على الأقل.
           </p>
         </section>
 
@@ -376,7 +406,7 @@ export default function InterviewBooking() {
               ) : (
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 font-semibold text-gray-800">{selectedSlot ? formatInterviewDate(selectedSlot.startTime) : ""}</div>
               )}
-              <p>{booking?.status === "scheduled" ? "سيتم إلغاء دعوتك السابقة وإرسال دعوة Google Calendar جديدة." : "سيتم حجز هذا الموعد وإرسال دعوة Google Calendar إليك."}</p>
+              <p>{booking?.status === "scheduled" ? "سيتم إلغاء موعدك السابق وإرسال رسالة تأكيد جديدة عبر البريد الإلكتروني." : "سيتم حجز هذا الموعد وإرسال رسالة تأكيد عبر البريد الإلكتروني."}</p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="sm:flex-row-reverse sm:justify-start">

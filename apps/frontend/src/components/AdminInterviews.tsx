@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, CalendarPlus, Camera, Clock3, Coffee, ExternalLink, Link2, Save, Trash2, UserCheck, UserRound, Users } from "lucide-react";
+import { AlertCircle, CalendarPlus, Camera, Clock3, Coffee, ExternalLink, Link2, Save, Trash2, UserCheck, UserRound, Users, Video } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -73,7 +73,10 @@ function EvaluationForm({ slot }: { slot: any }) {
   const save = trpc.interview.saveEvaluation.useMutation({
     onSuccess: async () => {
       toast.success("Évaluation enregistrée");
-      await utils.interview.adminList.invalidate();
+      await Promise.all([
+        utils.interview.adminList.invalidate(),
+        utils.interview.upcomingInterviews.invalidate(),
+      ]);
     },
     onError: (error) => toast.error(error.message || "Impossible d’enregistrer l’évaluation"),
   });
@@ -150,7 +153,12 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
   const [profileInitialized, setProfileInitialized] = useState(false);
   const profileImageInput = useRef<HTMLInputElement>(null);
   const utils = trpc.useUtils();
-  const slots = trpc.interview.adminList.useQuery(undefined, { enabled, retry: false });
+  const slots = trpc.interview.adminList.useQuery(undefined, { enabled, retry: false, refetchInterval: 30000 });
+  const upcomingInterviews = trpc.interview.upcomingInterviews.useQuery(undefined, {
+    enabled,
+    retry: false,
+    refetchInterval: 30000,
+  });
   const assignmentCandidates = trpc.interview.assignmentCandidates.useQuery(undefined, { enabled, retry: false });
   const assignmentAdmins = trpc.interview.assignmentAdmins.useQuery(undefined, { enabled: enabled && isSuperAdmin, retry: false });
   const assignmentAdminStats = trpc.interview.assignmentAdminStats.useQuery(undefined, { enabled: enabled && isSuperAdmin, retry: false });
@@ -177,6 +185,7 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
       setNotes("");
       await Promise.all([
         utils.interview.adminList.invalidate(),
+        utils.interview.upcomingInterviews.invalidate(),
         utils.interview.recentAudit.invalidate(),
       ]);
     },
@@ -189,7 +198,10 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
       } else {
         toast.success("État mis à jour");
       }
-      await utils.interview.adminList.invalidate();
+      await Promise.all([
+        utils.interview.adminList.invalidate(),
+        utils.interview.upcomingInterviews.invalidate(),
+      ]);
     },
     onError: (error) => toast.error(error.message || "Impossible de modifier l’état"),
   });
@@ -211,7 +223,10 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
   const deleteOwnSlot = trpc.interview.deleteOwnSlot.useMutation({
     onSuccess: async (result) => {
       toast.success(result.deleted ? "Créneau supprimé" : "Créneau annulé et candidat prévenu");
-      await utils.interview.adminList.invalidate();
+      await Promise.all([
+        utils.interview.adminList.invalidate(),
+        utils.interview.upcomingInterviews.invalidate(),
+      ]);
     },
     onError: (error) => toast.error(error.message || "Impossible de supprimer le créneau"),
   });
@@ -260,12 +275,30 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
     },
     onError: (error) => toast.error(error.message || "Impossible de réattribuer ce candidat"),
   });
+  const cancelCandidateBooking = trpc.interview.cancelCandidateBooking.useMutation({
+    onSuccess: async (result) => {
+      if (result.emailSent) {
+        toast.success("Réservation annulée et candidat prévenu");
+      } else {
+        toast.warning("Réservation annulée, mais l’e-mail au candidat n’a pas pu être envoyé");
+      }
+      await Promise.all([
+        utils.interview.assignmentCandidates.invalidate(),
+        utils.interview.adminList.invalidate(),
+        utils.interview.upcomingInterviews.invalidate(),
+        utils.interview.assignmentAdminStats.invalidate(),
+        utils.interview.recentAudit.invalidate(),
+      ]);
+    },
+    onError: (error) => toast.error(error.message || "Impossible d’annuler cette réservation"),
+  });
   const bulkRemoveSlots = trpc.interview.bulkRemoveSlots.useMutation({
     onSuccess: async (result) => {
       toast.success(`${result.deletedCount} supprimé(s), ${result.cancelledCount} annulé(s)`);
       setSelectedSlotIds([]);
       await Promise.all([
         utils.interview.adminList.invalidate(),
+        utils.interview.upcomingInterviews.invalidate(),
         utils.interview.assignmentAdminStats.invalidate(),
         utils.interview.recentAudit.invalidate(),
       ]);
@@ -483,6 +516,47 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
         <div className="rounded-xl border bg-white p-4"><p className="text-sm text-slate-500">Réservés</p><p className="mt-1 text-2xl font-bold">{(slots.data ?? []).filter((slot) => slot.bookingId).length}</p></div>
         <div className="rounded-xl border bg-white p-4"><p className="text-sm text-slate-500">Disponibles</p><p className="mt-1 text-2xl font-bold">{(slots.data ?? []).filter((slot) => !slot.bookingId && slot.status === "scheduled").length}</p></div>
       </section>
+
+      <section className="rounded-2xl border border-[#4A9B8E]/30 bg-white p-5 shadow-sm">
+        <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+          <div>
+            <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900">
+              <Video className="h-5 w-5 text-[#4A9B8E]" />
+              Prochains entretiens réservés
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Accès direct aux rendez-vous confirmés, sans chercher dans la liste des créneaux.
+            </p>
+          </div>
+          <span className="rounded-full bg-[#4A9B8E]/10 px-3 py-1 text-sm font-semibold text-[#3D7A6F]">
+            {upcomingInterviews.data?.length ?? 0} à venir
+          </span>
+        </div>
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          {(upcomingInterviews.data ?? []).map((interview) => (
+            <article key={interview.id} className="flex flex-col gap-4 rounded-xl border bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-bold text-slate-900">
+                  {interview.candidateFirstName} {interview.candidateLastName}
+                </p>
+                <p className="mt-1 text-sm font-medium text-[#3D7A6F]">{formatDate(interview.startTime)}</p>
+                <p className="mt-1 text-xs text-slate-500">{interview.candidateEmail}</p>
+              </div>
+              <a href={interview.meetingUrl} target="_blank" rel="noreferrer">
+                <Button type="button" className="w-full bg-[#4A9B8E] hover:bg-[#3D7A6F] sm:w-auto">
+                  <Video className="mr-2 h-4 w-4" /> Rejoindre le Meet
+                </Button>
+              </a>
+            </article>
+          ))}
+        </div>
+        {!upcomingInterviews.isLoading && (upcomingInterviews.data?.length ?? 0) === 0 ? (
+          <p className="mt-4 rounded-lg bg-slate-50 p-5 text-center text-sm text-slate-500">
+            Aucun entretien réservé à venir.
+          </p>
+        ) : null}
+      </section>
+
       {isInterviewAdmin ? (
         <section className={`border p-4 ${missingSlotCount > 0 ? "border-amber-300 bg-amber-50" : "border-emerald-200 bg-emerald-50"}`}>
           <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
@@ -711,21 +785,54 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
                     {(!isInterviewAdmin || candidateView === "mine") ? (
                       <td className="p-3">
                         {isSuperAdmin ? (
-                          <select
-                            className="h-9 min-w-44 rounded-md border bg-white px-2 text-sm"
-                            value={candidate.assignedAdminId || ""}
-                            disabled={!!candidate.bookingId || reassignCandidate.isPending}
-                            title={candidate.bookingId ? "Réattribution impossible après réservation" : undefined}
-                            onChange={(event) => {
-                              const targetAdminId = Number(event.target.value);
-                              if (targetAdminId && window.confirm(`Affecter ${candidate.firstName} ${candidate.lastName} à ce mini-admin ?`)) {
-                                reassignCandidate.mutate({ candidateId: candidate.id, targetAdminId });
-                              }
-                            }}
-                          >
-                            <option value="">Non affecté</option>
-                            {(assignmentAdmins.data ?? []).filter((admin) => admin.isActive).map((admin) => <option key={admin.id} value={admin.id}>{admin.name}</option>)}
-                          </select>
+                          <div className="min-w-64 space-y-2">
+                            <select
+                              className="h-9 min-w-44 rounded-md border bg-white px-2 text-sm"
+                              value={candidate.assignedAdminId || ""}
+                              disabled={!!candidate.bookingId || reassignCandidate.isPending}
+                              title={candidate.bookingId ? "Annulez d’abord la réservation pour réattribuer le candidat" : undefined}
+                              onChange={(event) => {
+                                const targetAdminId = Number(event.target.value);
+                                if (targetAdminId && window.confirm(`Affecter ${candidate.firstName} ${candidate.lastName} à ce mini-admin ?`)) {
+                                  reassignCandidate.mutate({ candidateId: candidate.id, targetAdminId });
+                                }
+                              }}
+                            >
+                              <option value="">Non affecté</option>
+                              {(assignmentAdmins.data ?? []).filter((admin) => admin.isActive).map((admin) => <option key={admin.id} value={admin.id}>{admin.name}</option>)}
+                            </select>
+                            {candidate.bookingId ? (
+                              <div className="rounded-lg border border-blue-200 bg-blue-50 p-2 text-xs text-blue-900">
+                                <p className="font-semibold">Rendez-vous réservé</p>
+                                {candidate.bookingStartTime ? <p className="mt-1">{formatDate(candidate.bookingStartTime)}</p> : null}
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {candidate.bookingMeetingUrl ? (
+                                    <a href={candidate.bookingMeetingUrl} target="_blank" rel="noreferrer">
+                                      <Button type="button" size="sm" variant="outline" className="h-8 bg-white">
+                                        <Video className="mr-1 h-3.5 w-3.5" /> Ouvrir Meet
+                                      </Button>
+                                    </a>
+                                  ) : null}
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="destructive"
+                                    className="h-8"
+                                    disabled={cancelCandidateBooking.isPending}
+                                    onClick={() => {
+                                      if (window.confirm(
+                                        `Annuler la réservation de ${candidate.firstName} ${candidate.lastName} ? Le candidat sera prévenu et devra choisir un nouveau créneau.`,
+                                      )) {
+                                        cancelCandidateBooking.mutate({ candidateId: candidate.id });
+                                      }
+                                    }}
+                                  >
+                                    Annuler la réservation
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
                         ) : candidate.assignedAdminName
                           ? <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-800">{candidate.assignedAdminName}</span>
                           : <span className="text-slate-400">Non affecté</span>}

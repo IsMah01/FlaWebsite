@@ -294,7 +294,7 @@ async function setCandidateAttendance(eventId: string, candidateEmail: string, a
     : [];
   if (attending) attendees.push({ email: candidateEmail });
   await googleCalendarRequest(
-    `${path}?sendUpdates=all`,
+    `${path}?sendUpdates=none`,
     {
       method: "PATCH",
       body: JSON.stringify({ attendees }),
@@ -309,7 +309,7 @@ export async function removeCandidateFromGoogleEvent(eventId: string, candidateE
 export async function deleteGoogleCalendarEvent(eventId: string) {
   const calendarId = encodeURIComponent(requireOAuthConfig().calendarId);
   try {
-    await googleCalendarRequest(`/calendars/${calendarId}/events/${encodeURIComponent(eventId)}?sendUpdates=all`, {
+    await googleCalendarRequest(`/calendars/${calendarId}/events/${encodeURIComponent(eventId)}?sendUpdates=none`, {
       method: "DELETE",
     });
   } catch (error) {

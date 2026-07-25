@@ -418,11 +418,30 @@ export async function sendInterviewUpdateEmail(
 
   const messages = {
     assigned: {
-      eyebrow: "تهانينا!",
-      subject: "تم اختيارك للانتقال إلى مرحلة المقابلة الشفوية",
-      title: "لقد تم قبول طلبك للانتقال إلى مرحلة المقابلة",
-      body: "يسرّ مؤسسة أطر الغد إخبارك بأنه تم اختيارك للانتقال إلى مرحلة المقابلة الشفوية عبر الفيديو. يرجى الدخول إلى فضاء المقابلة واختيار الموعد الذي يناسبك من بين المواعيد المتاحة.",
-      note: "هذه المرحلة جزء من مسار الانتقاء، ولا تعني القبول النهائي في البرنامج.",
+      eyebrow: "نتيجة الانتقاء الأولي",
+      subject: "تهانينا، لقد اجتزتم بنجاح مرحلة الانتقاء الأولي",
+      title: "الانتقال إلى مرحلة المقابلة الشفوية",
+      body: "يسرّنا أن نخبركم أنكم قد اجتزتم بنجاح مرحلة الانتقاء الأولي بعد دراسة استمارة ترشحكم، ووقع عليكم الاختيار للانتقال إلى المقابلة الشفوية ضمن مراحل المشاركة بأكاديمية أطر الغد في دورتها الثامنة عشر.\n\nنشكر لكم حرصكم واهتمامكم، والوقت الذي خصصتموه للإجابة عن الاستمارة، وما لمسناه من طموح وجدية ورغبة صادقة في خوض هذه التجربة.\n\nوتُعدّ المقابلة الشفوية محطة أساسية في مسار الانتقاء، تتيح لنا التعرف عليكم بشكل أعمق، والاستماع إلى أفكاركم ودوافعكم للمشاركة في الأكاديمية.\n\nلتحديد موعد المقابلة المناسب لكم، المرجو الاطلاع على الرابط التالي.",
+      bodyHtml: `
+        <p style="margin:0 0 18px;font-size:17px;line-height:2;">السلام عليكم ورحمة الله وبركاته،</p>
+        <p style="margin:0 0 18px;color:#425e59;font-size:16px;line-height:2;">
+          يسرّنا أن نخبركم أنكم قد <strong style="color:#173f39;">اجتزتم بنجاح مرحلة الانتقاء الأولي</strong>
+          بعد دراسة استمارة ترشحكم، ووقع عليكم الاختيار للانتقال إلى
+          <strong style="color:#173f39;">المقابلة الشفوية</strong>
+          ضمن مراحل المشاركة بأكاديمية أطر الغد في دورتها الثامنة عشر.
+        </p>
+        <p style="margin:0 0 18px;color:#425e59;font-size:16px;line-height:2;">
+          نشكر لكم حرصكم واهتمامكم، والوقت الذي خصصتموه للإجابة عن الاستمارة،
+          وما لمسناه من طموح وجدية ورغبة صادقة في خوض هذه التجربة.
+        </p>
+        <p style="margin:0 0 18px;color:#425e59;font-size:16px;line-height:2;">
+          وتُعدّ المقابلة الشفوية محطة أساسية في مسار الانتقاء، تتيح لنا التعرف عليكم
+          بشكل أعمق، والاستماع إلى أفكاركم ودوافعكم للمشاركة في الأكاديمية.
+        </p>
+        <p style="margin:0;color:#425e59;font-size:16px;line-height:2;">
+          لتحديد موعد المقابلة المناسب لكم، المرجو الاطلاع على الرابط التالي.
+        </p>`,
+      note: "نسأل الله لكم التوفيق، ونتطلع إلى لقائكم.<br><br><strong>لجنة إعداد أكاديمية أطر الغد</strong><br><strong>«أقوياء لبناء الوطن، أمناء لحماية الأمة.»</strong>",
       button: "اختيار موعد المقابلة",
     },
     slots_available: {
@@ -484,8 +503,10 @@ export async function sendInterviewUpdateEmail(
                   <td style="padding:32px 32px 18px;text-align:right;">
                     <p style="margin:0 0 10px;color:#4A9B8E;font-size:15px;font-weight:bold;">${message.eyebrow}</p>
                     <h1 style="margin:0 0 22px;color:#173f39;font-size:25px;line-height:1.55;">${message.title}</h1>
-                    <p style="margin:0 0 14px;font-size:17px;line-height:1.9;">${AR_HELLO} ${safeFirstName}،</p>
-                    <p style="margin:0;color:#425e59;font-size:16px;line-height:2;">${message.body}</p>
+                    ${type === "assigned"
+                      ? messages.assigned.bodyHtml
+                      : `<p style="margin:0 0 14px;font-size:17px;line-height:1.9;">${AR_HELLO} ${safeFirstName}،</p>
+                         <p style="margin:0;color:#425e59;font-size:16px;line-height:2;">${message.body}</p>`}
                   </td>
                 </tr>
                 <tr>
@@ -532,10 +553,14 @@ export async function sendInterviewUpdateEmail(
     </html>`;
   const text = [
     message.title,
-    `${AR_HELLO} ${firstName || ""}،`,
+    type === "assigned"
+      ? "السلام عليكم ورحمة الله وبركاته،"
+      : `${AR_HELLO} ${firstName || ""}،`,
     message.body,
     interviewer ? `مسؤول المقابلة: ${interviewer.name} — ${interviewer.email}${interviewer.phoneNumber ? ` — ${interviewer.phoneNumber}` : ""}` : "",
-    message.note,
+    type === "assigned"
+      ? "نسأل الله لكم التوفيق، ونتطلع إلى لقائكم.\n\nلجنة إعداد أكاديمية أطر الغد\n«أقوياء لبناء الوطن، أمناء لحماية الأمة.»"
+      : message.note,
     `${message.button}: ${interviewUrl}`,
     AR_ORG,
   ].join("\n\n");

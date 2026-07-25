@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, asc, desc, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNull, or } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import {
   adminUsers,
@@ -30,6 +30,10 @@ import {
   getServerNow,
   getServerNowMilliseconds,
 } from "./lib/server-clock";
+import {
+  isInterviewSlotBookable,
+  MINIMUM_BOOKING_LEAD_TIME_MS,
+} from "./lib/interview-booking-window";
 
 async function logInterviewAction(input: {
   actorAdminId: number;
@@ -71,30 +75,53 @@ async function requireAcceptedCandidate(req: Request) {
 async function cancelInterviewSlot(slotId: number) {
   const db = getDb();
   const [slot] = await db
-    .select({ googleEventId: interviewSlots.googleEventId })
+    .select({
+      googleEventId: interviewSlots.googleEventId,
+      status: interviewSlots.status,
+      candidateEmail: candidates.email,
+      candidateFirstName: candidates.firstName,
+    })
     .from(interviewSlots)
+    .leftJoin(interviewBookings, eq(interviewBookings.slotId, interviewSlots.id))
+    .leftJoin(candidates, eq(interviewBookings.candidateId, candidates.id))
     .where(eq(interviewSlots.id, slotId))
     .limit(1);
   if (!slot) throw new TRPCError({ code: "NOT_FOUND", message: "Créneau introuvable." });
 
+  let calendarSynced = true;
+  let calendarSyncError: string | null = null;
   try {
     if (slot.googleEventId) await deleteGoogleCalendarEvent(slot.googleEventId);
-    await db.update(interviewSlots).set({
-      status: "cancelled",
-      calendarSyncStatus: "synced",
-      calendarSyncError: null,
-    }).where(eq(interviewSlots.id, slotId));
-    return { success: true, calendarSynced: true };
   } catch (error) {
+    calendarSynced = false;
     const message = error instanceof Error ? error.message : "Erreur Google Calendar inconnue";
+    calendarSyncError = message.slice(0, 2000);
     console.error("[google-calendar] Event cancellation failed", message);
-    await db.update(interviewSlots).set({
-      status: "cancelled",
-      calendarSyncStatus: "failed",
-      calendarSyncError: message.slice(0, 2000),
-    }).where(eq(interviewSlots.id, slotId));
-    return { success: true, calendarSynced: false };
   }
+
+  const [transition] = await getSqlPool().execute<any>(
+    `UPDATE interview_slots
+     SET status = 'cancelled', calendarSyncStatus = ?, calendarSyncError = ?
+     WHERE id = ? AND status <> 'cancelled'`,
+    [calendarSynced ? "synced" : "failed", calendarSyncError, slotId],
+  );
+  const newlyCancelled = transition.affectedRows === 1;
+  if (!newlyCancelled && slot.status === "cancelled") {
+    await db.update(interviewSlots).set({
+      calendarSyncStatus: calendarSynced ? "synced" : "failed",
+      calendarSyncError,
+    }).where(eq(interviewSlots.id, slotId));
+  }
+  let emailSent: boolean | null = null;
+  if (newlyCancelled && slot.candidateEmail) {
+    const result = await sendInterviewUpdateEmail(
+      slot.candidateEmail,
+      slot.candidateFirstName || "",
+      "cancelled",
+    );
+    emailSent = result.success;
+  }
+  return { success: true, calendarSynced, newlyCancelled, emailSent };
 }
 
 export const interviewRouter = createRouter({
@@ -169,8 +196,11 @@ export const interviewRouter = createRouter({
     ]);
 
     const bookedSlotIds = new Set(bookings.map((booking) => booking.slotId));
+    const earliestBookableTime = new Date(now.getTime() + MINIMUM_BOOKING_LEAD_TIME_MS);
     const availableSlots = slots.filter(
-      (slot) => slot.startTime > now && (!bookedSlotIds.has(slot.id) || slot.id === ownBooking?.slotId),
+      (slot) =>
+        slot.startTime >= earliestBookableTime
+        && (!bookedSlotIds.has(slot.id) || slot.id === ownBooking?.slotId),
     );
 
     return {
@@ -235,8 +265,15 @@ export const interviewRouter = createRouter({
           [input.slotId],
         );
         const slot = slotRows[0];
-        if (!slot || slot.status !== "scheduled" || new Date(slot.startTime).getTime() <= getServerNowMilliseconds()) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "Ce créneau n’est plus disponible." });
+        if (
+          !slot
+          || slot.status !== "scheduled"
+          || !isInterviewSlotBookable(new Date(slot.startTime).getTime(), getServerNowMilliseconds())
+        ) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Ce créneau n’est plus réservable. La réservation doit être effectuée au moins 15 minutes avant le début de l’entretien.",
+          });
         }
         if (slot.createdByAdminId !== assignment.adminId) {
           throw new TRPCError({
@@ -278,6 +315,10 @@ export const interviewRouter = createRouter({
           }
 
           if (ownBookings[0]) {
+            await connection.query(
+              "DELETE FROM interview_reminder_emails WHERE bookingId = ?",
+              [ownBookings[0].id],
+            );
             await connection.query("DELETE FROM interview_bookings WHERE id = ?", [ownBookings[0].id]);
           }
           await connection.query(
@@ -410,6 +451,9 @@ export const interviewRouter = createRouter({
         assignedAdminName: adminUsers.name,
         assignedAt: interviewCandidateAssignments.assignedAt,
         bookingId: interviewBookings.id,
+        bookingStartTime: interviewSlots.startTime,
+        bookingEndTime: interviewSlots.endTime,
+        bookingMeetingUrl: interviewSlots.meetingUrl,
       })
       .from(candidates)
       .leftJoin(
@@ -418,6 +462,7 @@ export const interviewRouter = createRouter({
       )
       .leftJoin(adminUsers, eq(interviewCandidateAssignments.adminId, adminUsers.id))
       .leftJoin(interviewBookings, eq(interviewBookings.candidateId, candidates.id))
+      .leftJoin(interviewSlots, eq(interviewBookings.slotId, interviewSlots.id))
       .where(and(
         eq(candidates.applicationStatus, "accepted"),
         ctx.adminUser.role === "interview_admin"
@@ -602,6 +647,14 @@ export const interviewRouter = createRouter({
         if (bookingRows.length) {
           throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Un candidat ayant reserve un creneau ne peut pas etre reattribue." });
         }
+        const [assignmentRows] = await connection.query<any[]>(
+          "SELECT adminId FROM interview_candidate_assignments WHERE candidateId = ? LIMIT 1 FOR UPDATE",
+          [input.candidateId],
+        );
+        if (assignmentRows[0]?.adminId === input.targetAdminId) {
+          await connection.rollback();
+          return { success: true, changed: false };
+        }
 
         await connection.query(
           `INSERT INTO interview_candidate_assignments (candidateId, adminId)
@@ -616,9 +669,99 @@ export const interviewRouter = createRouter({
         );
         await connection.commit();
         await sendInterviewUpdateEmail(candidate.email, candidate.firstName, "reassigned");
-        return { success: true };
+        return { success: true, changed: true };
       } catch (error) {
         await connection.rollback();
+        throw error;
+      } finally {
+        connection.release();
+      }
+    }),
+
+  cancelCandidateBooking: superAdminQuery
+    .input(z.object({ candidateId: z.number().int().positive() }))
+    .mutation(async ({ input, ctx }) => {
+      const connection = await getSqlPool().getConnection();
+      let invitationRemoved = false;
+      let committed = false;
+      let googleEventId = "";
+      let candidateEmail = "";
+      try {
+        await connection.beginTransaction();
+        const [rows] = await connection.query<any[]>(
+          `SELECT bookings.id AS bookingId, slots.id AS slotId, slots.googleEventId,
+             slots.status, candidates.firstName, candidates.email,
+             admins.name AS adminName, admins.email AS adminEmail,
+             admins.phoneNumber AS adminPhoneNumber
+           FROM interview_bookings bookings
+           INNER JOIN interview_slots slots ON slots.id = bookings.slotId
+           INNER JOIN candidates ON candidates.id = bookings.candidateId
+           LEFT JOIN interview_candidate_assignments assignments
+             ON assignments.candidateId = candidates.id
+           LEFT JOIN admin_users admins ON admins.id = assignments.adminId
+           WHERE bookings.candidateId = ?
+           LIMIT 1 FOR UPDATE`,
+          [input.candidateId],
+        );
+        const booking = rows[0];
+        if (!booking) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Ce candidat n’a plus de réservation." });
+        }
+        if (booking.status !== "scheduled") {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "Seule une réservation planifiée peut être annulée.",
+          });
+        }
+        if (!booking.googleEventId) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "Cette réservation n’est pas synchronisée avec Google Calendar.",
+          });
+        }
+
+        googleEventId = booking.googleEventId;
+        candidateEmail = booking.email;
+        await removeCandidateFromGoogleEvent(googleEventId, candidateEmail);
+        invitationRemoved = true;
+
+        await connection.query(
+          "DELETE FROM interview_reminder_emails WHERE bookingId = ?",
+          [booking.bookingId],
+        );
+        await connection.query("DELETE FROM interview_bookings WHERE id = ?", [booking.bookingId]);
+        await connection.query(
+          `INSERT INTO interview_audit_logs
+             (actorAdminId, action, candidateId, targetAdminId, slotId)
+           VALUES (?, 'booking_cancelled_by_super_admin', ?, ?, ?)`,
+          [ctx.adminUser.id, input.candidateId, ctx.adminUser.id, booking.slotId],
+        );
+        await connection.commit();
+        committed = true;
+
+        const emailResult = await sendInterviewUpdateEmail(
+          booking.email,
+          booking.firstName,
+          "cancelled",
+          booking.adminName && booking.adminEmail
+            ? {
+                name: booking.adminName,
+                email: booking.adminEmail,
+                phoneNumber: booking.adminPhoneNumber,
+              }
+            : undefined,
+        );
+        return { success: true, emailSent: emailResult.success };
+      } catch (error) {
+        if (!committed) await connection.rollback().catch(() => null);
+        if (!committed && invitationRemoved && googleEventId && candidateEmail) {
+          await inviteCandidateToGoogleEvent(googleEventId, candidateEmail).catch((compensationError) => {
+            console.error(
+              "[google-calendar] Candidate invitation restore failed",
+              compensationError instanceof Error ? compensationError.message : compensationError,
+            );
+          });
+        }
         throw error;
       } finally {
         connection.release();
@@ -721,6 +864,32 @@ export const interviewRouter = createRouter({
       isOwn: slot.createdByAdminId === ctx.adminUser.id,
       canDelete: ctx.adminUser.role !== "interview_admin" || slot.createdByAdminId === ctx.adminUser.id,
     }));
+  }),
+
+  upcomingInterviews: interviewAdminQuery.query(async ({ ctx }) => {
+    const db = getDb();
+    return db
+      .select({
+        id: interviewSlots.id,
+        startTime: interviewSlots.startTime,
+        endTime: interviewSlots.endTime,
+        meetingUrl: interviewSlots.meetingUrl,
+        candidateFirstName: candidates.firstName,
+        candidateLastName: candidates.lastName,
+        candidateEmail: candidates.email,
+      })
+      .from(interviewSlots)
+      .innerJoin(interviewBookings, eq(interviewSlots.id, interviewBookings.slotId))
+      .innerJoin(candidates, eq(interviewBookings.candidateId, candidates.id))
+      .where(and(
+        eq(interviewSlots.status, "scheduled"),
+        gt(interviewSlots.endTime, getServerNow()),
+        ctx.adminUser.role === "interview_admin"
+          ? eq(interviewSlots.createdByAdminId, ctx.adminUser.id)
+          : undefined,
+      ))
+      .orderBy(asc(interviewSlots.startTime))
+      .limit(8);
   }),
 
   createSlot: interviewAdminQuery
@@ -874,14 +1043,15 @@ export const interviewRouter = createRouter({
           .innerJoin(candidates, eq(interviewBookings.candidateId, candidates.id))
           .where(eq(interviewBookings.slotId, input.slotId))
           .limit(1);
-        if (candidate) await sendInterviewUpdateEmail(candidate.email, candidate.firstName, "cancelled");
-        await logInterviewAction({
-          actorAdminId: ctx.adminUser.id,
-          action: "slot_cancelled",
-          slotId: input.slotId,
-          candidateId: candidate?.id,
-          targetAdminId: slot.createdByAdminId || undefined,
-        });
+        if (result.newlyCancelled) {
+          await logInterviewAction({
+            actorAdminId: ctx.adminUser.id,
+            action: "slot_cancelled",
+            slotId: input.slotId,
+            candidateId: candidate?.id,
+            targetAdminId: slot.createdByAdminId || undefined,
+          });
+        }
         return result;
       }
       await db.update(interviewSlots).set({ status: input.status }).where(eq(interviewSlots.id, input.slotId));
@@ -1002,9 +1172,6 @@ export const interviewRouter = createRouter({
         if (slot.bookingId) {
           await cancelInterviewSlot(slot.id);
           cancelledCount += 1;
-          if (slot.candidateEmail) {
-            await sendInterviewUpdateEmail(slot.candidateEmail, slot.candidateFirstName || "", "cancelled");
-          }
         } else {
           if (slot.googleEventId) await deleteGoogleCalendarEvent(slot.googleEventId);
           await db.delete(interviewSlots).where(eq(interviewSlots.id, slot.id));

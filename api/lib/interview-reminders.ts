@@ -2,6 +2,7 @@ import type { ResultSetHeader, RowDataPacket } from "mysql2";
 import { getSqlPool } from "../queries/connection";
 import { sendInterviewReminderEmail } from "./email";
 import { getServerNow } from "./server-clock";
+import { dueInterviewReminderType } from "./interview-reminder-windows";
 
 type UpcomingInterview = RowDataPacket & {
   bookingId: number;
@@ -50,6 +51,18 @@ async function finishReminder(
   );
 }
 
+async function isReminderStillValid(bookingId: number, now: Date) {
+  const [rows] = await getSqlPool().execute<RowDataPacket[]>(
+    `SELECT b.id
+     FROM interview_bookings b
+     INNER JOIN interview_slots s ON s.id = b.slotId
+     WHERE b.id = ? AND s.status = 'scheduled' AND s.startTime > ?
+     LIMIT 1`,
+    [bookingId, now],
+  );
+  return rows.length === 1;
+}
+
 export async function runInterviewReminderJob(now = getServerNow()) {
   const [rows] = await getSqlPool().execute<UpcomingInterview[]>(
     `SELECT b.id AS bookingId, c.firstName, c.email, s.startTime, s.meetingUrl
@@ -58,7 +71,7 @@ export async function runInterviewReminderJob(now = getServerNow()) {
      INNER JOIN candidates c ON c.id = b.candidateId
      WHERE s.status = 'scheduled'
        AND s.startTime > ?
-       AND s.startTime <= DATE_ADD(?, INTERVAL 24 HOUR)
+       AND s.startTime <= DATE_ADD(?, INTERVAL 1455 MINUTE)
      ORDER BY s.startTime ASC`,
     [now, now],
   );
@@ -67,8 +80,16 @@ export async function runInterviewReminderJob(now = getServerNow()) {
   let failed = 0;
   for (const interview of rows) {
     const millisecondsLeft = new Date(interview.startTime).getTime() - now.getTime();
-    const reminderType = millisecondsLeft <= 60 * 60 * 1000 ? "1h" : "24h";
+    const reminderType = dueInterviewReminderType(millisecondsLeft);
+    if (!reminderType) continue;
     if (!(await reserveReminder(interview, reminderType))) continue;
+    if (!(await isReminderStillValid(interview.bookingId, now))) {
+      await getSqlPool().execute(
+        "DELETE FROM interview_reminder_emails WHERE bookingId = ? AND reminderType = ? AND status = 'pending'",
+        [interview.bookingId, reminderType],
+      );
+      continue;
+    }
 
     const result = await sendInterviewReminderEmail(
       interview.email,
