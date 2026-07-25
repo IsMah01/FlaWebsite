@@ -412,7 +412,7 @@ export const interviewRouter = createRouter({
   updateMyProfile: interviewAdminQuery
     .input(z.object({
       imageUrl: z.string().trim().max(500).nullable(),
-      phoneNumber: z.string().trim().max(50),
+      phoneNumber: z.string().trim().max(50).optional().default(""),
       description: z.string().trim().max(1000),
     }))
     .mutation(async ({ input, ctx }) => {

@@ -501,7 +501,7 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
               <Textarea id="profile-description" className="mt-1 min-h-32 flex-1 resize-y" maxLength={1000} value={profileDescription} onChange={(event) => setProfileDescription(event.target.value)} placeholder="Votre rôle, votre parcours et quelques mots pour accueillir les candidats." />
               <div className="mt-2 flex items-center justify-between gap-3">
                 <span className="text-xs text-slate-500">{profileDescription.length}/1000</span>
-                <Button type="button" disabled={updateProfile.isPending || uploadProfileImage.isPending} onClick={() => updateProfile.mutate({ imageUrl: profileImageUrl, phoneNumber: profilePhoneNumber, description: profileDescription })}>
+                <Button type="button" disabled={updateProfile.isPending || uploadProfileImage.isPending} onClick={() => updateProfile.mutate({ imageUrl: profileImageUrl ?? null, phoneNumber: String(profilePhoneNumber ?? ""), description: String(profileDescription ?? "") })}>
                   <Save className="mr-2 h-4 w-4" />Enregistrer le profil
                 </Button>
               </div>
