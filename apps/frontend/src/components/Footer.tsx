@@ -69,6 +69,7 @@ export default function Footer() {
           <div className="mb-3 flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
             <Link to="/privacy" className="transition-colors hover:text-white">سياسة الخصوصية</Link>
             <Link to="/terms" className="transition-colors hover:text-white">شروط الاستخدام</Link>
+            <Link to="/fla-interviews" className="transition-colors hover:text-white" dir="ltr">FLA Interviews</Link>
           </div>
           <p>© 2026 مؤسسة أطر الغد. جميع الحقوق محفوظة.</p>
         </div>
