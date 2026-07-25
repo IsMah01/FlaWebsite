@@ -44,6 +44,8 @@ export default function PrivacyPolicy() {
               بعد موافقة مسؤول مخوّل، تستخدم المنصة نطاق Google Calendar
               {" "}
               <code dir="ltr" className="rounded bg-slate-100 px-1.5 py-1 text-xs">calendar.events</code>
+              {" و "}
+              <code dir="ltr" className="rounded bg-slate-100 px-1.5 py-1 text-xs">meetings.space.settings</code>
               {" "}
               للوصول إلى أحداث التقويم المرتبطة بحساب Google المركزي للمؤسسة.
             </p>

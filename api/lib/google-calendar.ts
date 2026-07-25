@@ -1,7 +1,10 @@
 import crypto from "node:crypto";
 import { getSqlPool } from "../queries/connection";
 
-const GOOGLE_CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.events";
+const GOOGLE_OAUTH_SCOPES = [
+  "https://www.googleapis.com/auth/calendar.events",
+  "https://www.googleapis.com/auth/meetings.space.settings",
+];
 const CONNECTION_ID = 1;
 
 function oauthConfig() {
@@ -55,7 +58,7 @@ export function buildGoogleAuthorizationUrl(state: string) {
     client_id: config.clientId,
     redirect_uri: config.redirectUri,
     response_type: "code",
-    scope: GOOGLE_CALENDAR_SCOPE,
+    scope: GOOGLE_OAUTH_SCOPES.join(" "),
     access_type: "offline",
     prompt: "consent",
     include_granted_scopes: "true",
@@ -176,6 +179,53 @@ async function googleCalendarRequest(path: string, init?: RequestInit) {
   return response.json() as Promise<any>;
 }
 
+async function googleMeetRequest(path: string, init?: RequestInit) {
+  const response = await fetch(`https://meet.googleapis.com/v2${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${await getAccessToken()}`,
+      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...(init?.headers || {}),
+    },
+  });
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Google Meet request failed (${response.status}): ${body.slice(0, 300)}`);
+  }
+  if (response.status === 204) return null;
+  return response.json() as Promise<any>;
+}
+
+function meetingCodeFromUrl(meetingUrl: string) {
+  const url = new URL(meetingUrl);
+  if (url.hostname !== "meet.google.com") {
+    throw new Error("Google Calendar returned an invalid Meet URL.");
+  }
+  const meetingCode = url.pathname.split("/").filter(Boolean)[0];
+  if (!meetingCode) throw new Error("Google Calendar returned a Meet URL without a meeting code.");
+  return meetingCode;
+}
+
+async function configureGoogleMeetOpenAccess(meetingUrl: string) {
+  const meetingCode = meetingCodeFromUrl(meetingUrl);
+  const space = await googleMeetRequest(`/spaces/${encodeURIComponent(meetingCode)}`);
+  if (!space?.name) throw new Error("Google Meet did not return the meeting space.");
+
+  const updatedSpace = await googleMeetRequest(
+    `/${space.name}?updateMask=config.accessType`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        name: space.name,
+        config: { accessType: "OPEN" },
+      }),
+    },
+  );
+  if (updatedSpace?.config?.accessType !== "OPEN") {
+    throw new Error("Google Meet did not confirm open meeting access.");
+  }
+}
+
 export async function createGoogleMeetEvent(input: {
   startTime: Date;
   endTime: Date;
@@ -216,6 +266,17 @@ export async function createGoogleMeetEvent(input: {
     }
     throw new Error("Google Calendar did not generate a Meet link.");
   }
+
+  try {
+    await configureGoogleMeetOpenAccess(currentEvent.hangoutLink);
+  } catch (error) {
+    await googleCalendarRequest(
+      `/calendars/${calendarId}/events/${encodeURIComponent(currentEvent.id)}?sendUpdates=none`,
+      { method: "DELETE" },
+    ).catch(() => null);
+    throw error;
+  }
+
   return { eventId: currentEvent.id as string, meetingUrl: currentEvent.hangoutLink as string };
 }
 
