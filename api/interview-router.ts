@@ -20,8 +20,16 @@ import {
   inviteCandidateToGoogleEvent,
   removeCandidateFromGoogleEvent,
 } from "./lib/google-calendar";
-import { sendInterviewUpdateEmail } from "./lib/email";
+import {
+  sendInterviewAdminBookingNotificationEmail,
+  sendInterviewBookingConfirmationEmail,
+  sendInterviewUpdateEmail,
+} from "./lib/email";
 import { buildAvailabilitySlots } from "./lib/interview-slots";
+import {
+  getServerNow,
+  getServerNowMilliseconds,
+} from "./lib/server-clock";
 
 async function logInterviewAction(input: {
   actorAdminId: number;
@@ -93,12 +101,14 @@ export const interviewRouter = createRouter({
   candidateOverview: publicQuery.query(async ({ ctx }) => {
     const candidate = await requireAcceptedCandidate(ctx.req);
     const db = getDb();
-    const now = new Date();
+    const now = getServerNow();
     const [assignments, ownBookings] = await Promise.all([
       db
         .select({
           adminId: interviewCandidateAssignments.adminId,
           name: adminUsers.name,
+          email: adminUsers.email,
+          phoneNumber: adminUsers.phoneNumber,
           imageUrl: adminUsers.profileImageRef,
           description: adminUsers.profileDescription,
         })
@@ -125,12 +135,20 @@ export const interviewRouter = createRouter({
     const ownBooking = ownBookings[0] ?? null;
     const interviewer = assignment ? {
       name: assignment.name,
+      email: assignment.email,
+      phoneNumber: assignment.phoneNumber,
       imageUrl: assignment.imageUrl,
       description: assignment.description,
     } : null;
 
     if (!assignment) {
-      return { availableSlots: [], booking: ownBooking, awaitingAssignment: !ownBooking, interviewer };
+      return {
+        availableSlots: [],
+        booking: ownBooking,
+        awaitingAssignment: !ownBooking,
+        interviewer,
+        serverNow: now,
+      };
     }
 
     const [slots, bookings] = await Promise.all([
@@ -155,7 +173,13 @@ export const interviewRouter = createRouter({
       (slot) => slot.startTime > now && (!bookedSlotIds.has(slot.id) || slot.id === ownBooking?.slotId),
     );
 
-    return { availableSlots, booking: ownBooking, awaitingAssignment: false, interviewer };
+    return {
+      availableSlots,
+      booking: ownBooking,
+      awaitingAssignment: false,
+      interviewer,
+      serverNow: now,
+    };
   }),
 
   bookSlot: publicQuery
@@ -171,11 +195,13 @@ export const interviewRouter = createRouter({
       let previousEventId: string | null = null;
       let targetInvitationAdded = false;
       let previousInvitationRemoved = false;
+      let bookingEmailInput: Parameters<typeof sendInterviewBookingConfirmationEmail>[0] | null = null;
+      let adminEmailInput: Parameters<typeof sendInterviewAdminBookingNotificationEmail>[0] | null = null;
 
       try {
         await connection.beginTransaction();
         const [candidateRows] = await connection.query<any[]>(
-          "SELECT id, email, applicationStatus FROM candidates WHERE newUserId = ? LIMIT 1 FOR UPDATE",
+          "SELECT id, firstName, lastName, email, applicationStatus FROM candidates WHERE newUserId = ? LIMIT 1 FOR UPDATE",
           [session.newUserId],
         );
         const candidate = candidateRows[0];
@@ -188,7 +214,11 @@ export const interviewRouter = createRouter({
         candidateEmail = candidate.email;
 
         const [assignmentRows] = await connection.query<any[]>(
-          "SELECT adminId FROM interview_candidate_assignments WHERE candidateId = ? LIMIT 1 FOR UPDATE",
+          `SELECT assignments.adminId, admins.name AS adminName, admins.email AS adminEmail,
+             admins.phoneNumber AS adminPhoneNumber
+           FROM interview_candidate_assignments assignments
+           INNER JOIN admin_users admins ON admins.id = assignments.adminId
+           WHERE assignments.candidateId = ? LIMIT 1 FOR UPDATE`,
           [candidate.id],
         );
         const assignment = assignmentRows[0];
@@ -200,11 +230,12 @@ export const interviewRouter = createRouter({
         }
 
         const [slotRows] = await connection.query<any[]>(
-          "SELECT id, startTime, status, googleEventId, createdByAdminId FROM interview_slots WHERE id = ? LIMIT 1 FOR UPDATE",
+          `SELECT id, startTime, endTime, meetingUrl, interviewerName, status, googleEventId, createdByAdminId
+           FROM interview_slots WHERE id = ? LIMIT 1 FOR UPDATE`,
           [input.slotId],
         );
         const slot = slotRows[0];
-        if (!slot || slot.status !== "scheduled" || new Date(slot.startTime).getTime() <= Date.now()) {
+        if (!slot || slot.status !== "scheduled" || new Date(slot.startTime).getTime() <= getServerNowMilliseconds()) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Ce créneau n’est plus disponible." });
         }
         if (slot.createdByAdminId !== assignment.adminId) {
@@ -223,12 +254,15 @@ export const interviewRouter = createRouter({
         }
 
         const [ownBookings] = await connection.query<any[]>(
-          `SELECT b.id, b.slotId, s.googleEventId
+          `SELECT b.id, b.slotId, s.googleEventId, s.startTime
            FROM interview_bookings b
            INNER JOIN interview_slots s ON s.id = b.slotId
            WHERE b.candidateId = ? LIMIT 1 FOR UPDATE`,
           [candidate.id],
         );
+        if (ownBookings[0]?.slotId === input.slotId) {
+          calendarInviteSent = true;
+        }
         if (ownBookings[0]?.slotId !== input.slotId) {
           if (!slot.googleEventId) {
             throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Ce créneau n’est pas synchronisé avec Google Calendar." });
@@ -251,6 +285,29 @@ export const interviewRouter = createRouter({
             [input.slotId, candidate.id],
           );
           calendarInviteSent = true;
+          bookingEmailInput = {
+            to: candidate.email,
+            firstName: candidate.firstName,
+            startTime: new Date(slot.startTime),
+            endTime: new Date(slot.endTime),
+            meetingUrl: slot.meetingUrl,
+            interviewerName: slot.interviewerName,
+            interviewerEmail: assignment.adminEmail,
+            interviewerPhoneNumber: assignment.adminPhoneNumber,
+            previousStartTime: ownBookings[0]?.startTime
+              ? new Date(ownBookings[0].startTime)
+              : null,
+          };
+          adminEmailInput = {
+            to: assignment.adminEmail,
+            adminName: assignment.adminName,
+            candidateName: `${candidate.firstName} ${candidate.lastName}`.trim(),
+            startTime: new Date(slot.startTime),
+            endTime: new Date(slot.endTime),
+            previousStartTime: ownBookings[0]?.startTime
+              ? new Date(ownBookings[0].startTime)
+              : null,
+          };
         }
 
         await connection.commit();
@@ -283,7 +340,21 @@ export const interviewRouter = createRouter({
       } finally {
         connection.release();
       }
-      return { success: true, calendarInviteSent };
+      const [emailResult, adminEmailResult] = await Promise.all([
+        bookingEmailInput
+          ? sendInterviewBookingConfirmationEmail(bookingEmailInput)
+          : Promise.resolve({ success: true as const, attempts: 0 }),
+        adminEmailInput
+          ? sendInterviewAdminBookingNotificationEmail(adminEmailInput)
+          : Promise.resolve({ success: true as const, attempts: 0 }),
+      ]);
+      return {
+        success: true,
+        calendarInviteSent,
+        confirmationEmailSent: emailResult.success,
+        confirmationEmailAttempts: emailResult.attempts,
+        adminNotificationEmailSent: adminEmailResult.success,
+      };
     }),
 
   adminGoogleStatus: interviewAdminQuery.query(async () => getGoogleCalendarConnectionStatus()),
@@ -292,6 +363,7 @@ export const interviewRouter = createRouter({
 
   myProfile: interviewAdminQuery.query(async ({ ctx }) => ({
     name: ctx.adminUser.name,
+    phoneNumber: ctx.adminUser.phoneNumber,
     imageUrl: ctx.adminUser.profileImageRef,
     description: ctx.adminUser.profileDescription,
   })),
@@ -299,6 +371,7 @@ export const interviewRouter = createRouter({
   updateMyProfile: interviewAdminQuery
     .input(z.object({
       imageUrl: z.string().trim().max(500).nullable(),
+      phoneNumber: z.string().trim().max(50),
       description: z.string().trim().max(1000),
     }))
     .mutation(async ({ input, ctx }) => {
@@ -313,6 +386,7 @@ export const interviewRouter = createRouter({
       }
       await getDb().update(adminUsers).set({
         profileImageRef: input.imageUrl,
+        phoneNumber: input.phoneNumber || null,
         profileDescription: input.description || null,
       }).where(eq(adminUsers.id, ctx.adminUser.id));
       await logInterviewAction({
@@ -413,10 +487,20 @@ export const interviewRouter = createRouter({
           auditParams,
         );
         await connection.commit();
-        await Promise.all(candidateRows.map((candidate) =>
-          sendInterviewUpdateEmail(candidate.email, candidate.firstName, "assigned"),
+        const emailResults = await Promise.all(candidateRows.map((candidate) =>
+          sendInterviewUpdateEmail(candidate.email, candidate.firstName, "assigned", {
+            name: ctx.adminUser.name,
+            email: ctx.adminUser.email,
+            phoneNumber: ctx.adminUser.phoneNumber,
+          }),
         ));
-        return { success: true, assignedCount: input.candidateIds.length };
+        const emailSentCount = emailResults.filter((result) => result.success).length;
+        return {
+          success: true,
+          assignedCount: input.candidateIds.length,
+          emailSentCount,
+          emailFailedCount: emailResults.length - emailSentCount,
+        };
       } catch (error) {
         await connection.rollback();
         if (error instanceof TRPCError) throw error;
@@ -655,7 +739,7 @@ export const interviewRouter = createRouter({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      if (input.startTime.getTime() <= Date.now()) {
+      if (input.startTime.getTime() <= getServerNowMilliseconds()) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Le premier créneau doit être dans le futur." });
       }
       if (input.availabilityMode && ctx.adminUser.role !== "interview_admin") {

@@ -145,6 +145,7 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
   const [slotView, setSlotView] = useState<"list" | "planning">("list");
   const [selectedSlotIds, setSelectedSlotIds] = useState<number[]>([]);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+  const [profilePhoneNumber, setProfilePhoneNumber] = useState("");
   const [profileDescription, setProfileDescription] = useState("");
   const [profileInitialized, setProfileInitialized] = useState(false);
   const profileImageInput = useRef<HTMLInputElement>(null);
@@ -161,6 +162,7 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
   useEffect(() => {
     if (isInterviewAdmin && myProfile.data && !profileInitialized) {
       setProfileImageUrl(myProfile.data.imageUrl);
+      setProfilePhoneNumber(myProfile.data.phoneNumber || "");
       setProfileDescription(myProfile.data.description || "");
       setProfileInitialized(true);
     }
@@ -215,7 +217,15 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
   });
   const assignCandidates = trpc.interview.assignCandidates.useMutation({
     onSuccess: async (result) => {
-      toast.success(`${result.assignedCount} candidat(s) ajouté(s) à votre liste`);
+      if (result.emailFailedCount > 0) {
+        toast.warning(
+          `${result.assignedCount} candidat(s) affecté(s) · ${result.emailSentCount} e-mail(s) envoyé(s) · ${result.emailFailedCount} envoi(s) échoué(s) après 3 tentatives`,
+        );
+      } else {
+        toast.success(
+          `${result.assignedCount} candidat(s) affecté(s) · ${result.emailSentCount} e-mail(s) envoyé(s)`,
+        );
+      }
       setSelectedCandidateIds([]);
       setCandidateView("mine");
       await Promise.all([
@@ -444,11 +454,21 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
               <p className="mt-2 text-xs text-slate-500">JPG ou PNG, 2 Mo maximum.</p>
             </div>
             <div className="flex flex-col">
+              <Label htmlFor="profile-phone">Numéro de téléphone</Label>
+              <Input
+                id="profile-phone"
+                className="mt-1"
+                type="tel"
+                maxLength={50}
+                value={profilePhoneNumber}
+                onChange={(event) => setProfilePhoneNumber(event.target.value)}
+                placeholder="+212 6 00 00 00 00"
+              />
               <Label htmlFor="profile-description">Présentation</Label>
               <Textarea id="profile-description" className="mt-1 min-h-32 flex-1 resize-y" maxLength={1000} value={profileDescription} onChange={(event) => setProfileDescription(event.target.value)} placeholder="Votre rôle, votre parcours et quelques mots pour accueillir les candidats." />
               <div className="mt-2 flex items-center justify-between gap-3">
                 <span className="text-xs text-slate-500">{profileDescription.length}/1000</span>
-                <Button type="button" disabled={updateProfile.isPending || uploadProfileImage.isPending} onClick={() => updateProfile.mutate({ imageUrl: profileImageUrl, description: profileDescription })}>
+                <Button type="button" disabled={updateProfile.isPending || uploadProfileImage.isPending} onClick={() => updateProfile.mutate({ imageUrl: profileImageUrl, phoneNumber: profilePhoneNumber, description: profileDescription })}>
                   <Save className="mr-2 h-4 w-4" />Enregistrer le profil
                 </Button>
               </div>

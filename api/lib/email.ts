@@ -35,6 +35,14 @@ const AR_IGNORE_RESET =
   "\u0625\u0630\u0627 \u0644\u0645 \u062A\u0637\u0644\u0628 \u062A\u063A\u064A\u064A\u0631 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631\u060C \u064A\u0645\u0643\u0646\u0643 \u062A\u062C\u0627\u0647\u0644 \u0647\u0630\u0647 \u0627\u0644\u0631\u0633\u0627\u0644\u0629.";
 const AR_RIGHTS = "\u062C\u0645\u064A\u0639 \u0627\u0644\u062D\u0642\u0648\u0642 \u0645\u062D\u0641\u0648\u0638\u0629.";
 const AR_UNSUBSCRIBE = "\u0625\u0644\u063A\u0627\u0621 \u0627\u0644\u0627\u0634\u062A\u0631\u0627\u0643";
+const AR_INTERVIEW_REMINDER = "\u062A\u0630\u0643\u064A\u0631 \u0628\u0645\u0648\u0639\u062F \u0627\u0644\u0645\u0642\u0627\u0628\u0644\u0629 \u0627\u0644\u0634\u0641\u0648\u064A\u0629";
+const AR_INTERVIEW_IN_24H = "\u0645\u0648\u0639\u062F \u0645\u0642\u0627\u0628\u0644\u062A\u0643 \u0627\u0644\u0634\u0641\u0648\u064A\u0629 \u063A\u062F\u0627\u064B";
+const AR_INTERVIEW_IN_1H = "\u0645\u0648\u0639\u062F \u0645\u0642\u0627\u0628\u0644\u062A\u0643 \u0627\u0644\u0634\u0641\u0648\u064A\u0629 \u0628\u0639\u062F \u0633\u0627\u0639\u0629";
+const AR_INTERVIEW_DATE = "\u062A\u0627\u0631\u064A\u062E \u0648\u062A\u0648\u0642\u064A\u062A \u0627\u0644\u0645\u0642\u0627\u0628\u0644\u0629";
+const AR_MOROCCO_TIME = "\u0628\u062A\u0648\u0642\u064A\u062A \u0627\u0644\u0645\u063A\u0631\u0628";
+const AR_JOIN_MEET = "\u0627\u0644\u0627\u0646\u0636\u0645\u0627\u0645 \u0625\u0644\u0649 \u0627\u0644\u0645\u0642\u0627\u0628\u0644\u0629";
+const AR_MEET_HELP = "\u064A\u0631\u062C\u0649 \u0627\u0644\u0627\u0646\u0636\u0645\u0627\u0645 \u0642\u0628\u0644 \u0627\u0644\u0645\u0648\u0639\u062F \u0628\u062E\u0645\u0633 \u062F\u0642\u0627\u0626\u0642\u060C \u0648\u0627\u0644\u062A\u0623\u0643\u062F \u0645\u0646 \u062C\u0627\u0647\u0632\u064A\u0629 \u0627\u0644\u0643\u0627\u0645\u064A\u0631\u0627 \u0648\u0627\u0644\u0645\u064A\u0643\u0631\u0648\u0641\u0648\u0646.";
+const AR_LINK_FALLBACK = "\u0625\u0630\u0627 \u0644\u0645 \u064A\u0639\u0645\u0644 \u0627\u0644\u0632\u0631\u060C \u064A\u0645\u0643\u0646\u0643 \u0646\u0633\u062E \u0627\u0644\u0631\u0627\u0628\u0637 \u0627\u0644\u062A\u0627\u0644\u064A:";
 
 const transporter = nodemailer.createTransport({
   host: SMTP_HOST,
@@ -60,6 +68,40 @@ function getEmailLogo() {
     attachments: logoPath
       ? [{ filename: "logo.png", path: logoPath, cid: LOGO_CID }]
       : [],
+  };
+}
+
+function escapeEmailHtml(value: string) {
+  return value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[character]!);
+}
+
+async function sendMailWithRetry(
+  options: Parameters<typeof transporter.sendMail>[0],
+  maxAttempts = 3,
+) {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      await transporter.sendMail(options);
+      return { success: true as const, attempts: attempt };
+    } catch (error) {
+      lastError = error;
+      console.error(`[Email] Send attempt ${attempt}/${maxAttempts} failed:`, error);
+      if (attempt < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
+      }
+    }
+  }
+  return {
+    success: false as const,
+    attempts: maxAttempts,
+    reason: lastError instanceof Error ? lastError.message : "SEND_FAILED",
   };
 }
 
@@ -277,33 +319,79 @@ export async function sendInterviewReminderEmail(
   }
 
   const logo = getEmailLogo();
-  const dateLabel = new Intl.DateTimeFormat("fr-FR", {
+  const dateLabel = new Intl.DateTimeFormat("ar-MA", {
     timeZone: "Africa/Casablanca",
     dateStyle: "full",
     timeStyle: "short",
   }).format(startTime);
-  const delayLabel = reminderType === "24h" ? "24 heures" : "1 heure";
+  const reminderLabel = reminderType === "24h" ? AR_INTERVIEW_IN_24H : AR_INTERVIEW_IN_1H;
+  const safeFirstName = escapeEmailHtml(firstName || "");
+  const safeMeetingUrl = escapeEmailHtml(meetingUrl);
+  const subject = `${reminderLabel} - ${AR_ORG}`;
   const html = `
-    <div dir="rtl" style="font-family:Arial,Tahoma,sans-serif;max-width:620px;margin:auto;padding:24px;background:#f3f7f6;color:#173f39">
-      <div style="background:#fff;border-radius:16px;padding:28px;text-align:right">
-        <img src="${logo.src}" width="170" alt="Future Leaders Foundation" style="display:block;margin:0 0 20px auto">
-        <h1 style="color:#2d6f64;font-size:24px">تذكير بموعد المقابلة الشفوية</h1>
-        <p>مرحباً ${firstName || ""}،</p>
-        <p style="line-height:1.9">نذكّركم بأن موعد مقابلتكم الشفوية سيكون بعد ${delayLabel}.</p>
-        <p style="font-weight:bold;line-height:1.8">${dateLabel} (توقيت المغرب)</p>
-        <div style="text-align:center;margin:28px 0">
-          <a href="${meetingUrl}" style="display:inline-block;background:#4A9B8E;color:#fff;padding:13px 28px;border-radius:9px;text-decoration:none;font-weight:bold">الدخول إلى Google Meet</a>
-        </div>
-        <p style="font-size:12px;color:#74837f;word-break:break-all;direction:ltr;text-align:center">${meetingUrl}</p>
-      </div>
-    </div>`;
+    <!doctype html>
+    <html lang="ar" dir="rtl">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>${subject}</title>
+      </head>
+      <body dir="rtl" style="margin:0;padding:0;background-color:#f2f7f6;font-family:Tahoma,Arial,sans-serif;color:#173f39;">
+        <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${reminderLabel} — ${dateLabel}</div>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background-color:#f2f7f6;">
+          <tr><td align="center" style="padding:24px 12px;">
+            <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:600px;background-color:#ffffff;border-radius:16px;overflow:hidden;">
+              <tr><td align="center" style="padding:28px 24px 20px;border-bottom:1px solid #e5eeec;">
+                <img src="${logo.src}" width="190" alt="Future Leaders Foundation" style="display:block;width:190px;max-width:80%;height:auto;border:0;">
+              </td></tr>
+              <tr><td style="padding:32px 32px 12px;text-align:right;">
+                <p style="margin:0 0 10px;color:#4A9B8E;font-size:14px;font-weight:bold;">${AR_INTERVIEW_REMINDER}</p>
+                <h1 style="margin:0 0 22px;color:#173f39;font-size:25px;line-height:1.5;">${reminderLabel}</h1>
+                <p style="margin:0 0 12px;font-size:17px;line-height:1.9;">${AR_HELLO} ${safeFirstName}\u060C</p>
+                <p style="margin:0;font-size:16px;line-height:1.9;color:#425e59;">${AR_MEET_HELP}</p>
+              </td></tr>
+              <tr><td style="padding:18px 32px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background-color:#eef8f6;border:1px solid #cfe6e1;border-radius:12px;">
+                  <tr><td align="center" style="padding:20px;">
+                    <p style="margin:0 0 8px;color:#4A9B8E;font-size:13px;font-weight:bold;">${AR_INTERVIEW_DATE}</p>
+                    <p style="margin:0;color:#173f39;font-size:18px;font-weight:bold;line-height:1.7;">${dateLabel}</p>
+                    <p style="margin:5px 0 0;color:#647c77;font-size:12px;">${AR_MOROCCO_TIME}</p>
+                  </td></tr>
+                </table>
+              </td></tr>
+              <tr><td align="center" style="padding:10px 32px 28px;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr>
+                  <td bgcolor="#4A9B8E" style="border-radius:9px;text-align:center;">
+                    <a href="${safeMeetingUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:14px 30px;color:#ffffff;text-decoration:none;font-size:16px;font-weight:bold;">${AR_JOIN_MEET}</a>
+                  </td>
+                </tr></table>
+                <p style="margin:24px 0 8px;color:#788d89;font-size:12px;line-height:1.7;">${AR_LINK_FALLBACK}</p>
+                <a href="${safeMeetingUrl}" target="_blank" rel="noopener noreferrer" dir="ltr" style="display:inline-block;max-width:100%;color:#4A9B8E;font-size:12px;word-break:break-all;">${safeMeetingUrl}</a>
+              </td></tr>
+              <tr><td align="center" style="padding:20px 24px;background-color:#173f39;color:#dceae7;font-size:12px;line-height:1.8;">
+                ${AR_ORG}<br>Future Leaders Foundation
+              </td></tr>
+            </table>
+          </td></tr>
+        </table>
+      </body>
+    </html>`;
+  const text = [
+    reminderLabel,
+    `${AR_HELLO} ${firstName || ""}\u060C`,
+    `${AR_INTERVIEW_DATE}: ${dateLabel} (${AR_MOROCCO_TIME})`,
+    AR_MEET_HELP,
+    `${AR_JOIN_MEET}: ${meetingUrl}`,
+    AR_ORG,
+  ].join("\n\n");
 
   try {
     await transporter.sendMail({
       from: `"${AR_ORG}" <${SMTP_FROM}>`,
       to,
-      subject: `تذكير: موعد المقابلة بعد ${delayLabel} - ${AR_ORG}`,
+      subject,
       html,
+      text,
       attachments: logo.attachments,
     });
     return { success: true };
@@ -317,6 +405,11 @@ export async function sendInterviewUpdateEmail(
   to: string,
   firstName: string,
   type: "assigned" | "slots_available" | "cancelled" | "reassigned",
+  interviewer?: {
+    name: string;
+    email: string;
+    phoneNumber?: string | null;
+  },
 ) {
   if (!SMTP_HOST || !SMTP_USER) {
     console.warn("[Email] SMTP not configured. Skipping interview update email.");
@@ -325,46 +418,373 @@ export async function sendInterviewUpdateEmail(
 
   const messages = {
     assigned: {
-      subject: "Votre responsable d'entretien a ete attribue",
-      body: "Un responsable vient de vous etre attribue. Vous pourrez choisir un creneau des qu'il publiera ses disponibilites.",
+      eyebrow: "تهانينا!",
+      subject: "تم اختيارك للانتقال إلى مرحلة المقابلة الشفوية",
+      title: "لقد تم قبول طلبك للانتقال إلى مرحلة المقابلة",
+      body: "يسرّ مؤسسة أطر الغد إخبارك بأنه تم اختيارك للانتقال إلى مرحلة المقابلة الشفوية عبر الفيديو. يرجى الدخول إلى فضاء المقابلة واختيار الموعد الذي يناسبك من بين المواعيد المتاحة.",
+      note: "هذه المرحلة جزء من مسار الانتقاء، ولا تعني القبول النهائي في البرنامج.",
+      button: "اختيار موعد المقابلة",
     },
     slots_available: {
-      subject: "De nouveaux creneaux d'entretien sont disponibles",
-      body: "De nouveaux horaires sont disponibles pour votre entretien. Connectez-vous afin de choisir votre creneau.",
+      eyebrow: "مواعيد جديدة متاحة",
+      subject: "يمكنك الآن اختيار موعد مقابلتك",
+      title: "اختر الموعد الذي يناسبك",
+      body: "تمت إضافة مواعيد جديدة لمقابلتك الشفوية عبر الفيديو. يرجى الدخول إلى فضاء المقابلة واختيار الموعد المناسب في أقرب وقت.",
+      note: "بعد حجز الموعد، ستجد تفاصيل المقابلة ورابط Google Meet داخل فضائك.",
+      button: "عرض المواعيد المتاحة",
     },
     cancelled: {
-      subject: "Mise a jour de votre entretien",
-      body: "Votre creneau d'entretien a ete annule. Connectez-vous afin de consulter les prochains horaires disponibles.",
+      eyebrow: "تحديث بخصوص مقابلتك",
+      subject: "تم إلغاء موعد مقابلتك السابق",
+      title: "يرجى اختيار موعد جديد",
+      body: "نحيطك علماً بأنه تم إلغاء موعد مقابلتك السابق. يرجى الدخول إلى فضاء المقابلة للاطلاع على المواعيد الجديدة واختيار الموعد الذي يناسبك.",
+      note: "لن تتلقى أي تذكير بخصوص الموعد الملغى. ستبدأ التذكيرات من جديد بعد اختيار موعد جديد. نعتذر عن هذا التغيير ونشكرك على تفهّمك.",
+      button: "اختيار موعد جديد",
     },
     reassigned: {
-      subject: "Votre responsable d'entretien a change",
-      body: "Un nouveau responsable vient de vous etre attribue. Ses disponibilites seront affichees dans votre espace entretien.",
+      eyebrow: "تحديث بخصوص مقابلتك",
+      subject: "تم تحديث المسؤول عن مقابلتك",
+      title: "تم تعيين مسؤول جديد لمقابلتك",
+      body: "تم تحديث المسؤول عن مقابلتك الشفوية. يمكنك الدخول إلى فضاء المقابلة للاطلاع على المواعيد المتاحة واختيار الموعد الذي يناسبك.",
+      note: "إذا كنت قد حجزت موعداً من قبل، ستظهر لك أحدث التفاصيل داخل فضائك.",
+      button: "فتح فضاء المقابلة",
     },
   } as const;
   const message = messages[type];
   const interviewUrl = `${PUBLIC_APP_URL}/interview`;
   const logo = getEmailLogo();
+  const safeFirstName = escapeEmailHtml(firstName || "");
+  const safeInterviewUrl = escapeEmailHtml(interviewUrl);
+  const safeInterviewerName = interviewer ? escapeEmailHtml(interviewer.name) : "";
+  const safeInterviewerEmail = interviewer ? escapeEmailHtml(interviewer.email) : "";
+  const safeInterviewerPhone = interviewer?.phoneNumber
+    ? escapeEmailHtml(interviewer.phoneNumber)
+    : "";
+  const subject = `${message.subject} - ${AR_ORG}`;
+  const html = `
+    <!doctype html>
+    <html lang="ar" dir="rtl">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>${subject}</title>
+      </head>
+      <body dir="rtl" style="margin:0;padding:0;background-color:#f2f7f6;font-family:Tahoma,Arial,sans-serif;color:#173f39;">
+        <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${message.title}</div>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background-color:#f2f7f6;">
+          <tr>
+            <td align="center" style="padding:24px 12px;">
+              <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:600px;background-color:#ffffff;border-radius:16px;overflow:hidden;">
+                <tr>
+                  <td align="center" style="padding:28px 24px 20px;border-bottom:1px solid #e5eeec;">
+                    <img src="${logo.src}" width="190" alt="Future Leaders Foundation" style="display:block;width:190px;max-width:80%;height:auto;border:0;">
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:32px 32px 18px;text-align:right;">
+                    <p style="margin:0 0 10px;color:#4A9B8E;font-size:15px;font-weight:bold;">${message.eyebrow}</p>
+                    <h1 style="margin:0 0 22px;color:#173f39;font-size:25px;line-height:1.55;">${message.title}</h1>
+                    <p style="margin:0 0 14px;font-size:17px;line-height:1.9;">${AR_HELLO} ${safeFirstName}،</p>
+                    <p style="margin:0;color:#425e59;font-size:16px;line-height:2;">${message.body}</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding:10px 32px 24px;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                      <tr>
+                        <td bgcolor="#4A9B8E" style="border-radius:9px;text-align:center;">
+                          <a href="${safeInterviewUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:14px 32px;color:#ffffff;text-decoration:none;font-size:16px;font-weight:bold;">${message.button}</a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:0 32px 28px;">
+                    ${interviewer ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;margin-bottom:18px;background-color:#f8faf9;border-right:4px solid #4A9B8E;">
+                      <tr><td style="padding:14px 16px;color:#425e59;font-size:13px;line-height:1.9;">
+                        <strong>مسؤول مقابلتك: ${safeInterviewerName}</strong><br>
+                        البريد الإلكتروني: <a href="mailto:${safeInterviewerEmail}" style="color:#4A9B8E;text-decoration:none;">${safeInterviewerEmail}</a><br>
+                        ${safeInterviewerPhone ? `الهاتف: <a href="tel:${safeInterviewerPhone}" dir="ltr" style="color:#4A9B8E;text-decoration:none;">${safeInterviewerPhone}</a>` : ""}
+                      </td></tr>
+                    </table>` : ""}
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background-color:#eef8f6;border-right:4px solid #4A9B8E;">
+                      <tr>
+                        <td style="padding:14px 16px;color:#425e59;font-size:13px;line-height:1.8;">${message.note}</td>
+                      </tr>
+                    </table>
+                    <p style="margin:22px 0 8px;text-align:center;color:#788d89;font-size:12px;line-height:1.7;">إذا لم يعمل الزر، انسخ الرابط التالي وافتحه في متصفحك:</p>
+                    <p dir="ltr" style="margin:0;text-align:center;">
+                      <a href="${safeInterviewUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-block;max-width:100%;color:#4A9B8E;font-size:12px;word-break:break-all;">${safeInterviewUrl}</a>
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding:20px 24px;background-color:#173f39;color:#dceae7;font-size:12px;line-height:1.8;">
+                    ${AR_ORG}<br>Future Leaders Foundation
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+    </html>`;
+  const text = [
+    message.title,
+    `${AR_HELLO} ${firstName || ""}،`,
+    message.body,
+    interviewer ? `مسؤول المقابلة: ${interviewer.name} — ${interviewer.email}${interviewer.phoneNumber ? ` — ${interviewer.phoneNumber}` : ""}` : "",
+    message.note,
+    `${message.button}: ${interviewUrl}`,
+    AR_ORG,
+  ].join("\n\n");
 
-  try {
-    await transporter.sendMail({
-      from: `"${AR_ORG}" <${SMTP_FROM}>`,
-      to,
-      subject: `${message.subject} - Future Leaders Foundation`,
-      html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:24px;background:#f3f7f6">
-        <div style="background:#fff;padding:28px">
-          <img src="${logo.src}" width="170" alt="Future Leaders Foundation">
-          <h1 style="color:#2d6f64;font-size:22px">Bonjour ${firstName || ""},</h1>
-          <p style="color:#3f5550;line-height:1.8">${message.body}</p>
-          <p style="text-align:center;margin-top:28px"><a href="${interviewUrl}" style="background:#4A9B8E;color:#fff;padding:12px 24px;text-decoration:none;border-radius:8px">Ouvrir mon espace entretien</a></p>
-        </div>
-      </div>`,
-      attachments: logo.attachments,
-    });
-    return { success: true };
-  } catch (error) {
-    console.error("[Email] Failed to send interview update:", error);
-    return { success: false, reason: "SEND_FAILED" };
+  return sendMailWithRetry({
+    from: `"${AR_ORG}" <${SMTP_FROM}>`,
+    to,
+    subject,
+    html,
+    text,
+    attachments: logo.attachments,
+  });
+}
+
+export async function sendInterviewBookingConfirmationEmail(input: {
+  to: string;
+  firstName: string;
+  startTime: Date;
+  endTime: Date;
+  meetingUrl: string;
+  interviewerName?: string | null;
+  interviewerEmail?: string | null;
+  interviewerPhoneNumber?: string | null;
+  previousStartTime?: Date | null;
+}) {
+  if (!SMTP_HOST || !SMTP_USER) {
+    console.warn("[Email] SMTP not configured. Skipping booking confirmation email.");
+    return { success: false as const, attempts: 0, reason: "SMTP_NOT_CONFIGURED" };
   }
+
+  const changed = Boolean(input.previousStartTime);
+  const title = changed ? "تم تأكيد تغيير موعد مقابلتك" : "تم تأكيد موعد مقابلتك";
+  const subject = `${title} - ${AR_ORG}`;
+  const dateFormatter = new Intl.DateTimeFormat("ar-MA", {
+    timeZone: "Africa/Casablanca",
+    dateStyle: "full",
+    timeStyle: "short",
+  });
+  const timeFormatter = new Intl.DateTimeFormat("ar-MA", {
+    timeZone: "Africa/Casablanca",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const dateLabel = dateFormatter.format(input.startTime);
+  const endLabel = timeFormatter.format(input.endTime);
+  const previousLabel = input.previousStartTime
+    ? dateFormatter.format(input.previousStartTime)
+    : null;
+  const safeFirstName = escapeEmailHtml(input.firstName || "");
+  const safeMeetingUrl = escapeEmailHtml(input.meetingUrl);
+  const safeInterviewerName = input.interviewerName
+    ? escapeEmailHtml(input.interviewerName)
+    : "";
+  const safeInterviewerEmail = input.interviewerEmail
+    ? escapeEmailHtml(input.interviewerEmail)
+    : "";
+  const safeInterviewerPhoneNumber = input.interviewerPhoneNumber
+    ? escapeEmailHtml(input.interviewerPhoneNumber)
+    : "";
+  const logo = getEmailLogo();
+  const html = `
+    <!doctype html>
+    <html lang="ar" dir="rtl">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>${subject}</title>
+      </head>
+      <body dir="rtl" style="margin:0;padding:0;background-color:#f2f7f6;font-family:Tahoma,Arial,sans-serif;color:#173f39;">
+        <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${title} — ${dateLabel}</div>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background-color:#f2f7f6;">
+          <tr><td align="center" style="padding:24px 12px;">
+            <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:600px;background-color:#ffffff;border-radius:16px;overflow:hidden;">
+              <tr><td align="center" style="padding:28px 24px 20px;border-bottom:1px solid #e5eeec;">
+                <img src="${logo.src}" width="190" alt="Future Leaders Foundation" style="display:block;width:190px;max-width:80%;height:auto;border:0;">
+              </td></tr>
+              <tr><td style="padding:32px 32px 16px;text-align:right;">
+                <p style="margin:0 0 10px;color:#4A9B8E;font-size:15px;font-weight:bold;">المقابلة الشفوية عبر الفيديو</p>
+                <h1 style="margin:0 0 20px;color:#173f39;font-size:25px;line-height:1.55;">${title}</h1>
+                <p style="margin:0 0 12px;font-size:17px;line-height:1.9;">${AR_HELLO} ${safeFirstName}،</p>
+                <p style="margin:0;color:#425e59;font-size:16px;line-height:1.9;">${changed ? "تم تسجيل موعدك الجديد بنجاح. تجد أدناه التفاصيل المحدّثة للمقابلة." : "تم تسجيل اختيارك بنجاح. تجد أدناه تفاصيل المقابلة الشفوية عبر الفيديو."}</p>
+              </td></tr>
+              ${previousLabel ? `<tr><td style="padding:4px 32px 10px;">
+                <p style="margin:0;padding:12px 16px;background:#fff6e8;color:#8a5a12;font-size:13px;line-height:1.7;border-right:4px solid #e7a93e;">الموعد السابق: <span style="text-decoration:line-through;">${previousLabel}</span></p>
+              </td></tr>` : ""}
+              <tr><td style="padding:12px 32px 20px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background-color:#eef8f6;border:1px solid #cfe6e1;border-radius:12px;">
+                  <tr><td align="center" style="padding:20px;">
+                    <p style="margin:0 0 8px;color:#4A9B8E;font-size:13px;font-weight:bold;">الموعد المؤكد</p>
+                    <p style="margin:0;color:#173f39;font-size:18px;font-weight:bold;line-height:1.7;">${dateLabel}</p>
+                    <p style="margin:5px 0 0;color:#647c77;font-size:13px;">إلى الساعة ${endLabel} — بتوقيت المغرب</p>
+                    ${safeInterviewerName ? `<p style="margin:10px 0 0;color:#425e59;font-size:14px;">مسؤول المقابلة: <strong>${safeInterviewerName}</strong></p>` : ""}
+                  </td></tr>
+                </table>
+              </td></tr>
+              ${(safeInterviewerEmail || safeInterviewerPhoneNumber) ? `<tr><td style="padding:0 32px 20px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background:#f8faf9;border-right:4px solid #4A9B8E;">
+                  <tr><td style="padding:14px 16px;color:#425e59;font-size:13px;line-height:1.9;">
+                    <strong>للتواصل مع مسؤول المقابلة في حالة وجود مشكلة:</strong><br>
+                    ${safeInterviewerEmail ? `البريد الإلكتروني: <a href="mailto:${safeInterviewerEmail}" style="color:#4A9B8E;text-decoration:none;">${safeInterviewerEmail}</a><br>` : ""}
+                    ${safeInterviewerPhoneNumber ? `الهاتف: <a href="tel:${safeInterviewerPhoneNumber}" dir="ltr" style="color:#4A9B8E;text-decoration:none;">${safeInterviewerPhoneNumber}</a>` : ""}
+                  </td></tr>
+                </table>
+              </td></tr>` : ""}
+              <tr><td align="center" style="padding:4px 32px 26px;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr>
+                  <td bgcolor="#4A9B8E" style="border-radius:9px;text-align:center;">
+                    <a href="${safeMeetingUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:14px 32px;color:#ffffff;text-decoration:none;font-size:16px;font-weight:bold;">الانضمام إلى المقابلة عبر Google Meet</a>
+                  </td>
+                </tr></table>
+                <p style="margin:22px 0 8px;color:#788d89;font-size:12px;line-height:1.7;">إذا لم يعمل الزر، انسخ رابط المقابلة التالي:</p>
+                <a href="${safeMeetingUrl}" target="_blank" rel="noopener noreferrer" dir="ltr" style="display:inline-block;max-width:100%;color:#4A9B8E;font-size:12px;word-break:break-all;">${safeMeetingUrl}</a>
+                <p style="margin:22px 0 0;color:#425e59;font-size:13px;line-height:1.8;">يرجى الانضمام قبل الموعد بخمس دقائق والتأكد من جاهزية الكاميرا والميكروفون.</p>
+              </td></tr>
+              <tr><td align="center" style="padding:20px 24px;background-color:#173f39;color:#dceae7;font-size:12px;line-height:1.8;">
+                ${AR_ORG}<br>Future Leaders Foundation
+              </td></tr>
+            </table>
+          </td></tr>
+        </table>
+      </body>
+    </html>`;
+  const text = [
+    title,
+    `${AR_HELLO} ${input.firstName || ""}،`,
+    previousLabel ? `الموعد السابق: ${previousLabel}` : "",
+    `الموعد المؤكد: ${dateLabel} إلى ${endLabel} (${AR_MOROCCO_TIME})`,
+    input.interviewerName ? `مسؤول المقابلة: ${input.interviewerName}` : "",
+    input.interviewerEmail ? `البريد الإلكتروني للمسؤول: ${input.interviewerEmail}` : "",
+    input.interviewerPhoneNumber ? `هاتف المسؤول: ${input.interviewerPhoneNumber}` : "",
+    `رابط Google Meet: ${input.meetingUrl}`,
+    AR_ORG,
+  ].filter(Boolean).join("\n\n");
+
+  return sendMailWithRetry({
+    from: `"${AR_ORG}" <${SMTP_FROM}>`,
+    to: input.to,
+    subject,
+    html,
+    text,
+    attachments: logo.attachments,
+  });
+}
+
+export async function sendInterviewAdminBookingNotificationEmail(input: {
+  to: string;
+  adminName: string;
+  candidateName: string;
+  startTime: Date;
+  endTime: Date;
+  previousStartTime?: Date | null;
+}) {
+  if (!SMTP_HOST || !SMTP_USER) {
+    console.warn("[Email] SMTP not configured. Skipping mini-admin booking notification.");
+    return { success: false as const, attempts: 0, reason: "SMTP_NOT_CONFIGURED" };
+  }
+
+  const changed = Boolean(input.previousStartTime);
+  const title = changed
+    ? "قام أحد المرشحين بتغيير موعد مقابلته"
+    : "قام أحد المرشحين باختيار موعد مقابلته";
+  const subject = `${title} - ${AR_ORG}`;
+  const dateFormatter = new Intl.DateTimeFormat("ar-MA", {
+    timeZone: "Africa/Casablanca",
+    dateStyle: "full",
+    timeStyle: "short",
+  });
+  const timeFormatter = new Intl.DateTimeFormat("ar-MA", {
+    timeZone: "Africa/Casablanca",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const newDateLabel = dateFormatter.format(input.startTime);
+  const endLabel = timeFormatter.format(input.endTime);
+  const previousLabel = input.previousStartTime
+    ? dateFormatter.format(input.previousStartTime)
+    : null;
+  const safeAdminName = escapeEmailHtml(input.adminName || "");
+  const safeCandidateName = escapeEmailHtml(input.candidateName);
+  const adminUrl = `${PUBLIC_APP_URL}/admin/interviews`;
+  const safeAdminUrl = escapeEmailHtml(adminUrl);
+  const logo = getEmailLogo();
+  const html = `
+    <!doctype html>
+    <html lang="ar" dir="rtl">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>${subject}</title>
+      </head>
+      <body dir="rtl" style="margin:0;padding:0;background-color:#f2f7f6;font-family:Tahoma,Arial,sans-serif;color:#173f39;">
+        <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${title} — ${safeCandidateName}</div>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background-color:#f2f7f6;">
+          <tr><td align="center" style="padding:24px 12px;">
+            <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:600px;background-color:#ffffff;border-radius:16px;overflow:hidden;">
+              <tr><td align="center" style="padding:28px 24px 20px;border-bottom:1px solid #e5eeec;">
+                <img src="${logo.src}" width="190" alt="Future Leaders Foundation" style="display:block;width:190px;max-width:80%;height:auto;border:0;">
+              </td></tr>
+              <tr><td style="padding:32px 32px 16px;text-align:right;">
+                <p style="margin:0 0 10px;color:#4A9B8E;font-size:15px;font-weight:bold;">إشعار جديد في فضاء المقابلات</p>
+                <h1 style="margin:0 0 20px;color:#173f39;font-size:24px;line-height:1.55;">${title}</h1>
+                <p style="margin:0 0 12px;font-size:17px;line-height:1.9;">${AR_HELLO} ${safeAdminName}،</p>
+                <p style="margin:0;color:#425e59;font-size:16px;line-height:1.9;">${changed ? "قام المرشح التالي بتغيير موعد مقابلته معك:" : "قام المرشح التالي باختيار موعد لإجراء المقابلة معك:"}</p>
+              </td></tr>
+              <tr><td style="padding:8px 32px 20px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background-color:#eef8f6;border:1px solid #cfe6e1;border-radius:12px;">
+                  <tr><td style="padding:20px;text-align:right;">
+                    <p style="margin:0 0 12px;color:#173f39;font-size:18px;font-weight:bold;">${safeCandidateName}</p>
+                    ${previousLabel ? `<p style="margin:0 0 10px;color:#8a5a12;font-size:13px;">الموعد السابق: <span style="text-decoration:line-through;">${previousLabel}</span></p>` : ""}
+                    <p style="margin:0;color:#425e59;font-size:15px;line-height:1.8;">الموعد ${changed ? "الجديد" : "المختار"}: <strong>${newDateLabel}</strong></p>
+                    <p style="margin:5px 0 0;color:#647c77;font-size:13px;">إلى الساعة ${endLabel} — بتوقيت المغرب</p>
+                  </td></tr>
+                </table>
+              </td></tr>
+              <tr><td align="center" style="padding:4px 32px 28px;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr>
+                  <td bgcolor="#4A9B8E" style="border-radius:9px;text-align:center;">
+                    <a href="${safeAdminUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:14px 32px;color:#ffffff;text-decoration:none;font-size:16px;font-weight:bold;">فتح فضاء إدارة المقابلات</a>
+                  </td>
+                </tr></table>
+                <p style="margin:22px 0 8px;color:#788d89;font-size:12px;">إذا لم يعمل الزر، استخدم الرابط التالي:</p>
+                <a href="${safeAdminUrl}" target="_blank" rel="noopener noreferrer" dir="ltr" style="display:inline-block;max-width:100%;color:#4A9B8E;font-size:12px;word-break:break-all;">${safeAdminUrl}</a>
+              </td></tr>
+              <tr><td align="center" style="padding:20px 24px;background-color:#173f39;color:#dceae7;font-size:12px;line-height:1.8;">
+                ${AR_ORG}<br>Future Leaders Foundation
+              </td></tr>
+            </table>
+          </td></tr>
+        </table>
+      </body>
+    </html>`;
+  const text = [
+    title,
+    `${AR_HELLO} ${input.adminName || ""}،`,
+    `المرشح: ${input.candidateName}`,
+    previousLabel ? `الموعد السابق: ${previousLabel}` : "",
+    `الموعد ${changed ? "الجديد" : "المختار"}: ${newDateLabel} إلى ${endLabel}`,
+    `فضاء إدارة المقابلات: ${adminUrl}`,
+    AR_ORG,
+  ].filter(Boolean).join("\n\n");
+
+  return sendMailWithRetry({
+    from: `"${AR_ORG}" <${SMTP_FROM}>`,
+    to: input.to,
+    subject,
+    html,
+    text,
+    attachments: logo.attachments,
+  });
 }
 
 export async function sendNewsletterEmail(

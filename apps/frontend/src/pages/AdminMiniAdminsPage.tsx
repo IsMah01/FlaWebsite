@@ -18,7 +18,12 @@ import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/useAuth";
 import { trpc } from "@/providers/trpc";
 
-type AdminDraft = { name: string; email: string; password: string };
+type AdminDraft = {
+  name: string;
+  email: string;
+  phoneNumber: string;
+  password: string;
+};
 
 export default function AdminMiniAdminsPage() {
   const { user, isLoading, logout } = useAuth({
@@ -29,6 +34,7 @@ export default function AdminMiniAdminsPage() {
     user?.role === "admin" && user.adminRole === "super_admin";
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [password, setPassword] = useState("");
   const [candidateFirstName, setCandidateFirstName] = useState("");
   const [candidateLastName, setCandidateLastName] = useState("");
@@ -47,6 +53,7 @@ export default function AdminMiniAdminsPage() {
       toast.success("Mini-admin créé");
       setName("");
       setEmail("");
+      setPhoneNumber("");
       setPassword("");
       await utils.admin.listInterviewAdmins.invalidate();
     },
@@ -74,6 +81,7 @@ export default function AdminMiniAdminsPage() {
         [variables.id]: {
           name: variables.name,
           email: variables.email,
+          phoneNumber: variables.phoneNumber,
           password: "",
         },
       }));
@@ -105,8 +113,18 @@ export default function AdminMiniAdminsPage() {
       />
     );
 
-  const getDraft = (entry: { id: number; name: string; email: string }) =>
-    drafts[entry.id] ?? { name: entry.name, email: entry.email, password: "" };
+  const getDraft = (entry: {
+    id: number;
+    name: string;
+    email: string;
+    phoneNumber: string | null;
+  }) =>
+    drafts[entry.id] ?? {
+      name: entry.name,
+      email: entry.email,
+      phoneNumber: entry.phoneNumber || "",
+      password: "",
+    };
   const setDraft = (id: number, draft: AdminDraft) =>
     setDrafts((current) => ({ ...current, [id]: draft }));
 
@@ -154,10 +172,10 @@ export default function AdminMiniAdminsPage() {
             </div>
           </div>
           <form
-            className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-4"
+            className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-5"
             onSubmit={(event) => {
               event.preventDefault();
-              createAdmin.mutate({ name, email, password });
+              createAdmin.mutate({ name, email, phoneNumber, password });
             }}
           >
             <div className="space-y-2">
@@ -180,6 +198,16 @@ export default function AdminMiniAdminsPage() {
                 onChange={(event) => setEmail(event.target.value)}
                 autoComplete="email"
                 required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-phone">Téléphone</Label>
+              <Input
+                id="new-phone"
+                type="tel"
+                value={phoneNumber}
+                onChange={(event) => setPhoneNumber(event.target.value)}
+                autoComplete="tel"
               />
             </div>
             <div className="space-y-2">
@@ -315,7 +343,7 @@ export default function AdminMiniAdminsPage() {
               return (
                 <form
                   key={entry.id}
-                  className="grid gap-4 p-5 lg:grid-cols-[1fr_1.2fr_1fr_auto] lg:items-end"
+                  className="grid gap-4 p-5 lg:grid-cols-[1fr_1.2fr_1fr_1fr_auto] lg:items-end"
                   onSubmit={(event) => {
                     event.preventDefault();
                     updateAdmin.mutate({ id: entry.id, ...draft });
@@ -349,6 +377,20 @@ export default function AdminMiniAdminsPage() {
                         })
                       }
                       required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor={`phone-${entry.id}`}>Téléphone</Label>
+                    <Input
+                      id={`phone-${entry.id}`}
+                      type="tel"
+                      value={draft.phoneNumber}
+                      onChange={(event) =>
+                        setDraft(entry.id, {
+                          ...draft,
+                          phoneNumber: event.target.value,
+                        })
+                      }
                     />
                   </div>
                   <div className="space-y-2">

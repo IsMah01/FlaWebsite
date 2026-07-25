@@ -330,6 +330,7 @@ export const adminUsers = mysqlTable("admin_users", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   email: varchar("email", { length: 320 }).notNull().unique(),
+  phoneNumber: varchar("phoneNumber", { length: 50 }),
   passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
   passwordResetToken: varchar("passwordResetToken", { length: 64 }),
   passwordResetExpiresAt: timestamp("passwordResetExpiresAt"),

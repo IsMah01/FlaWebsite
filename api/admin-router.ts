@@ -83,7 +83,7 @@ export const adminRouter = createRouter({
 
   listInterviewAdmins: superAdminQuery.query(async () => {
     const [rows] = await getSqlPool().query<any[]>(`
-      SELECT admins.id, admins.name, admins.email, admins.isActive, admins.createdAt,
+      SELECT admins.id, admins.name, admins.email, admins.phoneNumber, admins.isActive, admins.createdAt,
         COUNT(DISTINCT assignments.candidateId) AS assignedCandidates,
         COUNT(DISTINCT CASE WHEN slots.status = 'scheduled' THEN slots.id END) AS scheduledSlots
       FROM admin_users admins
@@ -104,6 +104,7 @@ export const adminRouter = createRouter({
     .input(z.object({
       name: z.string().trim().min(2).max(255),
       email: z.string().trim().email().max(320),
+      phoneNumber: z.string().trim().max(50).optional().default(""),
       password: adminPasswordSchema,
     }))
     .mutation(async ({ input }) => {
@@ -114,6 +115,7 @@ export const adminRouter = createRouter({
       await db.insert(adminUsers).values({
         name: input.name,
         email,
+        phoneNumber: input.phoneNumber || null,
         passwordHash: await bcrypt.hash(input.password, 12),
         role: "interview_admin",
         isActive: true,
@@ -152,6 +154,7 @@ export const adminRouter = createRouter({
       id: z.number().int().positive(),
       name: z.string().trim().min(2).max(255),
       email: z.string().trim().email().max(320),
+      phoneNumber: z.string().trim().max(50).optional().default(""),
       password: z.union([z.literal(""), adminPasswordSchema]),
     }))
     .mutation(async ({ input }) => {
@@ -170,6 +173,7 @@ export const adminRouter = createRouter({
       await db.update(adminUsers).set({
         name: input.name,
         email,
+        phoneNumber: input.phoneNumber || null,
         ...(input.password ? {
           passwordHash: await bcrypt.hash(input.password, 12),
           passwordResetToken: null,

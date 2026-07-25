@@ -1,6 +1,7 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2";
 import { getSqlPool } from "../queries/connection";
 import { sendInterviewReminderEmail } from "./email";
+import { getServerNow } from "./server-clock";
 
 type UpcomingInterview = RowDataPacket & {
   bookingId: number;
@@ -49,7 +50,7 @@ async function finishReminder(
   );
 }
 
-export async function runInterviewReminderJob(now = new Date()) {
+export async function runInterviewReminderJob(now = getServerNow()) {
   const [rows] = await getSqlPool().execute<UpcomingInterview[]>(
     `SELECT b.id AS bookingId, c.firstName, c.email, s.startTime, s.meetingUrl
      FROM interview_bookings b

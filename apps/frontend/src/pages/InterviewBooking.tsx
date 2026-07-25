@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CalendarCheck, CalendarDays, CalendarPlus, Clock, ExternalLink, Loader2, ShieldCheck, UserRound, Video } from "lucide-react";
+import { CalendarCheck, CalendarDays, CalendarPlus, Clock, ExternalLink, Loader2, Mail, Phone, ShieldCheck, UserRound, Video } from "lucide-react";
 import { Link } from "react-router";
 import { toast } from "sonner";
 import Navbar from "@/components/Navbar";
@@ -69,7 +69,12 @@ function interviewHour(value: Date | string) {
   return Number(hour);
 }
 
-function formatCountdown(startTime: Date | string, now: number) {
+function formatCountdown(
+  startTime: Date | string,
+  endTime: Date | string,
+  now: number,
+) {
+  if (new Date(endTime).getTime() < now) return "انتهى موعد المقابلة";
   const milliseconds = new Date(startTime).getTime() - now;
   if (milliseconds <= 0) return "بدأ موعد المقابلة";
   const totalMinutes = Math.ceil(milliseconds / 60000);
@@ -111,6 +116,7 @@ export default function InterviewBooking() {
   const [activeDay, setActiveDay] = useState("");
   const [period, setPeriod] = useState<"all" | "morning" | "afternoon">("all");
   const [now, setNow] = useState(Date.now());
+  const [serverClockOffset, setServerClockOffset] = useState(0);
   const { viewer, isLoading, isAcceptedCandidate } = useViewerSession();
   const utils = trpc.useUtils();
   const overview = trpc.interview.candidateOverview.useQuery(undefined, {
@@ -123,6 +129,9 @@ export default function InterviewBooking() {
       if (!result.calendarInviteSent) {
         toast.warning("تم حفظ الموعد، لكن تعذر إرسال دعوة Google Calendar. ستتواصل الإدارة معكم.");
       }
+      if (!result.confirmationEmailSent) {
+        toast.warning("تم حفظ الموعد، لكن تعذر إرسال رسالة التأكيد بعد ثلاث محاولات.");
+      }
       await utils.interview.candidateOverview.invalidate();
       setSelectedSlot(null);
     },
@@ -133,6 +142,13 @@ export default function InterviewBooking() {
     const timer = window.setInterval(() => setNow(Date.now()), 30000);
     return () => window.clearInterval(timer);
   }, []);
+  useEffect(() => {
+    if (!overview.data?.serverNow) return;
+    setServerClockOffset(
+      new Date(overview.data.serverNow).getTime() - Date.now(),
+    );
+    setNow(Date.now());
+  }, [overview.data?.serverNow]);
 
   if (isLoading) return <div className="min-h-screen bg-[#F8FAF9]" />;
 
@@ -156,6 +172,7 @@ export default function InterviewBooking() {
   }
 
   const booking = overview.data?.booking;
+  const authoritativeNow = now + serverClockOffset;
   const availableSlots = overview.data?.availableSlots ?? [];
   const slotsByDay = availableSlots.reduce<Array<{ key: string; date: Date | string; slots: typeof availableSlots }>>(
     (groups, slot) => {
@@ -175,7 +192,10 @@ export default function InterviewBooking() {
   });
   const meetOpensAt = booking ? new Date(booking.startTime).getTime() - 15 * 60 * 1000 : 0;
   const meetClosesAt = booking ? new Date(booking.endTime).getTime() : 0;
-  const canJoinMeet = !!booking && now >= meetOpensAt && now <= meetClosesAt;
+  const canJoinMeet =
+    !!booking
+    && authoritativeNow >= meetOpensAt
+    && authoritativeNow <= meetClosesAt;
 
   return (
     <div className="min-h-screen bg-[#F8FAF9]" dir="rtl">
@@ -207,6 +227,16 @@ export default function InterviewBooking() {
                     <p className="text-sm font-semibold text-[#4A9B8E]">مسؤول مقابلتكم</p>
                     <h2 className="mt-1 text-xl font-bold text-gray-900">{overview.data.interviewer.name}</h2>
                     {overview.data.interviewer.description ? <p className="mt-2 max-w-3xl whitespace-pre-line leading-7 text-gray-600">{overview.data.interviewer.description}</p> : null}
+                    <div className="mt-4 flex flex-wrap justify-center gap-3 text-sm sm:justify-start">
+                      <a href={`mailto:${overview.data.interviewer.email}`} className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-2 font-medium text-emerald-800 hover:bg-emerald-100">
+                        <Mail className="h-4 w-4" />{overview.data.interviewer.email}
+                      </a>
+                      {overview.data.interviewer.phoneNumber ? (
+                        <a href={`tel:${overview.data.interviewer.phoneNumber}`} className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-2 font-medium text-emerald-800 hover:bg-emerald-100">
+                          <Phone className="h-4 w-4" />{overview.data.interviewer.phoneNumber}
+                        </a>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               </section>
@@ -226,7 +256,7 @@ export default function InterviewBooking() {
                               ? "تم تسجيل الغياب عن المقابلة"
                               : "تم إلغاء هذا الموعد من طرف الإدارة"}
                       </h2>
-                      {booking.status === "scheduled" ? <span className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold text-white" aria-live="polite">{formatCountdown(booking.startTime, now)}</span> : null}
+                      {booking.status === "scheduled" ? <span className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold text-white" aria-live="polite">{formatCountdown(booking.startTime, booking.endTime, authoritativeNow)}</span> : null}
                     </div>
                     <p className="mt-3 font-semibold text-gray-800">{formatInterviewDate(booking.startTime)}</p>
                     <p className="mt-1 text-xs text-gray-500">بتوقيت المغرب</p>
@@ -242,7 +272,7 @@ export default function InterviewBooking() {
                           <Button className="w-full bg-emerald-600 hover:bg-emerald-700">الدخول إلى Google Meet <ExternalLink className="mr-2 h-4 w-4" /></Button>
                         </a>
                       ) : (
-                        <Button disabled className="bg-gray-300 text-gray-600"><Video className="ml-2 h-4 w-4" /> {now > meetClosesAt ? "انتهى وقت المقابلة" : "متاح قبل الموعد بـ15 دقيقة"}</Button>
+                        <Button disabled className="bg-gray-300 text-gray-600"><Video className="ml-2 h-4 w-4" /> {authoritativeNow > meetClosesAt ? "انتهى وقت المقابلة" : "متاح قبل الموعد بـ15 دقيقة"}</Button>
                       )}
                     </div>
                   ) : null}

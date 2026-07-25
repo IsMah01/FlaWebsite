@@ -17,6 +17,8 @@ import ResetPassword from "./pages/ResetPassword";
 import InterviewBooking from "./pages/InterviewBooking";
 import AdminInterviewsPage from "./pages/AdminInterviewsPage";
 import AdminMiniAdminsPage from "./pages/AdminMiniAdminsPage";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsOfService from "./pages/TermsOfService";
 import ScrollManager from "./components/ScrollManager";
 import { useViewerSession } from "./hooks/useViewerSession";
 
@@ -53,6 +55,8 @@ export default function App() {
         <Route path="/news" element={<NewsPage />} />
         <Route path="/candidate-questionnaire" element={<CandidateQuestionnaire />} />
         <Route path="/interview" element={<InterviewBooking />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/terms" element={<TermsOfService />} />
         <Route path="/login" element={<Login />} />
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/admin/interviews" element={<AdminInterviewsPage />} />
