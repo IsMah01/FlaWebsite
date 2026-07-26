@@ -196,7 +196,10 @@ export const adminAuthRouter = createRouter({
           ip,
           email: normalizedEmail,
         });
-        throw new Error("Email ou mot de passe incorrect");
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Email ou mot de passe incorrect",
+        });
       }
 
       const ok = await bcrypt.compare(input.password, admin.passwordHash);
@@ -206,7 +209,10 @@ export const adminAuthRouter = createRouter({
           email: normalizedEmail,
           adminId: admin.id,
         });
-        throw new Error("Email ou mot de passe incorrect");
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Email ou mot de passe incorrect",
+        });
       }
 
       const token = jwt.sign(
