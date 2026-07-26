@@ -141,7 +141,9 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
   const [repeatCount, setRepeatCount] = useState(1);
   const [gapMinutes, setGapMinutes] = useState(0);
   const [candidateSearch, setCandidateSearch] = useState("");
-  const [candidateView, setCandidateView] = useState<"available" | "mine">("available");
+  const [candidateView, setCandidateView] = useState<"available" | "mine">(
+    adminRole === "interview_admin" ? "mine" : "available",
+  );
   const [candidateStatusFilter, setCandidateStatusFilter] = useState<"all" | "unassigned" | "assigned" | "unbooked" | "booked">("all");
   const [selectedCandidateIds, setSelectedCandidateIds] = useState<number[]>([]);
   const [slotFilter, setSlotFilter] = useState<"all" | "mine" | "booked" | "available">("all");
