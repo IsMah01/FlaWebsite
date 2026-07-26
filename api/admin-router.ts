@@ -1,7 +1,7 @@
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createRouter, adminQuery, superAdminQuery } from "./middleware";
 import { getDb, getSqlPool } from "./queries/connection";
@@ -734,6 +734,38 @@ export const adminRouter = createRouter({
         .where(eq(candidates.id, input.candidateId));
 
       return { success: true };
+    }),
+
+  acceptCandidatesByEmail: adminQuery
+    .input(
+      z.object({
+        emails: z.array(z.string().email()).min(1).max(2000),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const emails = [...new Set(input.emails.map((email) => email.trim().toLowerCase()))];
+      const matched = await db
+        .select({ email: candidates.email, applicationStatus: candidates.applicationStatus })
+        .from(candidates)
+        .where(inArray(candidates.email, emails));
+      const matchedEmails = new Set(matched.map((candidate) => candidate.email.toLowerCase()));
+      const emailsToAccept = matched
+        .filter((candidate) => candidate.applicationStatus !== "accepted")
+        .map((candidate) => candidate.email);
+
+      if (emailsToAccept.length) {
+        await db
+          .update(candidates)
+          .set({ applicationStatus: "accepted" } as any)
+          .where(inArray(candidates.email, emailsToAccept));
+      }
+
+      return {
+        acceptedCount: emailsToAccept.length,
+        alreadyAcceptedCount: matched.length - emailsToAccept.length,
+        notFound: emails.filter((email) => !matchedEmails.has(email)),
+      };
     }),
 
   listContactMessages: adminQuery.query(async () => {

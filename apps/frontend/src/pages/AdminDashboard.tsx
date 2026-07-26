@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
-import { CalendarClock, Download, FileText, LogOut, Mail, MessageSquareText, RefreshCw, ShieldCheck, Trash2, UserCog, Users } from "lucide-react";
+import { CalendarClock, Download, FileText, LogOut, Mail, MessageSquareText, RefreshCw, ShieldCheck, Trash2, Upload, UserCog, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -353,6 +353,67 @@ export default function AdminDashboard() {
     },
     onError: (err) => toast.error(err.message || "فشل تحديث حالة المترشح"),
   });
+  const acceptCandidatesByEmail = trpc.admin.acceptCandidatesByEmail.useMutation({
+    onSuccess: async ({ acceptedCount, alreadyAcceptedCount, notFound }) => {
+      const missingMessage = notFound.length
+        ? ` ${notFound.length} adresse(s) introuvable(s) : ${notFound.slice(0, 5).join(", ")}${notFound.length > 5 ? "…" : ""}`
+        : "";
+      const unchangedMessage = alreadyAcceptedCount ? ` ${alreadyAcceptedCount} déjà accepté(s).` : "";
+      toast.success(`${acceptedCount} candidat(s) nouvellement accepté(s).${unchangedMessage}${missingMessage}`, { duration: 10000 });
+      await Promise.all([utils.admin.listCandidates.invalidate(), utils.admin.stats.invalidate()]);
+    },
+    onError: (err) => toast.error(err.message || "Impossible d'importer les candidats acceptés"),
+  });
+
+  async function importAcceptedCandidates(file?: File) {
+    if (!file) return;
+    try {
+      const lines = (await file.text())
+        .replace(/^\uFEFF/, "")
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+      const header = lines.shift()?.replace(/^"|"$/g, "").trim().toLowerCase();
+      if (!header || !["email", "e-mail", "adresse email", "adresse e-mail"].includes(header)) {
+        toast.error("Fichier refusé : la première ligne doit être uniquement « email »");
+        return;
+      }
+      const invalidLines: number[] = [];
+      const emailPattern = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
+      const parsedEmails = lines.map((line, index) => {
+        const value = line.replace(/^"|"$/g, "").trim().toLowerCase();
+        if (line.includes(";") || line.includes(",") || !emailPattern.test(value)) invalidLines.push(index + 2);
+        return value;
+      });
+      if (invalidLines.length) {
+        toast.error(`Fichier refusé : ligne(s) invalide(s) ${invalidLines.slice(0, 10).join(", ")}`);
+        return;
+      }
+      const emails = [...new Set(parsedEmails)];
+      if (!emails.length) {
+        toast.error("Le fichier ne contient aucun candidat");
+        return;
+      }
+      if (emails.length > 2000) {
+        toast.error("Le fichier ne peut pas contenir plus de 2 000 adresses e-mail");
+        return;
+      }
+      const existingCandidates = new Map(
+        (candidates.data ?? []).map((candidate) => [candidate.email.toLowerCase(), candidate]),
+      );
+      const found = emails.filter((email) => existingCandidates.has(email));
+      const alreadyAccepted = found.filter((email) => existingCandidates.get(email)?.applicationStatus === "accepted");
+      const toAccept = found.length - alreadyAccepted.length;
+      const notFound = emails.length - found.length;
+      const confirmed = window.confirm(
+        `Vérification avant import :\n\n${toAccept} candidat(s) seront acceptés\n${alreadyAccepted.length} sont déjà acceptés\n${notFound} adresse(s) sont introuvables\n\nConfirmer cette modification ?`,
+      );
+      if (!confirmed) return;
+      await acceptCandidatesByEmail.mutateAsync({ emails });
+    } catch {
+      // Mutation errors are displayed by onError.
+    }
+  }
   const setCandidateAmbassador = trpc.admin.setCandidateAmbassador.useMutation({
     onSuccess: async () => {
       toast.success("Statut ambassadeur mis à jour");
@@ -1080,6 +1141,20 @@ export default function AdminDashboard() {
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <span className="text-sm text-slate-500">{filteredCandidates.length} نتيجة</span>
+              <label className="inline-flex h-10 cursor-pointer items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground">
+                <Upload className="ml-2 h-4 w-4" />
+                {acceptCandidatesByEmail.isPending ? "Importation…" : "Importer les acceptés (CSV)"}
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  className="hidden"
+                  disabled={acceptCandidatesByEmail.isPending}
+                  onChange={(event) => {
+                    void importAcceptedCandidates(event.target.files?.[0]);
+                    event.target.value = "";
+                  }}
+                />
+              </label>
               <Button variant="outline" onClick={() => downloadCsv("candidats.csv", candidatesCsvRows)}>
                 <Download className="ml-2 h-4 w-4" /> csv تصدير المترشحين
               </Button>
