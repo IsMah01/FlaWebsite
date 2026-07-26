@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { CalendarCheck, CalendarDays, CalendarPlus, Clock, ExternalLink, Loader2, Mail, Phone, ShieldCheck, UserRound, Video } from "lucide-react";
-import { Link } from "react-router";
+import { Link, Navigate } from "react-router";
 import { toast } from "sonner";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -158,26 +158,7 @@ export default function InterviewBooking() {
     );
   }
 
-  if (!viewer) {
-    return (
-      <div className="min-h-screen bg-[#F8FAF9]" dir="rtl">
-        <Navbar />
-        <main className="mx-auto max-w-2xl px-4 pb-20 pt-32 text-center">
-          <ShieldCheck className="mx-auto h-14 w-14 text-[#4A9B8E]" />
-          <h1 className="mt-5 text-2xl font-bold text-gray-900">تسجيل الدخول مطلوب</h1>
-          <p className="mt-3 leading-7 text-gray-600">
-            يرجى تسجيل الدخول بحساب المترشح لفتح فضاء المقابلة. بعد تسجيل الدخول ستعودون تلقائياً إلى هذه الصفحة.
-          </p>
-          <Link to="/signin?redirect=/interview">
-            <Button className="mt-7 bg-[#4A9B8E] hover:bg-[#3D7A6F]">
-              تسجيل الدخول إلى حساب المترشح
-            </Button>
-          </Link>
-        </main>
-        <Footer />
-      </div>
-    );
-  }
+  if (!viewer) return <Navigate to="/signin?redirect=%2Finterview" replace />;
 
   if (!isAcceptedCandidate) {
     return (
