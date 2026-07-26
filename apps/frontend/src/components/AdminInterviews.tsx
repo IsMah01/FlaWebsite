@@ -707,8 +707,8 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
           <div className="flex flex-col gap-2 sm:flex-row">
             <select className="h-10 rounded-md border bg-white px-3 text-sm" value={candidateStatusFilter} onChange={(event) => setCandidateStatusFilter(event.target.value as typeof candidateStatusFilter)}>
               <option value="all">Tous les états</option>
-              <option value="unassigned">Non affectés</option>
-              <option value="assigned">Affectés</option>
+              <option value="unassigned">Non sélectionnés par un mini-admin</option>
+              <option value="assigned">Sélectionnés par un mini-admin</option>
               <option value="unbooked">Sans réservation</option>
               <option value="booked">Réservés</option>
             </select>
@@ -737,6 +737,18 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
                 Confirmer {selectedCandidateIds.length} sélection(s)
               </Button>
             ) : null}
+          </div>
+        ) : isSuperAdmin ? (
+          <div className="mt-4 inline-flex flex-wrap rounded-md border bg-slate-50 p-1">
+            <Button type="button" size="sm" variant={candidateStatusFilter === "all" ? "default" : "ghost"} onClick={() => setCandidateStatusFilter("all")}>
+              Tous ({assignmentCandidates.data?.length ?? 0})
+            </Button>
+            <Button type="button" size="sm" variant={candidateStatusFilter === "unassigned" ? "default" : "ghost"} onClick={() => setCandidateStatusFilter("unassigned")}>
+              Non sélectionnés ({availableCandidates.length})
+            </Button>
+            <Button type="button" size="sm" variant={candidateStatusFilter === "assigned" ? "default" : "ghost"} onClick={() => setCandidateStatusFilter("assigned")}>
+              Sélectionnés ({myCandidates.length})
+            </Button>
           </div>
         ) : null}
 
