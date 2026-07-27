@@ -503,6 +503,7 @@ export const candidateAuthRouter = createRouter({
       const [account] = await db
         .select({
           id: newUsers.id,
+          email: newUsers.email,
           passwordResetExpiresAt: newUsers.passwordResetExpiresAt,
         })
         .from(newUsers)
@@ -519,7 +520,7 @@ export const candidateAuthRouter = createRouter({
         .select({ id: candidateInvitations.id })
         .from(candidateInvitations)
         .where(and(
-          eq(candidateInvitations.email, normalizedEmail),
+          eq(candidateInvitations.email, account.email),
           eq(candidateInvitations.status, "pending"),
         ))
         .limit(1);
