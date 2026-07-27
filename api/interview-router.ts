@@ -454,6 +454,7 @@ export const interviewRouter = createRouter({
         bookingStartTime: interviewSlots.startTime,
         bookingEndTime: interviewSlots.endTime,
         bookingMeetingUrl: interviewSlots.meetingUrl,
+        bookingStatus: interviewSlots.status,
       })
       .from(candidates)
       .leftJoin(
@@ -707,13 +708,13 @@ export const interviewRouter = createRouter({
         if (!booking) {
           throw new TRPCError({ code: "NOT_FOUND", message: "Ce candidat n’a plus de réservation." });
         }
-        if (booking.status !== "scheduled") {
+        if (booking.status !== "scheduled" && booking.status !== "cancelled") {
           throw new TRPCError({
             code: "PRECONDITION_FAILED",
-            message: "Seule une réservation planifiée peut être annulée.",
+            message: "Un entretien terminé ou marqué absent ne peut plus être annulé.",
           });
         }
-        if (!booking.googleEventId) {
+        if (booking.status === "scheduled" && !booking.googleEventId) {
           throw new TRPCError({
             code: "PRECONDITION_FAILED",
             message: "Cette réservation n’est pas synchronisée avec Google Calendar.",
@@ -722,8 +723,10 @@ export const interviewRouter = createRouter({
 
         googleEventId = booking.googleEventId;
         candidateEmail = booking.email;
-        await removeCandidateFromGoogleEvent(googleEventId, candidateEmail);
-        invitationRemoved = true;
+        if (booking.status === "scheduled") {
+          await removeCandidateFromGoogleEvent(googleEventId, candidateEmail);
+          invitationRemoved = true;
+        }
 
         await connection.query(
           "DELETE FROM interview_reminder_emails WHERE bookingId = ?",
@@ -739,6 +742,9 @@ export const interviewRouter = createRouter({
         await connection.commit();
         committed = true;
 
+        if (booking.status === "cancelled") {
+          return { success: true, emailSent: null, alreadyCancelled: true };
+        }
         const emailResult = await sendInterviewUpdateEmail(
           booking.email,
           booking.firstName,
@@ -751,7 +757,7 @@ export const interviewRouter = createRouter({
               }
             : undefined,
         );
-        return { success: true, emailSent: emailResult.success };
+        return { success: true, emailSent: emailResult.success, alreadyCancelled: false };
       } catch (error) {
         if (!committed) await connection.rollback().catch(() => null);
         if (!committed && invitationRemoved && googleEventId && candidateEmail) {

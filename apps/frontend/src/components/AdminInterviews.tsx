@@ -281,7 +281,9 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
   });
   const cancelCandidateBooking = trpc.interview.cancelCandidateBooking.useMutation({
     onSuccess: async (result) => {
-      if (result.emailSent) {
+      if (result.alreadyCancelled) {
+        toast.success("Réservation résiduelle supprimée ; le candidat peut choisir un nouveau créneau");
+      } else if (result.emailSent) {
         toast.success("Réservation annulée et candidat prévenu");
       } else {
         toast.warning("Réservation annulée, mais l’e-mail au candidat n’a pas pu être envoyé");
@@ -899,7 +901,8 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
                                     size="sm"
                                     variant="destructive"
                                     className="h-8"
-                                    disabled={cancelCandidateBooking.isPending}
+                                    disabled={cancelCandidateBooking.isPending || !["scheduled", "cancelled"].includes(candidate.bookingStatus || "")}
+                                    title={!["scheduled", "cancelled"].includes(candidate.bookingStatus || "") ? "Un entretien terminé ou marqué absent ne peut plus être annulé" : undefined}
                                     onClick={() => {
                                       if (window.confirm(
                                         `Annuler la réservation de ${candidate.firstName} ${candidate.lastName} ? Le candidat sera prévenu et devra choisir un nouveau créneau.`,
@@ -908,7 +911,7 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
                                       }
                                     }}
                                   >
-                                    Annuler la réservation
+                                    {candidate.bookingStatus === "cancelled" ? "Libérer la réservation" : "Annuler la réservation"}
                                   </Button>
                                 </div>
                               </div>
