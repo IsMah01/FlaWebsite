@@ -841,6 +841,7 @@ export const interviewRouter = createRouter({
         candidateFirstName: candidates.firstName,
         candidateLastName: candidates.lastName,
         candidateEmail: candidates.email,
+        assignedAdminId: interviewCandidateAssignments.adminId,
         bookedAt: interviewBookings.bookedAt,
         communicationScore: interviewBookings.communicationScore,
         motivationScore: interviewBookings.motivationScore,
@@ -852,6 +853,7 @@ export const interviewRouter = createRouter({
       .from(interviewSlots)
       .leftJoin(interviewBookings, eq(interviewSlots.id, interviewBookings.slotId))
       .leftJoin(candidates, eq(interviewBookings.candidateId, candidates.id))
+      .leftJoin(interviewCandidateAssignments, eq(candidates.id, interviewCandidateAssignments.candidateId))
       .leftJoin(adminUsers, eq(interviewSlots.createdByAdminId, adminUsers.id))
       .where(
         ctx.adminUser.role === "interview_admin"

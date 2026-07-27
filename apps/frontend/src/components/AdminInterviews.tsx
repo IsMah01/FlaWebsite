@@ -380,7 +380,8 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
   }, [assignmentCandidates.data, availableCandidates, candidateAdminFilter, candidateSearch, candidateStatusFilter, candidateView, isInterviewAdmin, isSuperAdmin, myCandidates]);
 
   const visibleSlots = useMemo(() => (slots.data ?? []).filter((slot) => {
-    if (isSuperAdmin && slotAdminFilter !== "all" && slot.createdByAdminId !== Number(slotAdminFilter)) return false;
+    const responsibleAdminId = slot.assignedAdminId ?? slot.createdByAdminId;
+    if (isSuperAdmin && slotAdminFilter !== "all" && responsibleAdminId !== Number(slotAdminFilter)) return false;
     if (slotFilter === "mine") return slot.isOwn;
     if (slotFilter === "booked") return !!slot.bookingId;
     if (slotFilter === "available") return !slot.bookingId && slot.status === "scheduled";
@@ -389,10 +390,11 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
   const overlappingSlotGroups = useMemo(() => {
     const slotsByAdmin = new Map<number, typeof slots.data>();
     for (const slot of slots.data ?? []) {
-      if (slot.status !== "scheduled" || !slot.createdByAdminId) continue;
-      const adminSlots = slotsByAdmin.get(slot.createdByAdminId) ?? [];
+      const responsibleAdminId = slot.assignedAdminId ?? slot.createdByAdminId;
+      if (slot.status !== "scheduled" || !responsibleAdminId) continue;
+      const adminSlots = slotsByAdmin.get(responsibleAdminId) ?? [];
       adminSlots.push(slot);
-      slotsByAdmin.set(slot.createdByAdminId, adminSlots);
+      slotsByAdmin.set(responsibleAdminId, adminSlots);
     }
 
     const groups: Array<{
@@ -410,7 +412,10 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
         if (current.length > 1) {
           groups.push({
             adminId,
-            adminName: current[0].createdByAdminName || current[0].interviewerName || "Mini-admin inconnu",
+            adminName: (assignmentAdmins.data ?? []).find((admin) => admin.id === adminId)?.name
+              || current[0].createdByAdminName
+              || current[0].interviewerName
+              || "Mini-admin inconnu",
             slots: current,
           });
         }
@@ -430,7 +435,7 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
       closeCurrentGroup();
     }
     return groups;
-  }, [slots.data]);
+  }, [assignmentAdmins.data, slots.data]);
   const planningDays = useMemo(() => {
     const groups = new Map<string, typeof visibleSlots>();
     for (const slot of visibleSlots) {
