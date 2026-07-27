@@ -5,6 +5,7 @@ import {
   LogOut,
   Save,
   ShieldCheck,
+  Trash2,
   UserCog,
   UserRoundCheck,
   UserPlus,
@@ -93,6 +94,19 @@ export default function AdminMiniAdminsPage() {
     onSuccess: async () => utils.admin.listInterviewAdmins.invalidate(),
     onError: (error) =>
       toast.error(error.message || "Impossible de modifier ce compte"),
+  });
+  const deleteAdmin = trpc.admin.deleteInterviewAdmin.useMutation({
+    onSuccess: async (_, variables) => {
+      toast.success("Mini-admin supprimé");
+      setDrafts((current) => {
+        const next = { ...current };
+        delete next[variables.id];
+        return next;
+      });
+      await utils.admin.listInterviewAdmins.invalidate();
+    },
+    onError: (error) =>
+      toast.error(error.message || "Impossible de supprimer ce mini-admin", { duration: 10000 }),
   });
 
   if (isLoading)
@@ -440,20 +454,38 @@ export default function AdminMiniAdminsPage() {
                         {entry.isActive ? "Actif" : "Inactif"}
                       </span>
                       </div>
-                      <p className="mt-1 text-xs text-slate-500">{entry.assignedCandidates} candidat(s) · {entry.scheduledSlots} créneau(x)</p>
+                      <p className="mt-1 text-xs text-slate-500">{entry.assignedCandidates} candidat(s) · {entry.scheduledSlots} créneau(x) · {entry.bookedInterviews} entretien(s)</p>
                     </div>
-                    <Button
-                      size="icon"
-                      type="submit"
-                      disabled={
-                        updateAdmin.isPending &&
-                        updateAdmin.variables?.id === entry.id
-                      }
-                      title="Enregistrer"
-                    >
-                      <Save className="h-4 w-4" />
-                      <span className="sr-only">Enregistrer</span>
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        size="icon"
+                        type="submit"
+                        disabled={
+                          updateAdmin.isPending &&
+                          updateAdmin.variables?.id === entry.id
+                        }
+                        title="Enregistrer"
+                      >
+                        <Save className="h-4 w-4" />
+                        <span className="sr-only">Enregistrer</span>
+                      </Button>
+                      <Button
+                        size="icon"
+                        type="button"
+                        variant="destructive"
+                        disabled={deleteAdmin.isPending && deleteAdmin.variables?.id === entry.id}
+                        title="Supprimer définitivement"
+                        onClick={() => {
+                          const workload = `${entry.assignedCandidates} candidat(s), ${entry.scheduledSlots} créneau(x) et ${entry.bookedInterviews} entretien(s)`;
+                          if (window.confirm(`Supprimer définitivement le mini-admin ${entry.name} ?\n\nCharge actuelle : ${workload}.\n\nLa suppression sera refusée tant que ces éléments ne sont pas tous traités.`)) {
+                            deleteAdmin.mutate({ id: entry.id });
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        <span className="sr-only">Supprimer</span>
+                      </Button>
+                    </div>
                   </div>
                 </form>
               );

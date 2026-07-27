@@ -485,10 +485,12 @@ export const adminRouter = createRouter({
     const [rows] = await getSqlPool().query<any[]>(`
       SELECT admins.id, admins.name, admins.email, admins.phoneNumber, admins.isActive, admins.createdAt,
         COUNT(DISTINCT assignments.candidateId) AS assignedCandidates,
-        COUNT(DISTINCT CASE WHEN slots.status = 'scheduled' THEN slots.id END) AS scheduledSlots
+        COUNT(DISTINCT CASE WHEN slots.status = 'scheduled' THEN slots.id END) AS scheduledSlots,
+        COUNT(DISTINCT bookings.id) AS bookedInterviews
       FROM admin_users admins
       LEFT JOIN interview_candidate_assignments assignments ON assignments.adminId = admins.id
       LEFT JOIN interview_slots slots ON slots.createdByAdminId = admins.id
+      LEFT JOIN interview_bookings bookings ON bookings.slotId = slots.id
       WHERE admins.role = 'interview_admin'
       GROUP BY admins.id, admins.name, admins.email, admins.isActive, admins.createdAt
       ORDER BY admins.createdAt DESC
@@ -497,6 +499,7 @@ export const adminRouter = createRouter({
       ...row,
       assignedCandidates: Number(row.assignedCandidates),
       scheduledSlots: Number(row.scheduledSlots),
+      bookedInterviews: Number(row.bookedInterviews),
     }));
   }),
 
@@ -547,6 +550,72 @@ export const adminRouter = createRouter({
       }
       await db.update(adminUsers).set({ isActive: input.isActive }).where(eq(adminUsers.id, target.id));
       return { success: true };
+    }),
+
+  deleteInterviewAdmin: superAdminQuery
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      const connection = await getSqlPool().getConnection();
+      try {
+        await connection.beginTransaction();
+        const [targets] = await connection.query<any[]>(
+          "SELECT id, name FROM admin_users WHERE id = ? AND role = 'interview_admin' LIMIT 1 FOR UPDATE",
+          [input.id],
+        );
+        const target = targets[0];
+        if (!target) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Mini-admin introuvable." });
+        }
+
+        const [workloadRows] = await connection.query<any[]>(
+          `SELECT
+             (SELECT COUNT(*) FROM interview_candidate_assignments WHERE adminId = ?) AS assignments,
+             (SELECT COUNT(*) FROM interview_slots WHERE createdByAdminId = ? AND status = 'scheduled') AS scheduledSlots,
+             (SELECT COUNT(*)
+                FROM interview_bookings bookings
+                INNER JOIN interview_slots slots ON slots.id = bookings.slotId
+               WHERE slots.createdByAdminId = ?) AS bookedInterviews`,
+          [target.id, target.id, target.id],
+        );
+        const workload = workloadRows[0];
+        const assignments = Number(workload.assignments);
+        const scheduledSlots = Number(workload.scheduledSlots);
+        const bookedInterviews = Number(workload.bookedInterviews);
+        if (assignments > 0 || scheduledSlots > 0 || bookedInterviews > 0) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: `Suppression impossible : ${assignments} candidat(s) affecté(s), ${scheduledSlots} créneau(x) planifié(s) et ${bookedInterviews} entretien(s) réservé(s). Réattribuez les candidats et traitez les entretiens d’abord.`,
+          });
+        }
+
+        // Keep historical audit entries and non-booked closed slots without retaining a dangling account id.
+        await connection.query(
+          "UPDATE interview_audit_logs SET actorAdminId = NULL WHERE actorAdminId = ?",
+          [target.id],
+        );
+        await connection.query(
+          "UPDATE interview_audit_logs SET targetAdminId = NULL WHERE targetAdminId = ?",
+          [target.id],
+        );
+        await connection.query(
+          "UPDATE interview_slots SET createdByAdminId = NULL WHERE createdByAdminId = ?",
+          [target.id],
+        );
+        const [deleted] = await connection.execute<any>(
+          "DELETE FROM admin_users WHERE id = ? AND role = 'interview_admin'",
+          [target.id],
+        );
+        if (deleted.affectedRows !== 1) {
+          throw new TRPCError({ code: "CONFLICT", message: "Le compte a été modifié. Actualisez la page." });
+        }
+        await connection.commit();
+        return { success: true };
+      } catch (error) {
+        await connection.rollback().catch(() => null);
+        throw error;
+      } finally {
+        connection.release();
+      }
     }),
 
   updateInterviewAdmin: superAdminQuery
