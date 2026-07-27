@@ -950,7 +950,20 @@ export const interviewRouter = createRouter({
       });
       const connection = await getSqlPool().getConnection();
       const googleEvents: Array<{ eventId: string; meetingUrl: string }> = [];
+      const creationLockName = "interview-slots:create";
+      let creationLockAcquired = false;
       try {
+        const [lockRows] = await connection.query<any[]>(
+          "SELECT GET_LOCK(?, 10) AS acquired",
+          [creationLockName],
+        );
+        creationLockAcquired = Number(lockRows[0]?.acquired) === 1;
+        if (!creationLockAcquired) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "Une autre création de créneaux est en cours. Réessayez dans quelques secondes.",
+          });
+        }
         await connection.beginTransaction();
         for (const slot of planned) {
           const [overlaps] = await connection.query<any[]>(
@@ -1010,6 +1023,9 @@ export const interviewRouter = createRouter({
         await Promise.all(googleEvents.map((event) => deleteGoogleCalendarEvent(event.eventId).catch(() => null)));
         throw error;
       } finally {
+        if (creationLockAcquired) {
+          await connection.query("SELECT RELEASE_LOCK(?)", [creationLockName]).catch(() => null);
+        }
         connection.release();
       }
       return { success: true, createdCount: planned.length };

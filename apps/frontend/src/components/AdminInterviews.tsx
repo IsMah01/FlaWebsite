@@ -386,6 +386,51 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
     if (slotFilter === "available") return !slot.bookingId && slot.status === "scheduled";
     return true;
   }), [isSuperAdmin, slotAdminFilter, slotFilter, slots.data]);
+  const overlappingSlotGroups = useMemo(() => {
+    const slotsByAdmin = new Map<number, typeof slots.data>();
+    for (const slot of slots.data ?? []) {
+      if (slot.status !== "scheduled" || !slot.createdByAdminId) continue;
+      const adminSlots = slotsByAdmin.get(slot.createdByAdminId) ?? [];
+      adminSlots.push(slot);
+      slotsByAdmin.set(slot.createdByAdminId, adminSlots);
+    }
+
+    const groups: Array<{
+      adminId: number;
+      adminName: string;
+      slots: NonNullable<typeof slots.data>;
+    }> = [];
+    for (const [adminId, adminSlots] of slotsByAdmin) {
+      const sorted = [...(adminSlots ?? [])].sort(
+        (left, right) => new Date(left.startTime).getTime() - new Date(right.startTime).getTime(),
+      );
+      let current: typeof sorted = [];
+      let latestEnd = 0;
+      const closeCurrentGroup = () => {
+        if (current.length > 1) {
+          groups.push({
+            adminId,
+            adminName: current[0].createdByAdminName || current[0].interviewerName || "Mini-admin inconnu",
+            slots: current,
+          });
+        }
+      };
+      for (const slot of sorted) {
+        const start = new Date(slot.startTime).getTime();
+        const end = new Date(slot.endTime).getTime();
+        if (current.length && start < latestEnd) {
+          current.push(slot);
+          latestEnd = Math.max(latestEnd, end);
+        } else {
+          closeCurrentGroup();
+          current = [slot];
+          latestEnd = end;
+        }
+      }
+      closeCurrentGroup();
+    }
+    return groups;
+  }, [slots.data]);
   const planningDays = useMemo(() => {
     const groups = new Map<string, typeof visibleSlots>();
     for (const slot of visibleSlots) {
@@ -899,6 +944,33 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
           ) : null}
         </div>
       </section>
+
+      {isSuperAdmin && overlappingSlotGroups.length > 0 ? (
+        <section className="rounded-2xl border border-red-300 bg-red-50 p-4 shadow-sm">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+            <div className="min-w-0 flex-1">
+              <h2 className="font-bold text-red-900">Créneaux en conflit détectés</h2>
+              <p className="mt-1 text-sm text-red-800">Ces mini-admins possèdent plusieurs créneaux planifiés qui se chevauchent. Vérifiez les réservations avant d’annuler ou déplacer un créneau.</p>
+              <div className="mt-3 space-y-3">
+                {overlappingSlotGroups.map((group, groupIndex) => (
+                  <div key={`${group.adminId}-${groupIndex}`} className="rounded-lg border border-red-200 bg-white p-3 text-sm">
+                    <p className="font-semibold text-red-900">{group.adminName}</p>
+                    <ul className="mt-2 space-y-1 text-red-800">
+                      {group.slots.map((slot) => (
+                        <li key={slot.id}>
+                          {formatDate(slot.startTime)} – {formatDate(slot.endTime)}
+                          {slot.candidateId ? ` · ${slot.candidateFirstName} ${slot.candidateLastName}` : " · Disponible"}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <section className="overflow-x-auto rounded-2xl border bg-white p-4 shadow-sm">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
