@@ -26,7 +26,7 @@ export default function AdminCandidateInvitationsPage() {
       setImportRows([]);
       setInvalidRows([]);
       setFileName("");
-      toast.success(`${result.createdCount} invitation(s) créée(s), ${result.emailSentCount} e-mail(s) envoyé(s).`);
+      toast.success(`${result.createdCount} invitation(s) créée(s), ${result.acceptedExistingCount} compte(s) existant(s) accepté(s), ${result.confirmationEmailSentCount} confirmation(s) envoyée(s).`);
       await utils.admin.listCandidateInvitations.invalidate();
     },
     onError: (error) => toast.error(error.message || "Échec de l’import."),
@@ -67,7 +67,7 @@ export default function AdminCandidateInvitationsPage() {
 
         <section className="border bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-            <div><h2 className="font-bold">Importer les futurs candidats acceptés</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">Formats .xlsx et .csv. Ils restent invisibles aux mini-admins jusqu’à l’activation du compte et au choix du mot de passe.</p></div>
+            <div><h2 className="font-bold">Importer les futurs candidats acceptés</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">Formats .xlsx et .csv. Les comptes existants sont acceptés immédiatement ; ceux dont l’e-mail n’est pas confirmé reçoivent un nouveau lien. Les autres reçoivent une invitation d’activation.</p></div>
             <Button type="button" variant="outline" onClick={downloadCandidateImportTemplate}><Download className="mr-2 h-4 w-4" />Télécharger le modèle</Button>
           </div>
           <div className="mt-5 grid gap-4 md:grid-cols-[1fr_auto] md:items-end">

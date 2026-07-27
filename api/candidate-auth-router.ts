@@ -369,6 +369,7 @@ export const candidateAuthRouter = createRouter({
         }
 
         await db.update(newUsers).set({ emailConfirmed: true, confirmationToken: null }).where(eq(newUsers.email, decoded.email));
+        await db.update(candidates).set({ emailConfirmed: true, confirmationToken: null }).where(eq(candidates.email, decoded.email));
 
         return { success: true, message: "تم تأكيد البريد الإلكتروني بنجاح" };
       } catch {

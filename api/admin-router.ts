@@ -1,6 +1,7 @@
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
+import jwt from "jsonwebtoken";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createRouter, adminQuery, superAdminQuery } from "./middleware";
@@ -14,9 +15,14 @@ import {
   newUsers,
   users,
 } from "@db/schema";
-import { sendCandidateActivationInvitationEmail } from "./lib/email";
+import { sendCandidateActivationInvitationEmail, sendConfirmationEmail } from "./lib/email";
 
 const CANDIDATE_INVITATION_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000;
+const JWT_SECRET = process.env.APP_SECRET;
+
+if (!JWT_SECRET) {
+  throw new Error("APP_SECRET is required");
+}
 
 function createCandidateInvitationToken() {
   const token = crypto.randomBytes(32).toString("hex");
@@ -24,6 +30,18 @@ function createCandidateInvitationToken() {
     token,
     hash: crypto.createHash("sha256").update(token).digest("hex"),
     expiresAt: new Date(Date.now() + CANDIDATE_INVITATION_LIFETIME_MS),
+  };
+}
+
+function createImportedAccountConfirmationToken(email: string) {
+  const token = jwt.sign(
+    { email, nonce: crypto.randomBytes(16).toString("hex") },
+    JWT_SECRET,
+    { expiresIn: "24h" },
+  );
+  return {
+    token,
+    hash: crypto.createHash("sha256").update(token).digest("hex"),
   };
 }
 
@@ -68,7 +86,7 @@ export const adminRouter = createRouter({
       const results: Array<{
         rowNumber: number;
         email: string;
-        status: "created" | "duplicate_file" | "already_registered" | "already_invited" | "failed";
+        status: "created" | "accepted_existing" | "duplicate_file" | "already_invited" | "failed";
         message: string;
         invitationId?: number;
         token?: string;
@@ -82,6 +100,12 @@ export const adminRouter = createRouter({
         firstName: string;
         token: string;
         expiresAt: Date;
+      }> = [];
+      const toConfirm: Array<{
+        resultIndex: number;
+        email: string;
+        firstName: string;
+        token: string;
       }> = [];
       const pool = getSqlPool();
 
@@ -106,12 +130,102 @@ export const adminRouter = createRouter({
         );
         const existing = existingAccounts[0];
         if (existing.accountId || existing.candidateId) {
-          results.push({
-            rowNumber: row.rowNumber,
-            email: row.email,
-            status: "already_registered",
-            message: "Un compte existe déjà avec cette adresse.",
-          });
+          const connection = await pool.getConnection();
+          try {
+            await connection.beginTransaction();
+            const [accounts] = await connection.query<any[]>(
+              `SELECT id, firstName, lastName, studyStatus, attestationUrl, phoneNumber,
+                      email, isAmbassador, password, emailConfirmed, confirmationToken,
+                      newsletterConsent
+               FROM new_users WHERE email = ? LIMIT 1 FOR UPDATE`,
+              [row.email],
+            );
+            const account = accounts[0];
+            if (!account) {
+              throw new Error("Le candidat ne possède pas de compte de connexion associé.");
+            }
+
+            const confirmation = account.emailConfirmed
+              ? null
+              : createImportedAccountConfirmationToken(row.email);
+            if (confirmation) {
+              await connection.execute(
+                `UPDATE new_users SET confirmationToken = ? WHERE id = ?`,
+                [confirmation.hash, account.id],
+              );
+            }
+
+            const [candidateRows] = await connection.query<any[]>(
+              `SELECT id FROM candidates WHERE email = ? LIMIT 1 FOR UPDATE`,
+              [row.email],
+            );
+            if (candidateRows[0]) {
+              await connection.execute(
+                `UPDATE candidates
+                 SET applicationStatus = 'accepted', emailConfirmed = ?, confirmationToken = ?
+                 WHERE id = ?`,
+                [account.emailConfirmed, confirmation?.hash ?? null, candidateRows[0].id],
+              );
+            } else {
+              await connection.execute(
+                `INSERT INTO candidates
+                   (newUserId, firstName, lastName, studyStatus, attestationUrl, phoneNumber,
+                    email, isAmbassador, password, emailConfirmed, confirmationToken,
+                    newsletterConsent, applicationStatus, questionnaireAnswers, adminNote)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'accepted', ?, ?)`,
+                [
+                  account.id,
+                  account.firstName,
+                  account.lastName,
+                  account.studyStatus,
+                  account.attestationUrl,
+                  account.phoneNumber,
+                  account.email,
+                  account.isAmbassador,
+                  account.password,
+                  account.emailConfirmed,
+                  confirmation?.hash ?? account.confirmationToken,
+                  account.newsletterConsent,
+                  JSON.stringify([]),
+                  "Candidat accepté via l’import Excel.",
+                ],
+              );
+            }
+            await connection.execute(
+              `UPDATE candidate_invitations SET status = 'revoked'
+               WHERE email = ? AND status = 'pending'`,
+              [row.email],
+            );
+            await connection.commit();
+
+            const resultIndex = results.length;
+            results.push({
+              rowNumber: row.rowNumber,
+              email: row.email,
+              status: "accepted_existing",
+              message: account.emailConfirmed
+                ? "Compte existant marqué comme accepté. E-mail déjà confirmé."
+                : "Compte existant marqué comme accepté. Confirmation à envoyer.",
+            });
+            if (confirmation) {
+              toConfirm.push({
+                resultIndex,
+                email: row.email,
+                firstName: account.firstName,
+                token: confirmation.token,
+              });
+            }
+          } catch (error) {
+            await connection.rollback().catch(() => null);
+            results.push({
+              rowNumber: row.rowNumber,
+              email: row.email,
+              status: "failed",
+              message: error instanceof Error ? error.message : "Impossible d’accepter le compte existant.",
+            });
+          } finally {
+            connection.release();
+          }
           continue;
         }
         if (existing.invitationId && existing.invitationStatus !== "revoked") {
@@ -217,10 +331,26 @@ export const adminRouter = createRouter({
           : "Invitation créée, mais l’e-mail n’a pas pu être envoyé.";
       });
 
+      await runWithConcurrency(toConfirm, 5, async (entry) => {
+        const emailResult = await sendConfirmationEmail(
+          entry.email,
+          entry.firstName,
+          entry.token,
+          { reminder: true },
+        );
+        results[entry.resultIndex].message = emailResult.success
+          ? "Compte existant marqué comme accepté et e-mail de confirmation envoyé."
+          : "Compte existant marqué comme accepté, mais l’e-mail de confirmation a échoué.";
+      });
+
       return {
         results: results.map(({ token: _token, expiresAt: _expiresAt, firstName: _firstName, ...result }) => result),
         createdCount: results.filter((result) => result.status === "created").length,
+        acceptedExistingCount: results.filter((result) => result.status === "accepted_existing").length,
         emailSentCount: results.filter((result) => result.status === "created" && result.message.includes("envoyé")).length,
+        confirmationEmailSentCount: results.filter(
+          (result) => result.status === "accepted_existing" && result.message.includes("confirmation envoyé"),
+        ).length,
       };
     }),
 
