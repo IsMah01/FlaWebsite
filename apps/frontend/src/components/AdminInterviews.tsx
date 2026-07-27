@@ -145,8 +145,10 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
     adminRole === "interview_admin" ? "mine" : "available",
   );
   const [candidateStatusFilter, setCandidateStatusFilter] = useState<"all" | "unassigned" | "assigned" | "unbooked" | "booked">("all");
+  const [candidateAdminFilter, setCandidateAdminFilter] = useState("all");
   const [selectedCandidateIds, setSelectedCandidateIds] = useState<number[]>([]);
   const [slotFilter, setSlotFilter] = useState<"all" | "mine" | "booked" | "available">("all");
+  const [slotAdminFilter, setSlotAdminFilter] = useState("all");
   const [slotView, setSlotView] = useState<"list" | "planning">("list");
   const [selectedSlotIds, setSelectedSlotIds] = useState<number[]>([]);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
@@ -358,6 +360,13 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
       ? candidateView === "available" ? availableCandidates : myCandidates
       : assignmentCandidates.data ?? [];
     const statusFiltered = candidates.filter((candidate) => {
+      if (isSuperAdmin && candidateAdminFilter === "unassigned" && candidate.assignedAdminId) return false;
+      if (
+        isSuperAdmin
+        && candidateAdminFilter !== "all"
+        && candidateAdminFilter !== "unassigned"
+        && candidate.assignedAdminId !== Number(candidateAdminFilter)
+      ) return false;
       if (candidateStatusFilter === "unassigned") return !candidate.assignedAdminId;
       if (candidateStatusFilter === "assigned") return !!candidate.assignedAdminId;
       if (candidateStatusFilter === "unbooked") return !candidate.bookingId;
@@ -368,14 +377,15 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
     return statusFiltered.filter((candidate) =>
       `${candidate.firstName} ${candidate.lastName} ${candidate.email} ${candidate.phoneNumber || ""}`.toLowerCase().includes(query),
     );
-  }, [assignmentCandidates.data, availableCandidates, candidateSearch, candidateStatusFilter, candidateView, isInterviewAdmin, myCandidates]);
+  }, [assignmentCandidates.data, availableCandidates, candidateAdminFilter, candidateSearch, candidateStatusFilter, candidateView, isInterviewAdmin, isSuperAdmin, myCandidates]);
 
   const visibleSlots = useMemo(() => (slots.data ?? []).filter((slot) => {
+    if (isSuperAdmin && slotAdminFilter !== "all" && slot.createdByAdminId !== Number(slotAdminFilter)) return false;
     if (slotFilter === "mine") return slot.isOwn;
     if (slotFilter === "booked") return !!slot.bookingId;
     if (slotFilter === "available") return !slot.bookingId && slot.status === "scheduled";
     return true;
-  }), [slots.data, slotFilter]);
+  }), [isSuperAdmin, slotAdminFilter, slotFilter, slots.data]);
   const planningDays = useMemo(() => {
     const groups = new Map<string, typeof visibleSlots>();
     for (const slot of visibleSlots) {
@@ -705,6 +715,13 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
+            {isSuperAdmin ? (
+              <select className="h-10 rounded-md border bg-white px-3 text-sm" value={candidateAdminFilter} onChange={(event) => setCandidateAdminFilter(event.target.value)}>
+                <option value="all">Tous les mini-admins</option>
+                <option value="unassigned">Sans mini-admin</option>
+                {(assignmentAdmins.data ?? []).map((admin) => <option key={admin.id} value={String(admin.id)}>{admin.name}{admin.isActive ? "" : " (inactif)"}</option>)}
+              </select>
+            ) : null}
             <select className="h-10 rounded-md border bg-white px-3 text-sm" value={candidateStatusFilter} onChange={(event) => setCandidateStatusFilter(event.target.value as typeof candidateStatusFilter)}>
               <option value="all">Tous les états</option>
               <option value="unassigned">Non sélectionnés par un mini-admin</option>
@@ -902,6 +919,12 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
               <option value="booked">Créneaux réservés</option>
               <option value="available">Créneaux disponibles</option>
             </select>
+            {isSuperAdmin ? (
+              <select className="h-10 rounded-md border bg-white px-3 text-sm" value={slotAdminFilter} onChange={(event) => setSlotAdminFilter(event.target.value)}>
+                <option value="all">Tous les mini-admins</option>
+                {(assignmentAdmins.data ?? []).map((admin) => <option key={admin.id} value={String(admin.id)}>{admin.name}{admin.isActive ? "" : " (inactif)"}</option>)}
+              </select>
+            ) : null}
           </div>
         </div>
         {slotView === "planning" ? (
