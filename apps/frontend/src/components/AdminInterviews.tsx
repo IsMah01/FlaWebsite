@@ -259,8 +259,9 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
     },
   });
   const releaseCandidate = trpc.interview.releaseCandidate.useMutation({
-    onSuccess: async () => {
-      toast.success("Candidat remis dans la liste disponible");
+    onSuccess: async (result) => {
+      if (result.emailSent) toast.success("Candidat libéré et prévenu par e-mail");
+      else toast.warning("Candidat libéré, mais l’e-mail n’a pas pu être envoyé");
       await Promise.all([
         utils.interview.assignmentCandidates.invalidate(),
         utils.interview.recentAudit.invalidate(),
@@ -928,15 +929,15 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
                           type="button"
                           size="sm"
                           variant="outline"
-                          disabled={!!candidate.bookingId || releaseCandidate.isPending}
-                          title={candidate.bookingId ? "Ce candidat a déjà réservé un créneau" : "Remettre ce candidat dans la liste disponible"}
+                          disabled={(!!candidate.bookingId && candidate.bookingStatus !== "cancelled") || releaseCandidate.isPending}
+                          title={candidate.bookingId && candidate.bookingStatus !== "cancelled" ? "Ce candidat a déjà réservé un créneau" : "Remettre ce candidat dans la liste disponible"}
                           onClick={() => {
                             if (window.confirm(`Libérer ${candidate.firstName} ${candidate.lastName} ?`)) {
                               releaseCandidate.mutate({ candidateId: candidate.id });
                             }
                           }}
                         >
-                          {candidate.bookingId ? "Créneau réservé" : "Libérer"}
+                          {candidate.bookingId && candidate.bookingStatus !== "cancelled" ? "Créneau réservé" : "Libérer"}
                         </Button>
                       </td>
                     ) : null}

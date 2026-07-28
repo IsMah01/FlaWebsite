@@ -404,7 +404,7 @@ export async function sendInterviewReminderEmail(
 export async function sendInterviewUpdateEmail(
   to: string,
   firstName: string,
-  type: "assigned" | "slots_available" | "cancelled" | "reassigned",
+  type: "assigned" | "slots_available" | "booking_reminder" | "cancelled" | "released" | "reassigned",
   interviewer?: {
     name: string;
     email: string;
@@ -452,6 +452,14 @@ export async function sendInterviewUpdateEmail(
       note: "بعد حجز الموعد، ستجد تفاصيل المقابلة ورابط Google Meet داخل فضائك.",
       button: "عرض المواعيد المتاحة",
     },
+    booking_reminder: {
+      eyebrow: "تذكير بحجز المقابلة",
+      subject: "تذكير: يرجى اختيار موعد مقابلتك",
+      title: "لا تنس حجز موعد مقابلتك",
+      body: "لم تقم بعد بحجز موعد مقابلتك الشفوية. توجد مواعيد متاحة، يرجى الدخول إلى فضاء المقابلة واختيار الموعد المناسب لك في أقرب وقت.",
+      note: "بعد حجز الموعد، ستجد تفاصيل المقابلة ورابط Google Meet داخل فضائك.",
+      button: "اختيار موعد المقابلة",
+    },
     cancelled: {
       eyebrow: "تحديث بخصوص مقابلتك",
       subject: "تم إلغاء موعد مقابلتك السابق",
@@ -459,6 +467,14 @@ export async function sendInterviewUpdateEmail(
       body: "نحيطك علماً بأنه تم إلغاء موعد مقابلتك السابق. يرجى الدخول إلى فضاء المقابلة للاطلاع على المواعيد الجديدة واختيار الموعد الذي يناسبك.",
       note: "لن تتلقى أي تذكير بخصوص الموعد الملغى. ستبدأ التذكيرات من جديد بعد اختيار موعد جديد. نعتذر عن هذا التغيير ونشكرك على تفهّمك.",
       button: "اختيار موعد جديد",
+    },
+    released: {
+      eyebrow: "تحديث بخصوص مقابلتك",
+      subject: "تم تحديث إسناد مقابلتك",
+      title: "مقابلتك في انتظار إسناد جديد",
+      body: "تم إنهاء الإسناد الحالي للمسؤول عن مقابلتك. لا يلزمك اتخاذ أي إجراء الآن، وسيتم إشعارك عند إسناد مسؤول جديد إليك.",
+      note: "لن تتلقى تذكيرات بالحجز إلى أن يتم إسناد مسؤول جديد وتتوفر مواعيد قابلة للحجز.",
+      button: "فتح فضاء المقابلة",
     },
     reassigned: {
       eyebrow: "تحديث بخصوص مقابلتك",
@@ -568,6 +584,50 @@ export async function sendInterviewUpdateEmail(
   return sendMailWithRetry({
     from: `"${AR_ORG}" <${SMTP_FROM}>`,
     to,
+    subject,
+    html,
+    text,
+    attachments: logo.attachments,
+  });
+}
+
+export async function sendInterviewAdminSlotReminderEmail(input: {
+  to: string;
+  adminName: string;
+  unbookedCount: number;
+  emptySlotCount: number;
+}) {
+  if (!SMTP_HOST || !SMTP_USER) {
+    console.warn("[Email] SMTP not configured. Skipping admin slot reminder email.");
+    return { success: false as const, attempts: 0, reason: "SMTP_NOT_CONFIGURED" };
+  }
+
+  const adminUrl = `${PUBLIC_APP_URL}/admin/interviews`;
+  const safeName = escapeEmailHtml(input.adminName || "");
+  const safeAdminUrl = escapeEmailHtml(adminUrl);
+  const subject = `Rappel : ajoutez des créneaux d’entretien - ${AR_ORG}`;
+  const logo = getEmailLogo();
+  const html = `<!doctype html>
+    <html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${subject}</title></head>
+    <body style="margin:0;padding:0;background:#f2f7f6;font-family:Arial,sans-serif;color:#173f39;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:24px 12px;">
+        <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="width:100%;max-width:600px;background:#fff;border-radius:16px;overflow:hidden;">
+          <tr><td align="center" style="padding:26px;border-bottom:1px solid #e5eeec;"><img src="${logo.src}" width="190" alt="Future Leaders Foundation"></td></tr>
+          <tr><td style="padding:30px 32px;">
+            <h1 style="margin:0 0 20px;font-size:24px;">Des créneaux supplémentaires sont nécessaires</h1>
+            <p style="font-size:16px;line-height:1.8;">Bonjour ${safeName},</p>
+            <p style="font-size:16px;line-height:1.8;">Vous avez <strong>${input.unbookedCount} candidat(s) sans réservation</strong> et <strong>${input.emptySlotCount} créneau(x) futur(s) disponible(s)</strong>.</p>
+            <p style="font-size:16px;line-height:1.8;">Merci d’ajouter des créneaux afin de conserver une marge suffisante pour les candidats.</p>
+            <p style="text-align:center;margin:28px 0 0;"><a href="${safeAdminUrl}" style="display:inline-block;padding:14px 28px;border-radius:9px;background:#4A9B8E;color:#fff;text-decoration:none;font-weight:bold;">Gérer les créneaux</a></p>
+          </td></tr>
+        </table>
+      </td></tr></table>
+    </body></html>`;
+  const text = `Bonjour ${input.adminName},\n\nVous avez ${input.unbookedCount} candidat(s) sans réservation et ${input.emptySlotCount} créneau(x) futur(s) disponible(s). Merci d’ajouter des créneaux : ${adminUrl}`;
+
+  return sendMailWithRetry({
+    from: `"${AR_ORG}" <${SMTP_FROM}>`,
+    to: input.to,
     subject,
     html,
     text,

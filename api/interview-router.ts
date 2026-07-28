@@ -106,6 +106,14 @@ async function cancelInterviewSlot(slotId: number) {
     [calendarSynced ? "synced" : "failed", calendarSyncError, slotId],
   );
   const newlyCancelled = transition.affectedRows === 1;
+  if (newlyCancelled) {
+    await getSqlPool().execute(
+      `DELETE reminders FROM interview_reminder_emails reminders
+       INNER JOIN interview_bookings bookings ON bookings.id = reminders.bookingId
+       WHERE bookings.slotId = ?`,
+      [slotId],
+    );
+  }
   if (!newlyCancelled && slot.status === "cancelled") {
     await db.update(interviewSlots).set({
       calendarSyncStatus: calendarSynced ? "synced" : "failed",
@@ -573,8 +581,10 @@ export const interviewRouter = createRouter({
       try {
         await connection.beginTransaction();
         const [assignmentRows] = await connection.query<any[]>(
-          `SELECT id, adminId FROM interview_candidate_assignments
-           WHERE candidateId = ? LIMIT 1 FOR UPDATE`,
+          `SELECT assignments.id, assignments.adminId, candidates.firstName, candidates.email
+           FROM interview_candidate_assignments assignments
+           INNER JOIN candidates ON candidates.id = assignments.candidateId
+           WHERE assignments.candidateId = ? LIMIT 1 FOR UPDATE`,
           [input.candidateId],
         );
         const assignment = assignmentRows[0];
@@ -583,14 +593,22 @@ export const interviewRouter = createRouter({
         }
 
         const [bookingRows] = await connection.query<any[]>(
-          "SELECT id FROM interview_bookings WHERE candidateId = ? LIMIT 1 FOR UPDATE",
+          `SELECT bookings.id, slots.status
+           FROM interview_bookings bookings
+           INNER JOIN interview_slots slots ON slots.id = bookings.slotId
+           WHERE bookings.candidateId = ? LIMIT 1 FOR UPDATE`,
           [input.candidateId],
         );
-        if (bookingRows.length) {
+        const booking = bookingRows[0];
+        if (booking && booking.status !== "cancelled") {
           throw new TRPCError({
             code: "PRECONDITION_FAILED",
             message: "Ce candidat a deja reserve un creneau et ne peut plus etre libere.",
           });
+        }
+        if (booking) {
+          await connection.query("DELETE FROM interview_reminder_emails WHERE bookingId = ?", [booking.id]);
+          await connection.query("DELETE FROM interview_bookings WHERE id = ?", [booking.id]);
         }
 
         await connection.query("DELETE FROM interview_candidate_assignments WHERE id = ?", [assignment.id]);
@@ -600,7 +618,12 @@ export const interviewRouter = createRouter({
           [ctx.adminUser.id, input.candidateId, ctx.adminUser.id],
         );
         await connection.commit();
-        return { success: true };
+        const emailResult = await sendInterviewUpdateEmail(
+          assignment.email,
+          assignment.firstName,
+          "released",
+        );
+        return { success: true, emailSent: emailResult.success };
       } catch (error) {
         await connection.rollback();
         throw error;
@@ -628,10 +651,12 @@ export const interviewRouter = createRouter({
       try {
         await connection.beginTransaction();
         const [adminRows] = await connection.query<any[]>(
-          "SELECT id FROM admin_users WHERE id = ? AND role = 'interview_admin' AND isActive = true LIMIT 1 FOR UPDATE",
+          `SELECT id, name, email, phoneNumber FROM admin_users
+           WHERE id = ? AND role = 'interview_admin' AND isActive = true LIMIT 1 FOR UPDATE`,
           [input.targetAdminId],
         );
         if (!adminRows.length) throw new TRPCError({ code: "BAD_REQUEST", message: "Le mini-admin cible est introuvable ou inactif." });
+        const targetAdmin = adminRows[0];
 
         const [candidateRows] = await connection.query<any[]>(
           "SELECT id, firstName, email, applicationStatus FROM candidates WHERE id = ? LIMIT 1 FOR UPDATE",
@@ -669,7 +694,11 @@ export const interviewRouter = createRouter({
           [ctx.adminUser.id, input.candidateId, input.targetAdminId],
         );
         await connection.commit();
-        await sendInterviewUpdateEmail(candidate.email, candidate.firstName, "reassigned");
+        await sendInterviewUpdateEmail(candidate.email, candidate.firstName, "reassigned", {
+          name: targetAdmin.name,
+          email: targetAdmin.email,
+          phoneNumber: targetAdmin.phoneNumber,
+        });
         return { success: true, changed: true };
       } catch (error) {
         await connection.rollback();

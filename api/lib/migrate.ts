@@ -308,6 +308,42 @@ export async function ensureDatabaseSchema() {
     await addColumnIfMissing(connection, "interview_reminder_emails", "nextAttemptAt", "nextAttemptAt TIMESTAMP NULL");
 
     await connection.query(`
+      CREATE TABLE IF NOT EXISTS interview_booking_reminder_emails (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        candidateId INT NOT NULL,
+        email VARCHAR(320) NOT NULL,
+        reminderDate CHAR(10) NOT NULL,
+        reminderHour ENUM('10','18') NOT NULL,
+        status ENUM('pending','sent','failed') NOT NULL DEFAULT 'pending',
+        errorMessage TEXT NULL,
+        sentAt TIMESTAMP NULL,
+        createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY interview_booking_reminder_run_unique (candidateId, reminderDate, reminderHour),
+        INDEX interview_booking_reminder_status_idx (status)
+      )
+    `);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS interview_admin_slot_reminder_emails (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        adminId INT NOT NULL,
+        email VARCHAR(320) NOT NULL,
+        reminderDate CHAR(10) NOT NULL,
+        reminderHour ENUM('10','18') NOT NULL,
+        unbookedCount INT NOT NULL,
+        emptySlotCount INT NOT NULL,
+        status ENUM('pending','sent','failed') NOT NULL DEFAULT 'pending',
+        errorMessage TEXT NULL,
+        sentAt TIMESTAMP NULL,
+        createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY interview_admin_slot_reminder_run_unique (adminId, reminderDate, reminderHour),
+        INDEX interview_admin_slot_reminder_status_idx (status)
+      )
+    `);
+
+    await connection.query(`
       CREATE TABLE IF NOT EXISTS candidate_invitations (
         id INT AUTO_INCREMENT PRIMARY KEY,
         firstName VARCHAR(255) NOT NULL,
