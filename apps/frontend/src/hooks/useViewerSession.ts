@@ -58,7 +58,8 @@ export function useViewerSession() {
       return {
         kind: "site-user",
         id: authQuery.data.id,
-        name: authQuery.data.name || authQuery.data.email || authQuery.data.unionId,
+        name:
+          authQuery.data.name || authQuery.data.email || authQuery.data.unionId,
         email: authQuery.data.email,
         role: authQuery.data.role,
         isAmbassador: false,
@@ -73,7 +74,8 @@ export function useViewerSession() {
         email: candidateQuery.data.email,
         isAmbassador: candidateQuery.data.isAmbassador,
         studyStatus: candidateQuery.data.studyStatus,
-        hasSubmittedQuestionnaire: candidateQuery.data.hasSubmittedQuestionnaire,
+        hasSubmittedQuestionnaire:
+          candidateQuery.data.hasSubmittedQuestionnaire,
         applicationStatus: candidateQuery.data.applicationStatus,
       };
     }
@@ -82,7 +84,8 @@ export function useViewerSession() {
       return {
         kind: "site-user",
         id: authQuery.data.id,
-        name: authQuery.data.name || authQuery.data.email || authQuery.data.unionId,
+        name:
+          authQuery.data.name || authQuery.data.email || authQuery.data.unionId,
         email: authQuery.data.email,
         role: authQuery.data.role,
         isAmbassador: false,
