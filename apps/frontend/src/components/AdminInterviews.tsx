@@ -1157,16 +1157,29 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
           </div>
         </div>
         {slotView === "planning" ? (
-          <div className="grid gap-4 py-2 lg:grid-cols-2">
+          <div className="grid gap-4 py-2 xl:grid-cols-2">
             {planningDays.map(([day, daySlots]) => (
-              <div key={day} className="border bg-slate-50">
-                <h3 className="border-b bg-white p-3 font-semibold">{new Intl.DateTimeFormat("fr-FR", { timeZone: "Africa/Casablanca", dateStyle: "full" }).format(new Date(daySlots[0].startTime))}</h3>
-                <div className="divide-y">{daySlots.map((slot) => (
-                  <div key={slot.id} className="flex items-center justify-between gap-3 p-3">
-                    <div><p className="font-medium">{new Intl.DateTimeFormat("fr-FR", { timeZone: "Africa/Casablanca", hour: "2-digit", minute: "2-digit" }).format(new Date(slot.startTime))} – {new Intl.DateTimeFormat("fr-FR", { timeZone: "Africa/Casablanca", hour: "2-digit", minute: "2-digit" }).format(new Date(slot.endTime))}</p><p className="text-xs text-slate-500">{slot.candidateId ? `${slot.candidateFirstName} ${slot.candidateLastName}` : "Disponible"} · {slot.interviewerName || "-"}</p></div>
-                    <span className={`h-2.5 w-2.5 rounded-full ${slot.status === "completed" ? "bg-emerald-500" : slot.status === "absent" ? "bg-red-500" : slot.bookingId ? "bg-blue-500" : "bg-slate-300"}`} />
-                  </div>
-                ))}</div>
+              <div key={day} className="overflow-hidden rounded-xl border bg-slate-50">
+                <h3 className="border-b bg-white p-3 font-semibold capitalize">{new Intl.DateTimeFormat("fr-FR", { timeZone: "Africa/Casablanca", dateStyle: "full" }).format(new Date(daySlots[0].startTime))}</h3>
+                <div className="space-y-3 p-3">{daySlots.map((slot) => {
+                  const transferPending = (transferRequests.data ?? []).some((request) => request.slotId === slot.id && request.status === "pending");
+                  return (
+                  <article key={slot.id} className={`rounded-xl border bg-white p-4 shadow-sm ${slot.bookingId ? "border-blue-200" : "border-slate-200"}`}>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="flex items-center gap-2 text-base font-bold text-slate-900"><Clock3 className="h-4 w-4 text-[#4A9B8E]" />{new Intl.DateTimeFormat("fr-FR", { timeZone: "Africa/Casablanca", hour: "2-digit", minute: "2-digit" }).format(new Date(slot.startTime))} – {new Intl.DateTimeFormat("fr-FR", { timeZone: "Africa/Casablanca", hour: "2-digit", minute: "2-digit" }).format(new Date(slot.endTime))}</p>
+                        <p className="mt-1 text-xs text-slate-500">Jury : {slot.interviewerName || slot.createdByAdminName || "Non renseigné"}</p>
+                      </div>
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${slot.status === "completed" ? "bg-emerald-100 text-emerald-800" : slot.status === "absent" ? "bg-red-100 text-red-800" : slot.status === "cancelled" ? "bg-slate-200 text-slate-700" : slot.bookingId ? "bg-blue-100 text-blue-800" : "bg-amber-100 text-amber-800"}`}>{slot.status === "completed" ? "Terminé" : slot.status === "absent" ? "Absent" : slot.status === "cancelled" ? "Annulé" : slot.bookingId ? "Réservé" : "Disponible"}</span>
+                    </div>
+                    {slot.candidateId ? <div className="mt-3 rounded-lg bg-blue-50 p-3"><p className="flex items-center gap-2 font-semibold text-blue-950"><UserRound className="h-4 w-4" />{slot.candidateFirstName} {slot.candidateLastName}</p><p className="mt-1 break-all text-xs text-blue-800">{slot.candidateEmail}</p></div> : <p className="mt-3 rounded-lg bg-slate-100 p-3 text-sm text-slate-600">Aucun candidat n’a encore réservé ce créneau.</p>}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {slot.bookingId ? <a href={slot.meetingUrl} target="_blank" rel="noreferrer"><Button type="button" size="sm" variant="outline"><Video className="mr-1 h-4 w-4" /> Ouvrir Meet</Button></a> : null}
+                      {isInterviewAdmin && slot.bookingId && slot.status === "scheduled" ? transferPending ? <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-3 py-2 text-xs font-semibold text-amber-800"><Clock3 className="h-3.5 w-3.5" /> Transfert en attente</span> : <Button type="button" size="sm" variant="outline" className="border-blue-200 bg-blue-50 text-blue-800 hover:bg-blue-100" onClick={() => { setTransferDialogSlotId(slot.id); setTransferTargetAdminId(""); setTransferConflictConfirmation(false); }}><ArrowRightLeft className="mr-1 h-4 w-4" /> Transférer</Button> : null}
+                      {slot.canDelete && slot.status !== "cancelled" ? <Button type="button" size="sm" variant="destructive" disabled={deleteOwnSlot.isPending} onClick={() => { if (window.confirm(slot.bookingId ? "Supprimer ce créneau et prévenir le candidat réservé ?" : "Supprimer ce créneau disponible ?")) deleteOwnSlot.mutate({ slotId: slot.id }); }}><Trash2 className="mr-1 h-4 w-4" /> Supprimer</Button> : null}
+                    </div>
+                  </article>
+                );})}</div>
               </div>
             ))}
           </div>
