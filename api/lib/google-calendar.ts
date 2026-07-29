@@ -284,6 +284,21 @@ export async function inviteCandidateToGoogleEvent(eventId: string, candidateEma
   await setCandidateAttendance(eventId, candidateEmail, true);
 }
 
+export async function updateGoogleEventInterviewer(eventId: string, interviewerName: string) {
+  const calendarId = encodeURIComponent(requireOAuthConfig().calendarId);
+  const path = `/calendars/${calendarId}/events/${encodeURIComponent(eventId)}`;
+  const event = await googleCalendarRequest(path);
+  const descriptionLines = String(event?.description || "")
+    .split("\n")
+    .filter((line) => !line.trim().toLowerCase().startsWith("jury :"));
+  await googleCalendarRequest(`${path}?sendUpdates=none`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      description: [`Jury : ${interviewerName}`, ...descriptionLines].filter(Boolean).join("\n"),
+    }),
+  });
+}
+
 async function setCandidateAttendance(eventId: string, candidateEmail: string, attending: boolean) {
   const calendarId = encodeURIComponent(requireOAuthConfig().calendarId);
   const path = `/calendars/${calendarId}/events/${encodeURIComponent(eventId)}`;

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, CalendarPlus, Camera, Clock3, Coffee, ExternalLink, Link2, Save, Trash2, UserCheck, UserRound, Users, Video } from "lucide-react";
+import { AlertCircle, ArrowRightLeft, CalendarPlus, Camera, Check, Clock3, Coffee, ExternalLink, Link2, Save, Trash2, UserCheck, UserRound, Users, Video, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { trpc } from "@/providers/trpc";
 
 function formatDate(value: Date | string) {
@@ -151,6 +152,9 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
   const [slotAdminFilter, setSlotAdminFilter] = useState("all");
   const [slotView, setSlotView] = useState<"list" | "planning">("list");
   const [selectedSlotIds, setSelectedSlotIds] = useState<number[]>([]);
+  const [transferDialogSlotId, setTransferDialogSlotId] = useState<number | null>(null);
+  const [transferTargetAdminId, setTransferTargetAdminId] = useState("");
+  const [transferConflictConfirmation, setTransferConflictConfirmation] = useState(false);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
   const [profilePhoneNumber, setProfilePhoneNumber] = useState("");
   const [profileDescription, setProfileDescription] = useState("");
@@ -166,6 +170,12 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
   const assignmentCandidates = trpc.interview.assignmentCandidates.useQuery(undefined, { enabled, retry: false });
   const assignmentAdmins = trpc.interview.assignmentAdmins.useQuery(undefined, { enabled: enabled && isSuperAdmin, retry: false });
   const assignmentAdminStats = trpc.interview.assignmentAdminStats.useQuery(undefined, { enabled: enabled && isSuperAdmin, retry: false });
+  const transferAdmins = trpc.interview.transferAdmins.useQuery(undefined, { enabled: enabled && isInterviewAdmin, retry: false });
+  const transferRequests = trpc.interview.transferRequests.useQuery(undefined, {
+    enabled: enabled && isInterviewAdmin,
+    retry: false,
+    refetchInterval: 30000,
+  });
   const recentAudit = trpc.interview.recentAudit.useQuery(undefined, { enabled, retry: false });
   const myProfile = trpc.interview.myProfile.useQuery(undefined, {
     enabled: enabled && isInterviewAdmin,
@@ -208,6 +218,58 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
       ]);
     },
     onError: (error) => toast.error(error.message || "Impossible de modifier l’état"),
+  });
+  const requestTransfer = trpc.interview.requestInterviewTransfer.useMutation({
+    onSuccess: async (result, variables) => {
+      if (result.requiresConfirmation) {
+        setTransferConflictConfirmation(true);
+        return;
+      }
+      if (result.hasBookedConflict) {
+        toast.warning("Demande envoyée : le destinataire devra d’abord libérer son entretien en conflit");
+      } else if (result.emailSent) toast.success("Demande de transfert envoyée au mini-admin");
+      else toast.warning("Demande créée, mais l’e-mail au mini-admin n’a pas pu être envoyé");
+      setTransferDialogSlotId(null);
+      setTransferTargetAdminId("");
+      setTransferConflictConfirmation(false);
+      await Promise.all([
+        utils.interview.transferRequests.invalidate(),
+        utils.interview.recentAudit.invalidate(),
+      ]);
+    },
+    onError: (error) => toast.error(error.message || "Impossible de demander le transfert"),
+  });
+  const respondTransfer = trpc.interview.respondInterviewTransfer.useMutation({
+    onSuccess: async (result) => {
+      if (result.accepted && result.cancelledSlotSyncFailedCount > 0) {
+        toast.warning(`Transfert accepté, mais ${result.cancelledSlotSyncFailedCount} ancien(s) créneau(x) vide(s) restent à resynchroniser avec Google Calendar`);
+      } else if (result.accepted && result.calendarSynced === false) {
+        toast.warning("Transfert accepté, mais le nom du jury n’a pas été mis à jour dans Google Calendar");
+      } else if (result.accepted && result.candidateEmailSent === false) {
+        toast.warning("Transfert accepté, mais l’e-mail au candidat n’a pas pu être envoyé");
+      } else {
+        toast.success(result.accepted
+          ? result.cancelledEmptySlotCount > 0
+            ? `Entretien transféré ; ${result.cancelledEmptySlotCount} créneau(x) vide(s) en conflit annulé(s)`
+            : "Entretien transféré à votre compte"
+          : "Demande refusée");
+      }
+      await Promise.all([
+        utils.interview.transferRequests.invalidate(),
+        utils.interview.adminList.invalidate(),
+        utils.interview.assignmentCandidates.invalidate(),
+        utils.interview.upcomingInterviews.invalidate(),
+        utils.interview.recentAudit.invalidate(),
+      ]);
+    },
+    onError: (error) => toast.error(error.message || "Impossible de répondre au transfert"),
+  });
+  const cancelTransfer = trpc.interview.cancelInterviewTransfer.useMutation({
+    onSuccess: async () => {
+      toast.success("Demande de transfert annulée");
+      await utils.interview.transferRequests.invalidate();
+    },
+    onError: (error) => toast.error(error.message || "Impossible d’annuler la demande"),
   });
   const retryCalendarSync = trpc.interview.retryCalendarSync.useMutation({
     onSuccess: async (result) => {
@@ -507,6 +569,15 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
     });
   }
 
+  const pendingIncomingTransfers = (transferRequests.data ?? []).filter(
+    (request) => request.status === "pending" && request.direction === "incoming",
+  );
+  const pendingOutgoingTransfers = (transferRequests.data ?? []).filter(
+    (request) => request.status === "pending" && request.direction === "outgoing",
+  );
+  const transferDialogSlot = (slots.data ?? []).find((slot) => slot.id === transferDialogSlotId);
+  const selectedTransferAdmin = (transferAdmins.data ?? []).find((admin) => admin.id === Number(transferTargetAdminId));
+
   return (
     <div className="space-y-5">
       <section className={`rounded-2xl border p-5 shadow-sm ${googleStatus.data?.connected ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
@@ -571,6 +642,83 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
                 </Button>
               </div>
             </div>
+          </div>
+        </section>
+      ) : null}
+
+      {isInterviewAdmin && (pendingIncomingTransfers.length > 0 || pendingOutgoingTransfers.length > 0) ? (
+        <section className="rounded-2xl border border-blue-200 bg-blue-50 p-5 shadow-sm">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div><h2 className="flex items-center gap-2 text-lg font-bold text-blue-950"><ArrowRightLeft className="h-5 w-5" /> Transferts d’entretiens</h2><p className="mt-1 text-sm text-blue-800">Suivez ici les demandes reçues et celles qui attendent une réponse.</p></div>
+            <span className="w-fit rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-800">{pendingIncomingTransfers.length} reçue(s) · {pendingOutgoingTransfers.length} envoyée(s)</span>
+          </div>
+          <div className="mt-4 grid gap-3 lg:grid-cols-2">
+            {pendingIncomingTransfers.map((request) => (
+              <article key={request.id} className="rounded-xl border border-blue-200 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Demande reçue</p>
+                <p className="mt-2 font-semibold">{request.candidateName}</p>
+                <p className="text-sm text-slate-600">{formatDate(request.startTime)}</p>
+                <p className="mt-1 text-sm text-slate-600">Demandée par {request.fromAdminName}</p>
+                <span className={`mt-3 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${request.hasBookedConflict ? "bg-red-100 text-red-800" : "bg-emerald-100 text-emerald-800"}`}>{request.hasBookedConflict ? "Acceptation bloquée" : "Prêt à accepter"}</span>
+                {request.hasBookedConflict ? (
+                  <p className="mt-3 rounded-lg border border-red-200 bg-red-50 p-2 text-sm font-medium text-red-800">
+                    Vous avez déjà un entretien réservé à cet horaire. Annulez-le ou déplacez-le avant d’accepter.
+                  </p>
+                ) : null}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={respondTransfer.isPending || request.hasBookedConflict}
+                    title={request.hasBookedConflict ? "Libérez d’abord votre entretien réservé au même horaire" : undefined}
+                    onClick={() => {
+                      if (window.confirm(`Accepter l’entretien de ${request.candidateName} au même horaire ?`)) {
+                        respondTransfer.mutate({ requestId: request.id, accept: true });
+                      }
+                    }}
+                  >
+                    <Check className="mr-1 h-4 w-4" /> Accepter
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={respondTransfer.isPending}
+                    onClick={() => {
+                      if (window.confirm(`Refuser le transfert de ${request.candidateName} ?`)) {
+                        respondTransfer.mutate({ requestId: request.id, accept: false });
+                      }
+                    }}
+                  >
+                    <X className="mr-1 h-4 w-4" /> Refuser
+                  </Button>
+                </div>
+              </article>
+            ))}
+            {pendingOutgoingTransfers.map((request) => (
+              <article key={request.id} className="rounded-xl border border-amber-200 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">En attente d’acceptation</p>
+                <p className="mt-2 font-semibold">{request.candidateName}</p>
+                <p className="text-sm text-slate-600">{formatDate(request.startTime)}</p>
+                <p className="mt-1 text-sm text-slate-600">Envoyée à {request.toAdminName}</p>
+                <p className="mt-3 rounded-lg bg-amber-50 p-2 text-xs text-amber-900">Le rendez-vous reste chez vous tant que le destinataire n’a pas accepté.</p>
+                {request.hasBookedConflict ? (
+                  <p className="mt-2 text-sm font-medium text-amber-800">
+                    Le destinataire a déjà un entretien réservé à cet horaire. Il pourra accepter après l’avoir libéré.
+                  </p>
+                ) : null}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="mt-3"
+                  disabled={cancelTransfer.isPending}
+                  onClick={() => cancelTransfer.mutate({ requestId: request.id })}
+                >
+                  Annuler la demande
+                </Button>
+              </article>
+            ))}
           </div>
         </section>
       ) : null}
@@ -1068,6 +1216,15 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
                 </td>
                 <td className="p-3">
                   {slot.bookingId && slot.status === "completed" ? <EvaluationForm slot={slot} /> : <span className="text-xs text-slate-500">{slot.bookingId ? "Candidat réservé" : "En attente de réservation"}</span>}
+                  {isInterviewAdmin && slot.bookingId && slot.status === "scheduled" ? (
+                    (transferRequests.data ?? []).some((request) => request.slotId === slot.id && request.status === "pending") ? (
+                      <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800"><Clock3 className="h-3.5 w-3.5" /> Transfert en attente</span>
+                    ) : (
+                      <Button type="button" size="sm" variant="outline" className="mt-2 border-blue-200 bg-blue-50 text-blue-800 hover:bg-blue-100" onClick={() => { setTransferDialogSlotId(slot.id); setTransferTargetAdminId(""); setTransferConflictConfirmation(false); }}>
+                        <ArrowRightLeft className="mr-1 h-3.5 w-3.5" /> Transférer
+                      </Button>
+                    )
+                  ) : null}
                   {slot.canDelete && slot.status !== "cancelled" ? (
                     <Button type="button" size="sm" variant="destructive" className="mt-2" disabled={deleteOwnSlot.isPending} onClick={() => {
                       if (window.confirm("Supprimer ce créneau et prévenir le candidat réservé ?")) deleteOwnSlot.mutate({ slotId: slot.id });
@@ -1095,6 +1252,9 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
                   : entry.action === "candidate_reassigned" ? "candidat réattribué"
                     : entry.action === "candidate_released" ? "candidat libéré"
                       : entry.action === "slots_created" ? "créneaux créés"
+                        : entry.action === "interview_transfer_requested" ? "transfert d’entretien demandé"
+                          : entry.action === "interview_transfer_accepted" ? "transfert d’entretien accepté"
+                            : entry.action === "interview_transfer_rejected" ? "transfert d’entretien refusé"
                         : entry.action === "slot_cancelled" ? "créneau annulé"
                           : entry.action === "slot_deleted" ? "créneau supprimé"
                             : entry.action}
@@ -1107,6 +1267,31 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
           {!recentAudit.isLoading && !recentAudit.data?.length ? <p className="py-6 text-center text-sm text-slate-500">Aucune activité enregistrée.</p> : null}
         </div>
       </section>
+
+      <Dialog open={transferDialogSlotId !== null} onOpenChange={(open) => { if (!open && !requestTransfer.isPending) { setTransferDialogSlotId(null); setTransferTargetAdminId(""); setTransferConflictConfirmation(false); } }}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><ArrowRightLeft className="h-5 w-5 text-blue-700" /> Transférer cet entretien</DialogTitle>
+            <DialogDescription>Le mini-admin choisi devra accepter la demande avant que le transfert devienne effectif.</DialogDescription>
+          </DialogHeader>
+          {transferDialogSlot ? <div className="space-y-4">
+            <div className="rounded-xl border bg-slate-50 p-4">
+              <p className="font-semibold text-slate-900">{transferDialogSlot.candidateFirstName} {transferDialogSlot.candidateLastName}</p>
+              <p className="mt-1 text-sm text-slate-600">{formatDate(transferDialogSlot.startTime)} – {formatDate(transferDialogSlot.endTime)}</p>
+              <p className="mt-2 flex items-center gap-2 text-xs font-medium text-emerald-700"><Check className="h-4 w-4" /> Même horaire, même candidat et même lien Meet</p>
+            </div>
+            <div><Label htmlFor="transfer-target">Mini-admin destinataire</Label><select id="transfer-target" className="mt-1 h-10 w-full rounded-md border bg-white px-3 text-sm" value={transferTargetAdminId} disabled={requestTransfer.isPending} onChange={(event) => { setTransferTargetAdminId(event.target.value); setTransferConflictConfirmation(false); }}><option value="">Choisir un mini-admin…</option>{(transferAdmins.data ?? []).map((admin) => <option key={admin.id} value={String(admin.id)}>{admin.name}</option>)}</select></div>
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-950"><p className="font-semibold">Ce qui se passera à l’acceptation</p><ul className="mt-2 list-disc space-y-1 pl-5"><li>Le candidat sera affecté au nouveau mini-admin.</li><li>Les créneaux vides du destinataire au même horaire seront annulés automatiquement.</li><li>S’il a déjà un entretien réservé, il devra d’abord le libérer avant de pouvoir accepter.</li><li>Le candidat et les deux mini-admins recevront une notification par e-mail.</li></ul></div>
+            {transferConflictConfirmation ? <div className="rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-900"><p className="flex items-center gap-2 font-bold"><AlertCircle className="h-4 w-4" /> Conflit détecté chez {selectedTransferAdmin?.name}</p><p className="mt-1">Ce mini-admin a déjà un entretien réservé au même horaire. Vous pouvez envoyer la demande, mais il ne pourra l’accepter qu’après avoir libéré ce rendez-vous.</p></div> : null}
+          </div> : null}
+          <DialogFooter>
+            <Button type="button" variant="outline" disabled={requestTransfer.isPending} onClick={() => { setTransferDialogSlotId(null); setTransferTargetAdminId(""); setTransferConflictConfirmation(false); }}>Retour</Button>
+            <Button type="button" className={transferConflictConfirmation ? "bg-red-700 hover:bg-red-800" : "bg-blue-700 hover:bg-blue-800"} disabled={!transferDialogSlot || !transferTargetAdminId || requestTransfer.isPending} onClick={() => transferDialogSlot && requestTransfer.mutate({ slotId: transferDialogSlot.id, targetAdminId: Number(transferTargetAdminId), allowBookedConflict: transferConflictConfirmation })}>
+              <ArrowRightLeft className="mr-2 h-4 w-4" /> {requestTransfer.isPending ? "Vérification…" : transferConflictConfirmation ? "Envoyer malgré le conflit" : "Vérifier et envoyer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

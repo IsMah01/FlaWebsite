@@ -19,10 +19,12 @@ import {
   getGoogleCalendarConnectionStatus,
   inviteCandidateToGoogleEvent,
   removeCandidateFromGoogleEvent,
+  updateGoogleEventInterviewer,
 } from "./lib/google-calendar";
 import {
   sendInterviewAdminBookingNotificationEmail,
   sendInterviewBookingConfirmationEmail,
+  sendInterviewTransferAdminEmail,
   sendInterviewUpdateEmail,
 } from "./lib/email";
 import { buildAvailabilitySlots } from "./lib/interview-slots";
@@ -34,6 +36,7 @@ import {
   isInterviewSlotBookable,
   MINIMUM_BOOKING_LEAD_TIME_MS,
 } from "./lib/interview-booking-window";
+import { classifyTransferOverlaps } from "./lib/interview-transfer";
 
 async function logInterviewAction(input: {
   actorAdminId: number;
@@ -111,6 +114,12 @@ async function cancelInterviewSlot(slotId: number) {
       `DELETE reminders FROM interview_reminder_emails reminders
        INNER JOIN interview_bookings bookings ON bookings.id = reminders.bookingId
        WHERE bookings.slotId = ?`,
+      [slotId],
+    );
+    await getSqlPool().execute(
+      `UPDATE interview_transfer_requests
+       SET status = 'cancelled', respondedAt = CURRENT_TIMESTAMP
+       WHERE slotId = ? AND status = 'pending'`,
       [slotId],
     );
   }
@@ -641,6 +650,387 @@ export const interviewRouter = createRouter({
       .orderBy(asc(adminUsers.name));
   }),
 
+  transferAdmins: interviewAdminQuery.query(async ({ ctx }) => {
+    const [rows] = await getSqlPool().query<any[]>(
+      `SELECT id, name, email
+       FROM admin_users
+       WHERE role = 'interview_admin' AND isActive = true AND id <> ?
+       ORDER BY name ASC`,
+      [ctx.adminUser.id],
+    );
+    return rows;
+  }),
+
+  transferRequests: interviewAdminQuery.query(async ({ ctx }) => {
+    const params: number[] = [];
+    const scope = ctx.adminUser.role === "interview_admin"
+      ? "WHERE requests.fromAdminId = ? OR requests.toAdminId = ?"
+      : "";
+    if (scope) params.push(ctx.adminUser.id, ctx.adminUser.id);
+    const [rows] = await getSqlPool().query<any[]>(
+      `SELECT requests.id, requests.slotId, requests.candidateId, requests.fromAdminId,
+         requests.toAdminId, requests.status, requests.responseNote, requests.createdAt,
+         requests.respondedAt, slots.startTime, slots.endTime, slots.meetingUrl,
+         slots.status AS slotStatus,
+         CONCAT(candidates.firstName, ' ', candidates.lastName) AS candidateName,
+         candidates.email AS candidateEmail,
+         sourceAdmins.name AS fromAdminName, sourceAdmins.email AS fromAdminEmail,
+         targetAdmins.name AS toAdminName, targetAdmins.email AS toAdminEmail
+         , EXISTS(
+           SELECT 1 FROM interview_slots conflictSlots
+           INNER JOIN interview_bookings conflictBookings ON conflictBookings.slotId = conflictSlots.id
+           WHERE conflictSlots.createdByAdminId = requests.toAdminId
+             AND conflictSlots.id <> requests.slotId
+             AND conflictSlots.status = 'scheduled'
+             AND conflictSlots.startTime < slots.endTime
+             AND conflictSlots.endTime > slots.startTime
+         ) AS hasBookedConflict
+       FROM interview_transfer_requests requests
+       INNER JOIN interview_slots slots ON slots.id = requests.slotId
+       INNER JOIN candidates ON candidates.id = requests.candidateId
+       INNER JOIN admin_users sourceAdmins ON sourceAdmins.id = requests.fromAdminId
+       INNER JOIN admin_users targetAdmins ON targetAdmins.id = requests.toAdminId
+       ${scope}
+       ORDER BY (requests.status = 'pending') DESC, requests.createdAt DESC
+       LIMIT 100`,
+      params,
+    );
+    return rows.map((row) => ({
+      ...row,
+      direction: row.toAdminId === ctx.adminUser.id ? "incoming" : "outgoing",
+      hasBookedConflict: Number(row.hasBookedConflict) === 1,
+    }));
+  }),
+
+  requestInterviewTransfer: interviewAdminQuery
+    .input(z.object({
+      slotId: z.number().int().positive(),
+      targetAdminId: z.number().int().positive(),
+      allowBookedConflict: z.boolean().optional().default(false),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.adminUser.role !== "interview_admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Cette action est réservée aux mini-admins." });
+      }
+      if (input.targetAdminId === ctx.adminUser.id) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Choisissez un autre mini-admin." });
+      }
+
+      const connection = await getSqlPool().getConnection();
+      let request: any;
+      try {
+        await connection.beginTransaction();
+        const [slotRows] = await connection.query<any[]>(
+          `SELECT slots.id, slots.startTime, slots.endTime, slots.createdByAdminId, slots.status,
+             bookings.candidateId, candidates.firstName, candidates.lastName
+           FROM interview_slots slots
+           INNER JOIN interview_bookings bookings ON bookings.slotId = slots.id
+           INNER JOIN candidates ON candidates.id = bookings.candidateId
+           WHERE slots.id = ? LIMIT 1 FOR UPDATE`,
+          [input.slotId],
+        );
+        const slot = slotRows[0];
+        if (!slot || slot.createdByAdminId !== ctx.adminUser.id) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Entretien réservé introuvable dans vos créneaux." });
+        }
+        if (slot.status !== "scheduled" || new Date(slot.startTime) <= getServerNow()) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Seul un entretien planifié à venir peut être transféré." });
+        }
+
+        const [targetRows] = await connection.query<any[]>(
+          `SELECT id, name, email FROM admin_users
+           WHERE id = ? AND role = 'interview_admin' AND isActive = true LIMIT 1 FOR UPDATE`,
+          [input.targetAdminId],
+        );
+        const target = targetRows[0];
+        if (!target) throw new TRPCError({ code: "BAD_REQUEST", message: "Le mini-admin cible est introuvable ou inactif." });
+
+        const [assignmentRows] = await connection.query<any[]>(
+          `SELECT adminId FROM interview_candidate_assignments
+           WHERE candidateId = ? LIMIT 1 FOR UPDATE`,
+          [slot.candidateId],
+        );
+        if (assignmentRows[0]?.adminId !== ctx.adminUser.id) {
+          throw new TRPCError({ code: "CONFLICT", message: "Le candidat n’est plus affecté à votre compte." });
+        }
+        const [pendingRows] = await connection.query<any[]>(
+          `SELECT id FROM interview_transfer_requests
+           WHERE slotId = ? AND status = 'pending' LIMIT 1 FOR UPDATE`,
+          [slot.id],
+        );
+        if (pendingRows.length) {
+          throw new TRPCError({ code: "CONFLICT", message: "Une demande de transfert est déjà en attente pour cet entretien." });
+        }
+        const [conflicts] = await connection.query<any[]>(
+          `SELECT slots.id FROM interview_slots slots
+           INNER JOIN interview_bookings bookings ON bookings.slotId = slots.id
+           WHERE slots.createdByAdminId = ? AND slots.status = 'scheduled'
+             AND slots.startTime < ? AND slots.endTime > ? LIMIT 1`,
+          [target.id, slot.endTime, slot.startTime],
+        );
+        const hasBookedConflict = conflicts.length > 0;
+        if (hasBookedConflict && !input.allowBookedConflict) {
+          await connection.rollback();
+          return {
+            success: false as const,
+            requiresConfirmation: true as const,
+            targetName: target.name as string,
+          };
+        }
+
+        const [created] = await connection.query<any>(
+          `INSERT INTO interview_transfer_requests
+             (slotId, candidateId, fromAdminId, toAdminId, status)
+           VALUES (?, ?, ?, ?, 'pending')`,
+          [slot.id, slot.candidateId, ctx.adminUser.id, target.id],
+        );
+        await connection.query(
+          `INSERT INTO interview_audit_logs (actorAdminId, action, candidateId, targetAdminId, slotId)
+           VALUES (?, 'interview_transfer_requested', ?, ?, ?)`,
+          [ctx.adminUser.id, slot.candidateId, target.id, slot.id],
+        );
+        await connection.commit();
+        request = { id: created.insertId, slot, target, hasBookedConflict };
+      } catch (error) {
+        await connection.rollback().catch(() => null);
+        throw error;
+      } finally {
+        connection.release();
+      }
+
+      const emailResult = await sendInterviewTransferAdminEmail({
+        to: request.target.email,
+        recipientName: request.target.name,
+        type: "request",
+        candidateName: `${request.slot.firstName} ${request.slot.lastName}`,
+        startTime: new Date(request.slot.startTime),
+        otherAdminName: ctx.adminUser.name,
+        responseNote: request.hasBookedConflict
+          ? "Vous avez déjà un entretien réservé à cet horaire. Annulez ou déplacez cet entretien avant d’accepter ce transfert."
+          : undefined,
+      });
+      return {
+        success: true,
+        requiresConfirmation: false as const,
+        requestId: request.id,
+        emailSent: emailResult.success,
+        hasBookedConflict: request.hasBookedConflict,
+      };
+    }),
+
+  respondInterviewTransfer: interviewAdminQuery
+    .input(z.object({
+      requestId: z.number().int().positive(),
+      accept: z.boolean(),
+      responseNote: z.string().trim().max(1000).optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.adminUser.role !== "interview_admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Cette action est réservée aux mini-admins." });
+      }
+      const connection = await getSqlPool().getConnection();
+      let transfer: any;
+      let emptyConflictingSlotIds: number[] = [];
+      try {
+        await connection.beginTransaction();
+        const [requestRows] = await connection.query<any[]>(
+          `SELECT requests.*, slots.startTime, slots.endTime, slots.meetingUrl, slots.googleEventId,
+             slots.createdByAdminId, slots.status AS slotStatus,
+             bookings.candidateId AS bookedCandidateId,
+             candidates.firstName, candidates.lastName, candidates.email AS candidateEmail,
+             sourceAdmins.name AS fromAdminName, sourceAdmins.email AS fromAdminEmail,
+             targetAdmins.name AS toAdminName, targetAdmins.email AS toAdminEmail,
+             targetAdmins.phoneNumber AS toAdminPhoneNumber, targetAdmins.isActive AS targetIsActive
+           FROM interview_transfer_requests requests
+           INNER JOIN interview_slots slots ON slots.id = requests.slotId
+           INNER JOIN interview_bookings bookings ON bookings.slotId = slots.id
+           INNER JOIN candidates ON candidates.id = requests.candidateId
+           INNER JOIN admin_users sourceAdmins ON sourceAdmins.id = requests.fromAdminId
+           INNER JOIN admin_users targetAdmins ON targetAdmins.id = requests.toAdminId
+           WHERE requests.id = ? LIMIT 1 FOR UPDATE`,
+          [input.requestId],
+        );
+        const request = requestRows[0];
+        if (!request || request.toAdminId !== ctx.adminUser.id) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Demande de transfert introuvable." });
+        }
+        if (request.status !== "pending") {
+          throw new TRPCError({ code: "CONFLICT", message: "Cette demande a déjà reçu une réponse." });
+        }
+
+        if (!input.accept) {
+          await connection.query(
+            `UPDATE interview_transfer_requests
+             SET status = 'rejected', responseNote = ?, respondedAt = CURRENT_TIMESTAMP WHERE id = ?`,
+            [input.responseNote || null, request.id],
+          );
+          await connection.query(
+            `INSERT INTO interview_audit_logs (actorAdminId, action, candidateId, targetAdminId, slotId, details)
+             VALUES (?, 'interview_transfer_rejected', ?, ?, ?, ?)`,
+            [ctx.adminUser.id, request.candidateId, request.fromAdminId, request.slotId, JSON.stringify({ responseNote: input.responseNote || null })],
+          );
+          await connection.commit();
+          transfer = { ...request, accepted: false };
+        } else {
+          if (!request.targetIsActive || request.slotStatus !== "scheduled" || request.createdByAdminId !== request.fromAdminId
+            || request.bookedCandidateId !== request.candidateId || new Date(request.startTime) <= getServerNow()) {
+            throw new TRPCError({ code: "CONFLICT", message: "L’entretien a changé et ne peut plus être transféré." });
+          }
+          const [assignmentRows] = await connection.query<any[]>(
+            `SELECT adminId FROM interview_candidate_assignments
+             WHERE candidateId = ? LIMIT 1 FOR UPDATE`,
+            [request.candidateId],
+          );
+          if (assignmentRows[0]?.adminId !== request.fromAdminId) {
+            throw new TRPCError({ code: "CONFLICT", message: "L’affectation du candidat a changé." });
+          }
+          const [conflicts] = await connection.query<any[]>(
+            `SELECT slots.id, bookings.id AS bookingId
+             FROM interview_slots slots
+             LEFT JOIN interview_bookings bookings ON bookings.slotId = slots.id
+             WHERE slots.createdByAdminId = ? AND slots.id <> ? AND slots.status = 'scheduled'
+               AND slots.startTime < ? AND slots.endTime > ?
+             FOR UPDATE`,
+            [ctx.adminUser.id, request.slotId, request.endTime, request.startTime],
+          );
+          const conflictState = classifyTransferOverlaps(conflicts.map((conflict) => ({
+            id: Number(conflict.id),
+            bookingId: conflict.bookingId === null ? null : Number(conflict.bookingId),
+          })));
+          if (conflictState.hasBookedConflict) {
+            throw new TRPCError({ code: "CONFLICT", message: "Vous avez déjà un entretien réservé pendant cet horaire." });
+          }
+          emptyConflictingSlotIds = conflictState.emptySlotIds;
+          if (emptyConflictingSlotIds.length) {
+            const placeholders = emptyConflictingSlotIds.map(() => "?").join(",");
+            await connection.query(
+              `UPDATE interview_slots SET status = 'cancelled' WHERE id IN (${placeholders})`,
+              emptyConflictingSlotIds,
+            );
+            await connection.query(
+              `UPDATE interview_transfer_requests SET status = 'cancelled', respondedAt = CURRENT_TIMESTAMP
+               WHERE slotId IN (${placeholders}) AND status = 'pending'`,
+              emptyConflictingSlotIds,
+            );
+          }
+
+          await connection.query(
+            `UPDATE interview_slots SET createdByAdminId = ?, interviewerName = ? WHERE id = ?`,
+            [ctx.adminUser.id, ctx.adminUser.name, request.slotId],
+          );
+          await connection.query(
+            `UPDATE interview_candidate_assignments SET adminId = ?, assignedAt = CURRENT_TIMESTAMP WHERE candidateId = ?`,
+            [ctx.adminUser.id, request.candidateId],
+          );
+          await connection.query(
+            `UPDATE interview_transfer_requests
+             SET status = 'accepted', responseNote = ?, respondedAt = CURRENT_TIMESTAMP WHERE id = ?`,
+            [input.responseNote || null, request.id],
+          );
+          await connection.query(
+            `UPDATE interview_transfer_requests SET status = 'cancelled', respondedAt = CURRENT_TIMESTAMP
+             WHERE slotId = ? AND id <> ? AND status = 'pending'`,
+            [request.slotId, request.id],
+          );
+          await connection.query(
+            `INSERT INTO interview_audit_logs (actorAdminId, action, candidateId, targetAdminId, slotId, details)
+             VALUES (?, 'interview_transfer_accepted', ?, ?, ?, ?)`,
+            [ctx.adminUser.id, request.candidateId, request.fromAdminId, request.slotId, JSON.stringify({
+              responseNote: input.responseNote || null,
+              cancelledEmptySlotIds: emptyConflictingSlotIds,
+            })],
+          );
+          await connection.commit();
+          transfer = { ...request, accepted: true };
+        }
+      } catch (error) {
+        await connection.rollback().catch(() => null);
+        throw error;
+      } finally {
+        connection.release();
+      }
+
+      let calendarSynced: boolean | null = null;
+      let cancelledSlotSyncFailedCount = 0;
+      if (transfer.accepted && emptyConflictingSlotIds.length) {
+        const cancellationResults = await Promise.all(
+          emptyConflictingSlotIds.map((slotId) => cancelInterviewSlot(slotId).catch((error) => {
+            console.error("[interview-transfer] Empty slot cancellation sync failed", error);
+            return { calendarSynced: false };
+          })),
+        );
+        cancelledSlotSyncFailedCount = cancellationResults.filter((result) => !result.calendarSynced).length;
+      }
+      if (transfer.accepted && transfer.googleEventId) {
+        try {
+          await updateGoogleEventInterviewer(transfer.googleEventId, transfer.toAdminName);
+          calendarSynced = true;
+          await getSqlPool().execute(
+            `UPDATE interview_slots SET calendarSyncStatus = 'synced', calendarSyncError = NULL WHERE id = ?`,
+            [transfer.slotId],
+          );
+        } catch (error) {
+          calendarSynced = false;
+          const message = error instanceof Error ? error.message : "Erreur Google Calendar inconnue";
+          await getSqlPool().execute(
+            `UPDATE interview_slots SET calendarSyncStatus = 'failed', calendarSyncError = ? WHERE id = ?`,
+            [message.slice(0, 2000), transfer.slotId],
+          );
+          console.error("[interview-transfer] Google Calendar update failed", message);
+        }
+      }
+
+      await sendInterviewTransferAdminEmail({
+        to: transfer.fromAdminEmail,
+        recipientName: transfer.fromAdminName,
+        type: transfer.accepted ? "accepted" : "rejected",
+        candidateName: `${transfer.firstName} ${transfer.lastName}`,
+        startTime: new Date(transfer.startTime),
+        otherAdminName: transfer.toAdminName,
+        responseNote: input.responseNote,
+      });
+      let candidateEmailSent: boolean | null = null;
+      if (transfer.accepted) {
+        const candidateResult = await sendInterviewUpdateEmail(
+          transfer.candidateEmail,
+          transfer.firstName,
+          "interview_transferred",
+          {
+            name: transfer.toAdminName,
+            email: transfer.toAdminEmail,
+            phoneNumber: transfer.toAdminPhoneNumber,
+          },
+        );
+        candidateEmailSent = candidateResult.success;
+      }
+      return {
+        success: true,
+        accepted: transfer.accepted,
+        candidateEmailSent,
+        calendarSynced,
+        cancelledEmptySlotCount: emptyConflictingSlotIds.length,
+        cancelledSlotSyncFailedCount,
+      };
+    }),
+
+  cancelInterviewTransfer: interviewAdminQuery
+    .input(z.object({ requestId: z.number().int().positive() }))
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.adminUser.role !== "interview_admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Cette action est réservée aux mini-admins." });
+      }
+      const [result] = await getSqlPool().execute<any>(
+        `UPDATE interview_transfer_requests
+         SET status = 'cancelled', respondedAt = CURRENT_TIMESTAMP
+         WHERE id = ? AND fromAdminId = ? AND status = 'pending'`,
+        [input.requestId, ctx.adminUser.id],
+      );
+      if (result.affectedRows !== 1) {
+        throw new TRPCError({ code: "CONFLICT", message: "Cette demande n’est plus annulable." });
+      }
+      return { success: true };
+    }),
+
   reassignCandidate: superAdminQuery
     .input(z.object({
       candidateId: z.number().int().positive(),
@@ -1108,6 +1498,14 @@ export const interviewRouter = createRouter({
         return result;
       }
       await db.update(interviewSlots).set({ status: input.status }).where(eq(interviewSlots.id, input.slotId));
+      if (input.status !== "scheduled") {
+        await getSqlPool().execute(
+          `UPDATE interview_transfer_requests
+           SET status = 'cancelled', respondedAt = CURRENT_TIMESTAMP
+           WHERE slotId = ? AND status = 'pending'`,
+          [input.slotId],
+        );
+      }
       await logInterviewAction({
         actorAdminId: ctx.adminUser.id,
         action: `slot_${input.status}`,
@@ -1246,14 +1644,37 @@ export const interviewRouter = createRouter({
     .mutation(async ({ input }) => {
       const db = getDb();
       const [slot] = await db
-        .select({ status: interviewSlots.status })
+        .select({
+          status: interviewSlots.status,
+          calendarSyncStatus: interviewSlots.calendarSyncStatus,
+          googleEventId: interviewSlots.googleEventId,
+          interviewerName: interviewSlots.interviewerName,
+        })
         .from(interviewSlots)
         .where(eq(interviewSlots.id, input.slotId))
         .limit(1);
       if (!slot) throw new TRPCError({ code: "NOT_FOUND", message: "Créneau introuvable." });
-      if (slot.status !== "cancelled") {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Seules les annulations échouées peuvent être resynchronisées." });
+      if (slot.status === "cancelled") return cancelInterviewSlot(input.slotId);
+      if (
+        slot.status === "scheduled"
+        && slot.calendarSyncStatus === "failed"
+        && slot.googleEventId
+        && slot.interviewerName
+      ) {
+        try {
+          await updateGoogleEventInterviewer(slot.googleEventId, slot.interviewerName);
+          await db.update(interviewSlots).set({
+            calendarSyncStatus: "synced",
+            calendarSyncError: null,
+          }).where(eq(interviewSlots.id, input.slotId));
+          return { success: true, calendarSynced: true };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Erreur Google Calendar inconnue";
+          await db.update(interviewSlots).set({ calendarSyncError: message.slice(0, 2000) })
+            .where(eq(interviewSlots.id, input.slotId));
+          return { success: true, calendarSynced: false };
+        }
       }
-      return cancelInterviewSlot(input.slotId);
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Ce créneau ne nécessite pas de resynchronisation." });
     }),
 });

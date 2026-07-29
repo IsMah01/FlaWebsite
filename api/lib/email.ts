@@ -404,7 +404,7 @@ export async function sendInterviewReminderEmail(
 export async function sendInterviewUpdateEmail(
   to: string,
   firstName: string,
-  type: "assigned" | "slots_available" | "booking_reminder" | "cancelled" | "released" | "reassigned",
+  type: "assigned" | "slots_available" | "booking_reminder" | "cancelled" | "released" | "reassigned" | "interview_transferred",
   interviewer?: {
     name: string;
     email: string;
@@ -483,6 +483,14 @@ export async function sendInterviewUpdateEmail(
       body: "تم تحديث المسؤول عن مقابلتك الشفوية. يمكنك الدخول إلى فضاء المقابلة للاطلاع على المواعيد المتاحة واختيار الموعد الذي يناسبك.",
       note: "إذا كنت قد حجزت موعداً من قبل، ستظهر لك أحدث التفاصيل داخل فضائك.",
       button: "فتح فضاء المقابلة",
+    },
+    interview_transferred: {
+      eyebrow: "تحديث بخصوص مقابلتك",
+      subject: "تم نقل مقابلتك إلى مسؤول جديد",
+      title: "تم تأكيد نقل مقابلتك",
+      body: "تم نقل الإشراف على مقابلتك إلى مسؤول جديد. سيبقى تاريخ ووقت المقابلة ورابط Google Meet دون تغيير، ولا يلزمك إجراء حجز جديد.",
+      note: "ستجد أدناه معلومات المسؤول الجديد عن مقابلتك. يمكنك أيضاً فتح فضاء المقابلة للاطلاع على الموعد ورابط Google Meet.",
+      button: "عرض تفاصيل المقابلة",
     },
   } as const;
   const message = messages[type];
@@ -625,6 +633,69 @@ export async function sendInterviewAdminSlotReminderEmail(input: {
     </body></html>`;
   const text = `Bonjour ${input.adminName},\n\nVous avez ${input.unbookedCount} candidat(s) sans réservation et ${input.emptySlotCount} créneau(x) futur(s) disponible(s). Merci d’ajouter des créneaux : ${adminUrl}`;
 
+  return sendMailWithRetry({
+    from: `"${AR_ORG}" <${SMTP_FROM}>`,
+    to: input.to,
+    subject,
+    html,
+    text,
+    attachments: logo.attachments,
+  });
+}
+
+export async function sendInterviewTransferAdminEmail(input: {
+  to: string;
+  recipientName: string;
+  type: "request" | "accepted" | "rejected";
+  candidateName: string;
+  startTime: Date;
+  otherAdminName: string;
+  responseNote?: string | null;
+}) {
+  if (!SMTP_HOST || !SMTP_USER) {
+    console.warn("[Email] SMTP not configured. Skipping interview transfer email.");
+    return { success: false as const, attempts: 0, reason: "SMTP_NOT_CONFIGURED" };
+  }
+
+  const adminUrl = `${PUBLIC_APP_URL}/admin/interviews`;
+  const dateLabel = new Intl.DateTimeFormat("fr-FR", {
+    timeZone: "Africa/Casablanca",
+    dateStyle: "full",
+    timeStyle: "short",
+  }).format(input.startTime);
+  const title = input.type === "request"
+    ? "Nouvelle demande de transfert d’entretien"
+    : input.type === "accepted"
+      ? "Transfert d’entretien accepté"
+      : "Transfert d’entretien refusé";
+  const relationship = input.type === "request"
+    ? `${input.otherAdminName} souhaite vous transférer cet entretien. En cas d’acceptation, l’horaire, le candidat et le lien Meet resteront inchangés. Les créneaux vides qui se chevauchent seront annulés automatiquement ; un entretien déjà réservé devra d’abord être libéré ou déplacé.`
+    : input.type === "accepted"
+      ? `${input.otherAdminName} a accepté de prendre en charge cet entretien.`
+      : `${input.otherAdminName} a refusé de prendre en charge cet entretien.`;
+  const logo = getEmailLogo();
+  const safeName = escapeEmailHtml(input.recipientName || "");
+  const safeCandidate = escapeEmailHtml(input.candidateName);
+  const safeRelationship = escapeEmailHtml(relationship);
+  const safeNote = input.responseNote ? escapeEmailHtml(input.responseNote) : "";
+  const safeAdminUrl = escapeEmailHtml(adminUrl);
+  const subject = `${title} - ${AR_ORG}`;
+  const html = `<!doctype html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${subject}</title></head>
+    <body style="margin:0;padding:0;background:#f2f7f6;font-family:Arial,sans-serif;color:#173f39;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:24px 12px;">
+        <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="width:100%;max-width:600px;background:#fff;border-radius:16px;overflow:hidden;">
+          <tr><td align="center" style="padding:26px;border-bottom:1px solid #e5eeec;"><img src="${logo.src}" width="190" alt="Future Leaders Foundation"></td></tr>
+          <tr><td style="padding:30px 32px;"><h1 style="margin:0 0 20px;font-size:24px;">${title}</h1>
+            <p style="font-size:16px;line-height:1.8;">Bonjour ${safeName},</p>
+            <p style="font-size:16px;line-height:1.8;">${safeRelationship}</p>
+            <p style="font-size:16px;line-height:1.8;"><strong>Candidat :</strong> ${safeCandidate}<br><strong>Horaire :</strong> ${dateLabel}</p>
+            ${safeNote ? `<p style="font-size:16px;line-height:1.8;"><strong>Message :</strong> ${safeNote}</p>` : ""}
+            <p style="text-align:center;margin:28px 0 0;"><a href="${safeAdminUrl}" style="display:inline-block;padding:14px 28px;border-radius:9px;background:#4A9B8E;color:#fff;text-decoration:none;font-weight:bold;">Ouvrir les entretiens</a></p>
+          </td></tr>
+        </table>
+      </td></tr></table>
+    </body></html>`;
+  const text = `${title}\n\nBonjour ${input.recipientName},\n\n${relationship}\nCandidat : ${input.candidateName}\nHoraire : ${dateLabel}${input.responseNote ? `\nMessage : ${input.responseNote}` : ""}\n\n${adminUrl}`;
   return sendMailWithRetry({
     from: `"${AR_ORG}" <${SMTP_FROM}>`,
     to: input.to,

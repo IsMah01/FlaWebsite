@@ -288,6 +288,23 @@ export async function ensureDatabaseSchema() {
     `);
 
     await connection.query(`
+      CREATE TABLE IF NOT EXISTS interview_transfer_requests (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        slotId INT NOT NULL,
+        candidateId INT NOT NULL,
+        fromAdminId INT NOT NULL,
+        toAdminId INT NOT NULL,
+        status ENUM('pending','accepted','rejected','cancelled') NOT NULL DEFAULT 'pending',
+        responseNote VARCHAR(1000) NULL,
+        createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        respondedAt TIMESTAMP NULL,
+        INDEX interview_transfer_slot_index (slotId),
+        INDEX interview_transfer_from_status_index (fromAdminId, status),
+        INDEX interview_transfer_to_status_index (toAdminId, status)
+      )
+    `);
+
+    await connection.query(`
       CREATE TABLE IF NOT EXISTS interview_reminder_emails (
         id INT AUTO_INCREMENT PRIMARY KEY,
         bookingId INT NOT NULL,

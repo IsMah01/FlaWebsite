@@ -198,6 +198,22 @@ export const interviewCandidateAssignments = mysqlTable(
 export type InterviewCandidateAssignment = typeof interviewCandidateAssignments.$inferSelect;
 export type InsertInterviewCandidateAssignment = typeof interviewCandidateAssignments.$inferInsert;
 
+export const interviewTransferRequests = mysqlTable("interview_transfer_requests", {
+  id: int("id").autoincrement().primaryKey(),
+  slotId: int("slotId").notNull(),
+  candidateId: int("candidateId").notNull(),
+  fromAdminId: int("fromAdminId").notNull(),
+  toAdminId: int("toAdminId").notNull(),
+  status: mysqlEnum("status", ["pending", "accepted", "rejected", "cancelled"])
+    .default("pending")
+    .notNull(),
+  responseNote: varchar("responseNote", { length: 1000 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  respondedAt: timestamp("respondedAt"),
+});
+
+export type InterviewTransferRequest = typeof interviewTransferRequests.$inferSelect;
+
 export const interviewAuditLogs = mysqlTable("interview_audit_logs", {
   id: int("id").autoincrement().primaryKey(),
   actorAdminId: int("actorAdminId").notNull(),

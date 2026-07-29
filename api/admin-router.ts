@@ -537,14 +537,16 @@ export const adminRouter = createRouter({
         const [workloadRows] = await getSqlPool().query<any[]>(
           `SELECT
              (SELECT COUNT(*) FROM interview_candidate_assignments WHERE adminId = ?) AS assignments,
-             (SELECT COUNT(*) FROM interview_slots WHERE createdByAdminId = ? AND status = 'scheduled') AS scheduledSlots`,
-          [target.id, target.id],
+             (SELECT COUNT(*) FROM interview_slots WHERE createdByAdminId = ? AND status = 'scheduled') AS scheduledSlots,
+             (SELECT COUNT(*) FROM interview_transfer_requests
+               WHERE status = 'pending' AND (fromAdminId = ? OR toAdminId = ?)) AS pendingTransfers`,
+          [target.id, target.id, target.id, target.id],
         );
         const workload = workloadRows[0];
-        if (Number(workload.assignments) > 0 || Number(workload.scheduledSlots) > 0) {
+        if (Number(workload.assignments) > 0 || Number(workload.scheduledSlots) > 0 || Number(workload.pendingTransfers) > 0) {
           throw new TRPCError({
             code: "PRECONDITION_FAILED",
-            message: `Reattribuez d'abord ses ${workload.assignments} candidat(s) et traitez ses ${workload.scheduledSlots} creneau(x) planifie(s).`,
+            message: `Réattribuez d'abord ses ${workload.assignments} candidat(s), traitez ses ${workload.scheduledSlots} créneau(x) planifié(s) et ses ${workload.pendingTransfers} transfert(s) en attente.`,
           });
         }
       }
@@ -574,17 +576,20 @@ export const adminRouter = createRouter({
              (SELECT COUNT(*)
                 FROM interview_bookings bookings
                 INNER JOIN interview_slots slots ON slots.id = bookings.slotId
-               WHERE slots.createdByAdminId = ?) AS bookedInterviews`,
-          [target.id, target.id, target.id],
+               WHERE slots.createdByAdminId = ?) AS bookedInterviews,
+             (SELECT COUNT(*) FROM interview_transfer_requests
+               WHERE status = 'pending' AND (fromAdminId = ? OR toAdminId = ?)) AS pendingTransfers`,
+          [target.id, target.id, target.id, target.id, target.id],
         );
         const workload = workloadRows[0];
         const assignments = Number(workload.assignments);
         const scheduledSlots = Number(workload.scheduledSlots);
         const bookedInterviews = Number(workload.bookedInterviews);
-        if (assignments > 0 || scheduledSlots > 0 || bookedInterviews > 0) {
+        const pendingTransfers = Number(workload.pendingTransfers);
+        if (assignments > 0 || scheduledSlots > 0 || bookedInterviews > 0 || pendingTransfers > 0) {
           throw new TRPCError({
             code: "PRECONDITION_FAILED",
-            message: `Suppression impossible : ${assignments} candidat(s) affecté(s), ${scheduledSlots} créneau(x) planifié(s) et ${bookedInterviews} entretien(s) réservé(s). Réattribuez les candidats et traitez les entretiens d’abord.`,
+            message: `Suppression impossible : ${assignments} candidat(s) affecté(s), ${scheduledSlots} créneau(x) planifié(s), ${bookedInterviews} entretien(s) réservé(s) et ${pendingTransfers} transfert(s) en attente. Traitez-les d’abord.`,
           });
         }
 
