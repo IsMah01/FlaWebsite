@@ -8,6 +8,7 @@ import {
 import { getServerNow } from "./server-clock";
 import { dueInterviewReminderType } from "./interview-reminder-windows";
 import { MINIMUM_BOOKING_LEAD_TIME_MS } from "./interview-booking-window";
+import { deleteGoogleCalendarEvent } from "./google-calendar";
 
 type UpcomingInterview = RowDataPacket & {
   bookingId: number;
@@ -36,6 +37,47 @@ type AdminNeedingSlots = RowDataPacket & {
   unbookedCount: number | string;
   emptySlotCount: number | string;
 };
+
+type ExpiredUnbookedSlot = RowDataPacket & {
+  id: number;
+  googleEventId: string | null;
+};
+
+export async function deleteExpiredUnbookedInterviewSlots(now = getServerNow()) {
+  const [slots] = await getSqlPool().execute<ExpiredUnbookedSlot[]>(
+    `SELECT slot.id, slot.googleEventId
+     FROM interview_slots slot
+     LEFT JOIN interview_bookings booking ON booking.slotId = slot.id
+     WHERE slot.status = 'scheduled'
+       AND slot.endTime < ?
+       AND booking.id IS NULL
+     ORDER BY slot.endTime ASC
+     LIMIT 100`,
+    [now],
+  );
+
+  let deleted = 0;
+  let failed = 0;
+  for (const slot of slots) {
+    try {
+      if (slot.googleEventId) await deleteGoogleCalendarEvent(slot.googleEventId);
+      const [result] = await getSqlPool().execute<ResultSetHeader>(
+        `DELETE slot FROM interview_slots slot
+         LEFT JOIN interview_bookings booking ON booking.slotId = slot.id
+         WHERE slot.id = ?
+           AND slot.status = 'scheduled'
+           AND slot.endTime < ?
+           AND booking.id IS NULL`,
+        [slot.id, now],
+      );
+      deleted += result.affectedRows;
+    } catch (error) {
+      failed += 1;
+      console.error("[interview-slot-cleanup] Slot cleanup failed:", slot.id, error instanceof Error ? error.message : error);
+    }
+  }
+  return { eligible: slots.length, deleted, failed };
+}
 
 function bookingReminderClock(now: Date) {
   const timeZone = process.env.INTERVIEW_BOOKING_REMINDER_TIMEZONE || "Africa/Casablanca";
@@ -367,7 +409,8 @@ export async function runInterviewReminderJob(now = getServerNow()) {
 export function startInterviewReminderScheduler() {
   const interviewRemindersEnabled = process.env.INTERVIEW_REMINDERS_ENABLED !== "false";
   const bookingRemindersEnabled = process.env.INTERVIEW_BOOKING_REMINDERS_ENABLED !== "false";
-  if (!interviewRemindersEnabled && !bookingRemindersEnabled) {
+  const slotCleanupEnabled = process.env.INTERVIEW_EXPIRED_SLOT_CLEANUP_ENABLED !== "false";
+  if (!interviewRemindersEnabled && !bookingRemindersEnabled && !slotCleanupEnabled) {
     console.log("[interview-reminders] Scheduler disabled.");
     return;
   }
@@ -378,6 +421,10 @@ export function startInterviewReminderScheduler() {
     running = true;
     try {
       const now = getServerNow();
+      if (slotCleanupEnabled) {
+        const cleanup = await deleteExpiredUnbookedInterviewSlots(now);
+        if (cleanup.deleted || cleanup.failed) console.log("[interview-slot-cleanup] Run complete:", cleanup);
+      }
       if (interviewRemindersEnabled) {
         const result = await runInterviewReminderJob(now);
         if (result.sent || result.failed) console.log("[interview-reminders] Run complete:", result);
@@ -408,6 +455,9 @@ export function startInterviewReminderScheduler() {
   };
 
   console.log("[interview-reminders] Scheduler ready: booked interviews at 24h and 1h.");
+  if (slotCleanupEnabled) {
+    console.log("[interview-slot-cleanup] Scheduler ready: expired unbooked slots are deleted automatically.");
+  }
   if (bookingRemindersEnabled) {
     console.log("[interview-booking-reminders] Scheduler ready: 10:00 and 18:00 Africa/Casablanca.");
     console.log("[interview-admin-slot-reminders] Scheduler ready: capacity checks at 10:00 and 18:00.");

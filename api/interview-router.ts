@@ -177,6 +177,7 @@ export const interviewRouter = createRouter({
     ]);
     const assignment = assignments[0];
     const ownBooking = ownBookings[0] ?? null;
+    const interviewIsClosed = ownBooking?.status === "completed" || ownBooking?.status === "absent";
     const interviewer = assignment ? {
       name: assignment.name,
       email: assignment.email,
@@ -190,6 +191,16 @@ export const interviewRouter = createRouter({
         availableSlots: [],
         booking: ownBooking,
         awaitingAssignment: !ownBooking,
+        interviewer,
+        serverNow: now,
+      };
+    }
+
+    if (interviewIsClosed) {
+      return {
+        availableSlots: [],
+        booking: ownBooking,
+        awaitingAssignment: false,
         interviewer,
         serverNow: now,
       };
@@ -308,12 +319,18 @@ export const interviewRouter = createRouter({
         }
 
         const [ownBookings] = await connection.query<any[]>(
-          `SELECT b.id, b.slotId, s.googleEventId, s.startTime
+          `SELECT b.id, b.slotId, s.googleEventId, s.startTime, s.status
            FROM interview_bookings b
            INNER JOIN interview_slots s ON s.id = b.slotId
            WHERE b.candidateId = ? LIMIT 1 FOR UPDATE`,
           [candidate.id],
         );
+        if (ownBookings[0]?.status === "completed" || ownBookings[0]?.status === "absent") {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Votre entretien est deja cloture. Vous ne pouvez plus choisir un autre creneau.",
+          });
+        }
         if (ownBookings[0]?.slotId === input.slotId) {
           calendarInviteSent = true;
         }
@@ -1499,6 +1516,12 @@ export const interviewRouter = createRouter({
       }
       await db.update(interviewSlots).set({ status: input.status }).where(eq(interviewSlots.id, input.slotId));
       if (input.status !== "scheduled") {
+        await getSqlPool().execute(
+          `DELETE reminders FROM interview_reminder_emails reminders
+           INNER JOIN interview_bookings bookings ON bookings.id = reminders.bookingId
+           WHERE bookings.slotId = ?`,
+          [input.slotId],
+        );
         await getSqlPool().execute(
           `UPDATE interview_transfer_requests
            SET status = 'cancelled', respondedAt = CURRENT_TIMESTAMP

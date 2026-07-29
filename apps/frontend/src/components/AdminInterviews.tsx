@@ -145,7 +145,7 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
   const [candidateView, setCandidateView] = useState<"available" | "mine">(
     adminRole === "interview_admin" ? "mine" : "available",
   );
-  const [candidateStatusFilter, setCandidateStatusFilter] = useState<"all" | "unassigned" | "assigned" | "unbooked" | "booked">("all");
+  const [candidateStatusFilter, setCandidateStatusFilter] = useState<"all" | "unassigned" | "assigned" | "unbooked" | "booked" | "completed" | "absent">("all");
   const [candidateAdminFilter, setCandidateAdminFilter] = useState("all");
   const [selectedCandidateIds, setSelectedCandidateIds] = useState<number[]>([]);
   const [slotFilter, setSlotFilter] = useState<"all" | "mine" | "booked" | "available">("all");
@@ -434,8 +434,10 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
       ) return false;
       if (candidateStatusFilter === "unassigned") return !candidate.assignedAdminId;
       if (candidateStatusFilter === "assigned") return !!candidate.assignedAdminId;
-      if (candidateStatusFilter === "unbooked") return !candidate.bookingId;
-      if (candidateStatusFilter === "booked") return !!candidate.bookingId;
+      if (candidateStatusFilter === "unbooked") return !candidate.bookingId || candidate.bookingStatus === "cancelled";
+      if (candidateStatusFilter === "booked") return candidate.bookingStatus === "scheduled";
+      if (candidateStatusFilter === "completed") return candidate.bookingStatus === "completed";
+      if (candidateStatusFilter === "absent") return candidate.bookingStatus === "absent";
       return true;
     });
     if (!query) return statusFiltered;
@@ -929,6 +931,8 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
               <option value="assigned">Sélectionnés par un mini-admin</option>
               <option value="unbooked">Sans réservation</option>
               <option value="booked">Réservés</option>
+              <option value="completed">Entretien passé</option>
+              <option value="absent">Absents</option>
             </select>
             <Input className="max-w-sm" placeholder="Rechercher par nom, e-mail ou téléphone" value={candidateSearch} onChange={(event) => setCandidateSearch(event.target.value)} />
           </div>
@@ -991,6 +995,7 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
                 <th className="p-3 text-left">Nom</th>
                 <th className="p-3 text-left">E-mail</th>
                 <th className="p-3 text-left">Téléphone</th>
+                <th className="p-3 text-left">Statut entretien</th>
                 {(!isInterviewAdmin || candidateView === "mine") ? <th className="p-3 text-left">Affectation</th> : null}
                 {isInterviewAdmin && candidateView === "mine" ? <th className="p-3 text-right">Action</th> : null}
               </tr>
@@ -1014,6 +1019,17 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
                     <td className="p-3 font-medium">{candidate.firstName} {candidate.lastName}</td>
                     <td className="p-3">{candidate.email}</td>
                     <td className="p-3">{candidate.phoneNumber || "-"}</td>
+                    <td className="p-3">
+                      {candidate.bookingStatus === "completed" ? (
+                        <span className="inline-flex rounded-full bg-violet-100 px-2.5 py-1 text-xs font-medium text-violet-800">Entretien passé</span>
+                      ) : candidate.bookingStatus === "scheduled" ? (
+                        <span className="inline-flex rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-800">Créneau réservé</span>
+                      ) : candidate.bookingStatus === "absent" ? (
+                        <span className="inline-flex rounded-full bg-rose-100 px-2.5 py-1 text-xs font-medium text-rose-800">Absent</span>
+                      ) : (
+                        <span className="inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800">Pas encore réservé</span>
+                      )}
+                    </td>
                     {(!isInterviewAdmin || candidateView === "mine") ? (
                       <td className="p-3">
                         {isSuperAdmin ? (
