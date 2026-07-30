@@ -173,6 +173,47 @@ export async function sendConfirmationEmail(
   }
 }
 
+export async function sendCandidateInitialRejectionEmail(to: string, firstName: string) {
+  if (!SMTP_HOST || !SMTP_USER) {
+    console.warn("[Email] SMTP not configured. Skipping candidate rejection email.");
+    return { success: false as const, attempts: 0, reason: "SMTP_NOT_CONFIGURED" };
+  }
+
+  const logo = getEmailLogo();
+  const safeFirstName = escapeEmailHtml(firstName || "");
+  const subject = "نتيجة مرحلة الانتقاء الأولي - أكاديمية أطر الغد";
+  const html = `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${subject}</title></head>
+    <body dir="rtl" style="margin:0;padding:0;background:#f2f7f6;font-family:Tahoma,Arial,sans-serif;color:#173f39;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:24px 12px;">
+        <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="width:100%;max-width:600px;background:#fff;border-radius:16px;overflow:hidden;">
+          <tr><td align="center" style="padding:26px;border-bottom:1px solid #e5eeec;"><img src="${logo.src}" width="190" alt="Future Leaders Foundation"></td></tr>
+          <tr><td style="padding:30px 32px;font-size:16px;line-height:2;text-align:right;">
+            <p>السلام عليكم ورحمة الله وبركاته،</p>
+            ${safeFirstName ? `<p>مرحباً ${safeFirstName}،</p>` : ""}
+            <p>ببالغ التقدير، تتوجه إليكم أكاديمية أطر الغد بالشكر الجزيل على تعبئتكم الاستمارة، كما نثمّن ثقتكم في رسالتها ورغبتكم الصادقة في خوض هذه التجربة.</p>
+            <p>وبعد دراسة جميع الاستمارات بعناية، نأسف لإبلاغكم بأن طلبكم <strong>لم يُوفَّق في اجتياز مرحلة الانتقاء الأولي</strong> المؤهلة للمقابلات الشفوية في هذه الدورة.</p>
+            <p>ونود التأكيد أن هذا القرار لا يُعدّ حكمًا على قدراتكم أو إمكاناتكم، وإنما جاء في سياق عملية انتقاء دقيقة فرضتها محدودية المقاعد، والمفاضلة بين عدد كبير من المترشحين.</p>
+            <p>إن مجرد مبادرتكم إلى الترشح يعكس روحًا إيجابية ورغبة في التعلم والتطوير، وهي قيم نعتز بها ونأمل أن تظل رفيقة لكم في مسيرتكم.</p>
+            <p>ندعوكم إلى مواصلة الاجتهاد وصناعة الأثر في محيطكم، كما يسعدنا أن نراكم بين المترشحين في الدورات المقبلة، فربما تكون الفرصة القادمة موعدًا للقاء.</p>
+            <p>نسأل الله أن يوفقكم، ويبارك خطاكم، وأن يكتب لكم الخير حيثما حللتم.</p>
+            <p>مع خالص التقدير والاحترام،</p>
+            <p><strong>لجنة إعداد أكاديمية أطر الغد</strong></p>
+          </td></tr>
+        </table>
+      </td></tr></table>
+    </body></html>`;
+  const text = `السلام عليكم ورحمة الله وبركاته،\n\n${firstName ? `مرحباً ${firstName}،\n\n` : ""}ببالغ التقدير، تتوجه إليكم أكاديمية أطر الغد بالشكر الجزيل على تعبئتكم الاستمارة، كما نثمّن ثقتكم في رسالتها ورغبتكم الصادقة في خوض هذه التجربة.\n\nوبعد دراسة جميع الاستمارات بعناية، نأسف لإبلاغكم بأن طلبكم لم يُوفَّق في اجتياز مرحلة الانتقاء الأولي المؤهلة للمقابلات الشفوية في هذه الدورة.\n\nونود التأكيد أن هذا القرار لا يُعدّ حكمًا على قدراتكم أو إمكاناتكم، وإنما جاء في سياق عملية انتقاء دقيقة فرضتها محدودية المقاعد، والمفاضلة بين عدد كبير من المترشحين.\n\nإن مجرد مبادرتكم إلى الترشح يعكس روحًا إيجابية ورغبة في التعلم والتطوير، وهي قيم نعتز بها ونأمل أن تظل رفيقة لكم في مسيرتكم.\n\nندعوكم إلى مواصلة الاجتهاد وصناعة الأثر في محيطكم، كما يسعدنا أن نراكم بين المترشحين في الدورات المقبلة، فربما تكون الفرصة القادمة موعدًا للقاء.\n\nنسأل الله أن يوفقكم، ويبارك خطاكم، وأن يكتب لكم الخير حيثما حللتم.\n\nمع خالص التقدير والاحترام،\n\nلجنة إعداد أكاديمية أطر الغد`;
+
+  return sendMailWithRetry({
+    from: `"${AR_ORG}" <${SMTP_FROM}>`,
+    to,
+    subject,
+    html,
+    text,
+    attachments: logo.attachments,
+  });
+}
+
 export async function sendPasswordResetEmail(
   to: string,
   firstName: string,

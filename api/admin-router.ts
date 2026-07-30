@@ -15,7 +15,7 @@ import {
   newUsers,
   users,
 } from "@db/schema";
-import { sendCandidateActivationInvitationEmail, sendConfirmationEmail } from "./lib/email";
+import { sendCandidateActivationInvitationEmail, sendCandidateInitialRejectionEmail, sendConfirmationEmail } from "./lib/email";
 
 const CANDIDATE_INVITATION_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000;
 const JWT_SECRET = process.env.APP_SECRET;
@@ -971,6 +971,56 @@ export const adminRouter = createRouter({
         notFound: emails.filter((email) => !matchedEmails.has(email)),
       };
     }),
+
+  rejectAllPendingCandidates: superAdminQuery.mutation(async () => {
+    const connection = await getSqlPool().getConnection();
+    let pendingCandidates: Array<{ id: number; firstName: string; email: string }> = [];
+    try {
+      await connection.beginTransaction();
+      const [rows] = await connection.query<any[]>(
+        `SELECT id, firstName, email
+         FROM candidates
+         WHERE applicationStatus = 'pending'
+         ORDER BY id
+         FOR UPDATE`,
+      );
+      pendingCandidates = rows.map((row) => ({
+        id: Number(row.id),
+        firstName: String(row.firstName || ""),
+        email: String(row.email || ""),
+      }));
+      if (pendingCandidates.length) {
+        const placeholders = pendingCandidates.map(() => "?").join(",");
+        await connection.query(
+          `UPDATE candidates SET applicationStatus = 'rejected' WHERE id IN (${placeholders})`,
+          pendingCandidates.map((candidate) => candidate.id),
+        );
+      }
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback().catch(() => null);
+      throw error;
+    } finally {
+      connection.release();
+    }
+
+    let emailSentCount = 0;
+    let emailFailedCount = 0;
+    for (let index = 0; index < pendingCandidates.length; index += 10) {
+      const batch = pendingCandidates.slice(index, index + 10);
+      const results = await Promise.all(
+        batch.map((candidate) => sendCandidateInitialRejectionEmail(candidate.email, candidate.firstName)),
+      );
+      emailSentCount += results.filter((result) => result.success).length;
+      emailFailedCount += results.filter((result) => !result.success).length;
+    }
+
+    return {
+      rejectedCount: pendingCandidates.length,
+      emailSentCount,
+      emailFailedCount,
+    };
+  }),
 
   listContactMessages: adminQuery.query(async () => {
     const db = getDb();

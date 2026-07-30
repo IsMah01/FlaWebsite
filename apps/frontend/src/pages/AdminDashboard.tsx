@@ -364,6 +364,20 @@ export default function AdminDashboard() {
     },
     onError: (err) => toast.error(err.message || "Impossible d'importer les candidats acceptés"),
   });
+  const rejectAllPendingCandidates = trpc.admin.rejectAllPendingCandidates.useMutation({
+    onSuccess: async ({ rejectedCount, emailSentCount, emailFailedCount }) => {
+      if (emailFailedCount > 0) {
+        toast.warning(
+          `${rejectedCount} candidat(s) refusé(s) · ${emailSentCount} e-mail(s) envoyé(s) · ${emailFailedCount} échec(s) après 3 tentatives`,
+          { duration: 12000 },
+        );
+      } else {
+        toast.success(`${rejectedCount} candidat(s) refusé(s) et ${emailSentCount} e-mail(s) envoyé(s)`, { duration: 10000 });
+      }
+      await Promise.all([utils.admin.listCandidates.invalidate(), utils.admin.stats.invalidate()]);
+    },
+    onError: (err) => toast.error(err.message || "Impossible de refuser les candidatures en traitement"),
+  });
 
   async function importAcceptedCandidates(file?: File) {
     if (!file) return;
@@ -1141,6 +1155,25 @@ export default function AdminDashboard() {
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <span className="text-sm text-slate-500">{filteredCandidates.length} نتيجة</span>
+              {isSuperAdmin && pendingApplications > 0 ? (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={rejectAllPendingCandidates.isPending}
+                  onClick={() => {
+                    const firstConfirmation = window.confirm(
+                      `Refuser les ${pendingApplications} candidatures actuellement en traitement ? Chaque candidat recevra automatiquement l’e-mail de refus.`,
+                    );
+                    if (!firstConfirmation) return;
+                    const finalConfirmation = window.confirm(
+                      `Confirmation finale : passer définitivement ${pendingApplications} candidature(s) au statut « refusé » ?`,
+                    );
+                    if (finalConfirmation) rejectAllPendingCandidates.mutate();
+                  }}
+                >
+                  {rejectAllPendingCandidates.isPending ? "Envoi des e-mails…" : `Refuser les ${pendingApplications} en traitement`}
+                </Button>
+              ) : null}
               <label className="inline-flex h-10 cursor-pointer items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground">
                 <Upload className="ml-2 h-4 w-4" />
                 {acceptCandidatesByEmail.isPending ? "Importation…" : "Importer les acceptés (CSV)"}
