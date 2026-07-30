@@ -836,6 +836,49 @@ export async function sendInterviewBookingConfirmationEmail(input: {
   });
 }
 
+export async function sendInterviewRebookingAuthorizedAdminEmail(input: {
+  to: string;
+  adminName: string;
+  candidateName: string;
+}) {
+  if (!SMTP_HOST || !SMTP_USER) {
+    console.warn("[Email] SMTP not configured. Skipping rebooking authorization admin notification.");
+    return { success: false as const, attempts: 0, reason: "SMTP_NOT_CONFIGURED" };
+  }
+
+  const adminUrl = `${PUBLIC_APP_URL}/admin/interviews`;
+  const safeAdminName = escapeEmailHtml(input.adminName || "");
+  const safeCandidateName = escapeEmailHtml(input.candidateName);
+  const safeAdminUrl = escapeEmailHtml(adminUrl);
+  const logo = getEmailLogo();
+  const subject = `Nouvelle réservation autorisée pour ${input.candidateName} - Future Leaders Foundation`;
+  const html = `<!doctype html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeEmailHtml(subject)}</title></head>
+    <body style="margin:0;padding:0;background:#f2f7f6;font-family:Arial,sans-serif;color:#173f39;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:24px 12px;">
+        <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="width:100%;max-width:600px;background:#fff;border-radius:16px;overflow:hidden;">
+          <tr><td align="center" style="padding:26px;border-bottom:1px solid #e5eeec;"><img src="${logo.src}" width="190" alt="Future Leaders Foundation"></td></tr>
+          <tr><td style="padding:30px 32px;">
+            <h1 style="margin:0 0 20px;font-size:24px;">Nouvelle sélection de créneau autorisée</h1>
+            <p style="font-size:16px;line-height:1.8;">Bonjour ${safeAdminName},</p>
+            <p style="font-size:16px;line-height:1.8;">Le super-admin a autorisé <strong>${safeCandidateName}</strong> à choisir un nouveau créneau d’entretien.</p>
+            <p style="font-size:16px;line-height:1.8;">Le candidat a également été informé par e-mail. Vous serez notifié lorsqu’il aura effectué sa nouvelle réservation.</p>
+            <p style="text-align:center;margin:28px 0 0;"><a href="${safeAdminUrl}" style="display:inline-block;padding:14px 28px;border-radius:9px;background:#4A9B8E;color:#fff;text-decoration:none;font-weight:bold;">Ouvrir les entretiens</a></p>
+          </td></tr>
+        </table>
+      </td></tr></table>
+    </body></html>`;
+  const text = `Bonjour ${input.adminName},\n\nLe super-admin a autorisé ${input.candidateName} à choisir un nouveau créneau d’entretien. Le candidat a également été informé par e-mail.\n\n${adminUrl}`;
+
+  return sendMailWithRetry({
+    from: `"${AR_ORG}" <${SMTP_FROM}>`,
+    to: input.to,
+    subject,
+    html,
+    text,
+    attachments: logo.attachments,
+  });
+}
+
 export async function sendInterviewAdminBookingNotificationEmail(input: {
   to: string;
   adminName: string;

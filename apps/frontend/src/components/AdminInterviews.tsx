@@ -361,6 +361,26 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
     },
     onError: (error) => toast.error(error.message || "Impossible d’annuler cette réservation"),
   });
+  const allowCandidateRebooking = trpc.interview.allowCandidateRebooking.useMutation({
+    onSuccess: async (result) => {
+      if (result.candidateEmailSent && result.adminEmailSent) {
+        toast.success("Le candidat et son mini-admin ont été prévenus par e-mail");
+      } else if (!result.candidateEmailSent && !result.adminEmailSent) {
+        toast.warning("Autorisation enregistrée, mais les deux e-mails n’ont pas pu être envoyés");
+      } else if (!result.candidateEmailSent) {
+        toast.warning("Le mini-admin a été prévenu, mais l’e-mail au candidat a échoué");
+      } else {
+        toast.warning("Le candidat a été prévenu, mais l’e-mail au mini-admin a échoué");
+      }
+      await Promise.all([
+        utils.interview.assignmentCandidates.invalidate(),
+        utils.interview.adminList.invalidate(),
+        utils.interview.assignmentAdminStats.invalidate(),
+        utils.interview.recentAudit.invalidate(),
+      ]);
+    },
+    onError: (error) => toast.error(error.message || "Impossible d’autoriser une nouvelle réservation"),
+  });
   const bulkRemoveSlots = trpc.interview.bulkRemoveSlots.useMutation({
     onSuccess: async (result) => {
       toast.success(`${result.deletedCount} supprimé(s), ${result.cancelledCount} annulé(s)`);
@@ -1078,6 +1098,24 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
                                   >
                                     {candidate.bookingStatus === "cancelled" ? "Libérer la réservation" : "Annuler la réservation"}
                                   </Button>
+                                  {["completed", "absent"].includes(candidate.bookingStatus || "") ? (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-8 border-violet-300 bg-white text-violet-800 hover:bg-violet-50"
+                                      disabled={allowCandidateRebooking.isPending}
+                                      onClick={() => {
+                                        if (window.confirm(
+                                          `Autoriser ${candidate.firstName} ${candidate.lastName} à choisir un nouveau créneau ? L’ancien résultat sera archivé dans le journal d’audit.`,
+                                        )) {
+                                          allowCandidateRebooking.mutate({ candidateId: candidate.id });
+                                        }
+                                      }}
+                                    >
+                                      Autoriser un nouveau créneau
+                                    </Button>
+                                  ) : null}
                                 </div>
                               </div>
                             ) : null}
@@ -1280,7 +1318,8 @@ export default function AdminInterviews({ enabled, adminRole, adminName }: { ena
                 {entry.action === "candidate_assigned" ? "candidat affecté"
                   : entry.action === "candidate_reassigned" ? "candidat réattribué"
                     : entry.action === "candidate_released" ? "candidat libéré"
-                      : entry.action === "slots_created" ? "créneaux créés"
+                      : entry.action === "candidate_rebooking_authorized" ? "nouvelle réservation autorisée"
+                        : entry.action === "slots_created" ? "créneaux créés"
                         : entry.action === "interview_transfer_requested" ? "transfert d’entretien demandé"
                           : entry.action === "interview_transfer_accepted" ? "transfert d’entretien accepté"
                             : entry.action === "interview_transfer_rejected" ? "transfert d’entretien refusé"

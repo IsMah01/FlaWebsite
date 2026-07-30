@@ -24,6 +24,7 @@ import {
 import {
   sendInterviewAdminBookingNotificationEmail,
   sendInterviewBookingConfirmationEmail,
+  sendInterviewRebookingAuthorizedAdminEmail,
   sendInterviewTransferAdminEmail,
   sendInterviewUpdateEmail,
 } from "./lib/email";
@@ -1208,6 +1209,96 @@ export const interviewRouter = createRouter({
       } finally {
         connection.release();
       }
+    }),
+
+  allowCandidateRebooking: superAdminQuery
+    .input(z.object({ candidateId: z.number().int().positive() }))
+    .mutation(async ({ input, ctx }) => {
+      const connection = await getSqlPool().getConnection();
+      let candidateEmail = "";
+      let candidateFirstName = "";
+      let candidateName = "";
+      let interviewer: { name: string; email: string; phoneNumber: string | null } | undefined;
+      try {
+        await connection.beginTransaction();
+        const [rows] = await connection.query<any[]>(
+          `SELECT bookings.id AS bookingId, bookings.communicationScore,
+             bookings.motivationScore, bookings.leadershipScore,
+             bookings.recommendation, bookings.evaluationNotes, bookings.evaluatedAt,
+             slots.id AS slotId, slots.status, slots.startTime, slots.endTime,
+             candidates.firstName, candidates.lastName, candidates.email,
+             assignments.adminId AS assignedAdminId,
+             admins.name AS adminName, admins.email AS adminEmail,
+             admins.phoneNumber AS adminPhoneNumber
+           FROM interview_bookings bookings
+           INNER JOIN interview_slots slots ON slots.id = bookings.slotId
+           INNER JOIN candidates ON candidates.id = bookings.candidateId
+           LEFT JOIN interview_candidate_assignments assignments
+             ON assignments.candidateId = candidates.id
+           LEFT JOIN admin_users admins ON admins.id = assignments.adminId
+           WHERE bookings.candidateId = ?
+           LIMIT 1 FOR UPDATE`,
+          [input.candidateId],
+        );
+        const booking = rows[0];
+        if (!booking) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Ce candidat n'a aucune reservation a rouvrir." });
+        }
+        if (booking.status !== "completed" && booking.status !== "absent") {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "Cette action est reservee aux entretiens termines ou marques absents.",
+          });
+        }
+
+        candidateEmail = booking.email;
+        candidateFirstName = booking.firstName;
+        candidateName = `${booking.firstName} ${booking.lastName}`.trim();
+        interviewer = booking.adminName && booking.adminEmail
+          ? { name: booking.adminName, email: booking.adminEmail, phoneNumber: booking.adminPhoneNumber }
+          : undefined;
+
+        await connection.query("DELETE FROM interview_reminder_emails WHERE bookingId = ?", [booking.bookingId]);
+        await connection.query("DELETE FROM interview_bookings WHERE id = ?", [booking.bookingId]);
+        await connection.query(
+          `INSERT INTO interview_audit_logs
+             (actorAdminId, action, candidateId, targetAdminId, slotId, details)
+           VALUES (?, 'candidate_rebooking_authorized', ?, ?, ?, ?)`,
+          [ctx.adminUser.id, input.candidateId, booking.assignedAdminId, booking.slotId, JSON.stringify({
+            previousStatus: booking.status,
+            startTime: booking.startTime,
+            endTime: booking.endTime,
+            communicationScore: booking.communicationScore,
+            motivationScore: booking.motivationScore,
+            leadershipScore: booking.leadershipScore,
+            recommendation: booking.recommendation,
+            evaluationNotes: booking.evaluationNotes,
+            evaluatedAt: booking.evaluatedAt,
+          })],
+        );
+        await connection.commit();
+      } catch (error) {
+        await connection.rollback().catch(() => null);
+        throw error;
+      } finally {
+        connection.release();
+      }
+
+      const [candidateEmailResult, adminEmailResult] = await Promise.all([
+        sendInterviewUpdateEmail(candidateEmail, candidateFirstName, "cancelled", interviewer),
+        interviewer
+          ? sendInterviewRebookingAuthorizedAdminEmail({
+              to: interviewer.email,
+              adminName: interviewer.name,
+              candidateName,
+            })
+          : Promise.resolve({ success: false as const, attempts: 0, reason: "NO_ASSIGNED_ADMIN" }),
+      ]);
+      return {
+        success: true,
+        candidateEmailSent: candidateEmailResult.success,
+        adminEmailSent: adminEmailResult.success,
+      };
     }),
 
   assignmentAdminStats: superAdminQuery.query(async () => {
