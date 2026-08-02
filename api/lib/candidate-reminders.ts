@@ -26,7 +26,7 @@ type ZonedNow = {
 
 function getReminderConfig() {
   return {
-    enabled: process.env.CANDIDATE_REMINDERS_ENABLED !== "false",
+    enabled: process.env.CANDIDATE_REMINDERS_ENABLED === "true",
     deadline: process.env.CANDIDATE_FORM_DEADLINE || DEFAULT_DEADLINE,
     sendHour: Number(process.env.CANDIDATE_REMINDER_SEND_HOUR || DEFAULT_SEND_HOUR),
     timezone: process.env.CANDIDATE_REMINDER_TIMEZONE || DEFAULT_TIMEZONE,

@@ -407,8 +407,8 @@ export async function runInterviewReminderJob(now = getServerNow()) {
 }
 
 export function startInterviewReminderScheduler() {
-  const interviewRemindersEnabled = process.env.INTERVIEW_REMINDERS_ENABLED !== "false";
-  const bookingRemindersEnabled = process.env.INTERVIEW_BOOKING_REMINDERS_ENABLED !== "false";
+  const interviewRemindersEnabled = process.env.INTERVIEW_REMINDERS_ENABLED === "true";
+  const bookingRemindersEnabled = process.env.INTERVIEW_BOOKING_REMINDERS_ENABLED === "true";
   const slotCleanupEnabled = process.env.INTERVIEW_EXPIRED_SLOT_CLEANUP_ENABLED !== "false";
   if (!interviewRemindersEnabled && !bookingRemindersEnabled && !slotCleanupEnabled) {
     console.log("[interview-reminders] Scheduler disabled.");
