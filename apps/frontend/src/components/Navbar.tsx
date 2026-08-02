@@ -8,7 +8,7 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { viewer, isAuthenticated, logout, hasAmbassadorView, isAcceptedCandidate } = useViewerSession();
+  const { viewer, isAuthenticated, logout, hasAmbassadorView } = useViewerSession();
 
   const isHome = location.pathname === "/";
 
@@ -26,9 +26,6 @@ export default function Navbar() {
   };
 
   const navLinks = [
-    ...(isAcceptedCandidate
-      ? [{ label: "موعد المقابلة", action: () => { navigate("/interview"); setMenuOpen(false); } }]
-      : []),
     { label: "الرئيسية", action: () => scrollToSection("hero") },
     ...(!hasAmbassadorView
       ? [

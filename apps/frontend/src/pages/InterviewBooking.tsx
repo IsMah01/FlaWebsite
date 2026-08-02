@@ -18,6 +18,7 @@ import { useViewerSession } from "@/hooks/useViewerSession";
 import { trpc } from "@/providers/trpc";
 
 const INTERVIEW_TIME_ZONE = "Africa/Casablanca";
+const CANDIDATE_INTERVIEW_BOOKING_OPEN = false;
 
 function formatInterviewDate(value: Date | string) {
   return new Intl.DateTimeFormat("ar-MA", {
@@ -120,7 +121,7 @@ export default function InterviewBooking() {
   const { viewer, isLoading, isAcceptedCandidate } = useViewerSession();
   const utils = trpc.useUtils();
   const overview = trpc.interview.candidateOverview.useQuery(undefined, {
-    enabled: !!viewer && isAcceptedCandidate,
+    enabled: CANDIDATE_INTERVIEW_BOOKING_OPEN && !!viewer && isAcceptedCandidate,
     retry: false,
   });
   const bookSlot = trpc.interview.bookSlot.useMutation({
@@ -154,6 +155,25 @@ export default function InterviewBooking() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#F8FAF9]">
         <Loader2 className="h-10 w-10 animate-spin text-[#4A9B8E]" />
+      </div>
+    );
+  }
+
+  if (!CANDIDATE_INTERVIEW_BOOKING_OPEN) {
+    return (
+      <div className="min-h-screen bg-[#F8FAF9]" dir="rtl">
+        <Navbar />
+        <main className="mx-auto max-w-2xl px-4 pb-20 pt-32 text-center">
+          <CalendarCheck className="mx-auto h-14 w-14 text-[#4A9B8E]" />
+          <h1 className="mt-5 text-2xl font-bold text-gray-900">انتهت مرحلة المقابلات الشفوية</h1>
+          <p className="mt-3 leading-7 text-gray-600">
+            تم إغلاق صفحة مواعيد المقابلات. سيتم الإعلان عن النتائج النهائية قريباً.
+          </p>
+          <Link to="/">
+            <Button className="mt-7 bg-[#4A9B8E] hover:bg-[#3D7A6F]">العودة إلى الصفحة الرئيسية</Button>
+          </Link>
+        </main>
+        <Footer />
       </div>
     );
   }

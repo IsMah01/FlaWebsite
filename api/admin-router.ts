@@ -15,7 +15,7 @@ import {
   newUsers,
   users,
 } from "@db/schema";
-import { sendCandidateActivationInvitationEmail, sendCandidateInitialRejectionEmail, sendConfirmationEmail } from "./lib/email";
+import { sendCandidateActivationInvitationEmail, sendCandidateFinalAdmissionEmail, sendCandidateInitialRejectionEmail, sendConfirmationEmail } from "./lib/email";
 
 const CANDIDATE_INVITATION_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000;
 const JWT_SECRET = process.env.APP_SECRET;
@@ -853,6 +853,9 @@ export const adminRouter = createRouter({
         emailConfirmed: candidates.emailConfirmed,
         newsletterConsent: candidates.newsletterConsent,
         applicationStatus: (candidates as any).applicationStatus,
+        finalAdmissionStatus: candidates.finalAdmissionStatus,
+        finalAdmissionEmailSentAt: candidates.finalAdmissionEmailSentAt,
+        finalAdmissionEmailError: candidates.finalAdmissionEmailError,
         adminNote: (candidates as any).adminNote,
         questionnaireAnswers: (candidates as any).questionnaireAnswers,
         createdAt: candidates.createdAt,
@@ -971,6 +974,165 @@ export const adminRouter = createRouter({
         notFound: emails.filter((email) => !matchedEmails.has(email)),
       };
     }),
+
+  importFinalAdmittedCandidates: superAdminQuery
+    .input(z.object({ emails: z.array(z.string().email()).min(1).max(2000) }))
+    .mutation(async ({ input }) => {
+      const emails = [...new Set(input.emails.map((email) => email.trim().toLowerCase()))];
+      const connection = await getSqlPool().getConnection();
+      try {
+        await connection.beginTransaction();
+        const [oralCandidates] = await connection.query<any[]>(
+          `SELECT id, email, finalAdmissionEmailSentAt FROM candidates
+           WHERE applicationStatus = 'accepted'
+           ORDER BY id FOR UPDATE`,
+        );
+        const oralByEmail = new Map(
+          oralCandidates.map((candidate) => [String(candidate.email).toLowerCase(), Number(candidate.id)]),
+        );
+        const admittedIds = emails
+          .map((email) => oralByEmail.get(email))
+          .filter((id): id is number => typeof id === "number");
+        const notFoundOrIneligible = emails.filter((email) => !oralByEmail.has(email));
+        if (!admittedIds.length) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Aucun e-mail du fichier ne correspond a un candidat de la phase orale.",
+          });
+        }
+        const admittedIdSet = new Set(admittedIds);
+        const alreadyNotifiedToRemove = oralCandidates.filter(
+          (candidate) => candidate.finalAdmissionEmailSentAt && !admittedIdSet.has(Number(candidate.id)),
+        );
+        if (alreadyNotifiedToRemove.length) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: `Import bloque : ${alreadyNotifiedToRemove.length} candidat(s) ayant deja recu l'e-mail d'admission sont absents du fichier.`,
+          });
+        }
+
+        if (admittedIds.length) {
+          const placeholders = admittedIds.map(() => "?").join(",");
+          await connection.query(
+            `UPDATE candidates
+             SET finalAdmissionStatus = 'not_admitted_after_interview',
+                 finalAdmissionEmailSentAt = NULL, finalAdmissionEmailError = NULL
+             WHERE applicationStatus = 'accepted' AND id NOT IN (${placeholders})`,
+            admittedIds,
+          );
+          await connection.query(
+            `UPDATE candidates
+             SET finalAdmissionStatus = 'admitted', finalAdmissionEmailError = NULL
+             WHERE id IN (${placeholders})`,
+            admittedIds,
+          );
+        } else {
+          await connection.query(
+            `UPDATE candidates
+             SET finalAdmissionStatus = 'not_admitted_after_interview',
+                 finalAdmissionEmailSentAt = NULL, finalAdmissionEmailError = NULL
+             WHERE applicationStatus = 'accepted'`,
+          );
+        }
+        await connection.commit();
+        return {
+          admittedCount: admittedIds.length,
+          notAdmittedAfterInterviewCount: oralCandidates.length - admittedIds.length,
+          oralCandidateCount: oralCandidates.length,
+          notFoundOrIneligible,
+        };
+      } catch (error) {
+        await connection.rollback().catch(() => null);
+        throw error;
+      } finally {
+        connection.release();
+      }
+    }),
+
+  updateFinalAdmissionStatus: superAdminQuery
+    .input(z.object({
+      candidateId: z.number().int().positive(),
+      status: z.enum(["pending", "admitted", "not_admitted_after_interview"]),
+    }))
+    .mutation(async ({ input }) => {
+      const [rows] = await getSqlPool().query<any[]>(
+        `SELECT applicationStatus, finalAdmissionStatus, finalAdmissionEmailSentAt
+         FROM candidates WHERE id = ? LIMIT 1`,
+        [input.candidateId],
+      );
+      const candidate = rows[0];
+      if (!candidate) throw new TRPCError({ code: "NOT_FOUND", message: "Candidat introuvable." });
+      if (candidate.applicationStatus !== "accepted") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Ce candidat n'a pas participe a la phase orale." });
+      }
+      if (candidate.finalAdmissionEmailSentAt && input.status !== "admitted") {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "L'e-mail d'admission a deja ete envoye a ce candidat. Son statut ne peut plus etre retire.",
+        });
+      }
+      await getSqlPool().execute(
+        `UPDATE candidates
+         SET finalAdmissionStatus = ?,
+             finalAdmissionEmailSentAt = CASE WHEN ? = 'admitted' THEN finalAdmissionEmailSentAt ELSE NULL END,
+             finalAdmissionEmailError = NULL
+         WHERE id = ?`,
+        [input.status, input.status, input.candidateId],
+      );
+      return { success: true };
+    }),
+
+  sendFinalAdmissionEmails: superAdminQuery.mutation(async () => {
+    const connection = await getSqlPool().getConnection();
+    let rows: any[] = [];
+    try {
+      await connection.beginTransaction();
+      const [selectedRows] = await connection.query<any[]>(
+        `SELECT id, firstName, email FROM candidates
+         WHERE applicationStatus = 'accepted'
+           AND finalAdmissionStatus = 'admitted'
+           AND finalAdmissionEmailSentAt IS NULL
+           AND (finalAdmissionEmailError IS NULL
+             OR finalAdmissionEmailError <> 'SENDING'
+             OR updatedAt < DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 15 MINUTE))
+         ORDER BY id FOR UPDATE`,
+      );
+      rows = selectedRows;
+      if (rows.length) {
+        const placeholders = rows.map(() => "?").join(",");
+        await connection.query(
+          `UPDATE candidates SET finalAdmissionEmailError = 'SENDING'
+           WHERE id IN (${placeholders})`,
+          rows.map((candidate) => candidate.id),
+        );
+      }
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback().catch(() => null);
+      throw error;
+    } finally {
+      connection.release();
+    }
+    let sentCount = 0;
+    let failedCount = 0;
+    for (let index = 0; index < rows.length; index += 10) {
+      const batch = rows.slice(index, index + 10);
+      const results = await Promise.all(batch.map(async (candidate) => {
+        const result = await sendCandidateFinalAdmissionEmail({
+          to: String(candidate.email),
+          firstName: String(candidate.firstName || ""),
+        });
+        await getSqlPool().execute(
+          `UPDATE candidates SET finalAdmissionEmailSentAt = ?, finalAdmissionEmailError = ? WHERE id = ?`,
+          [result.success ? new Date() : null, result.success ? null : String(result.reason || "SEND_FAILED").slice(0, 2000), candidate.id],
+        );
+        return result.success;
+      }));
+      sentCount += results.filter(Boolean).length;
+      failedCount += results.filter((success) => !success).length;
+    }
+    return { targetedCount: rows.length, sentCount, failedCount };
+  }),
 
   rejectAllPendingCandidates: superAdminQuery.mutation(async () => {
     const connection = await getSqlPool().getConnection();

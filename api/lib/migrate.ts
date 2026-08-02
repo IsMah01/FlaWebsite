@@ -90,6 +90,9 @@ export async function ensureDatabaseSchema() {
         passwordResetExpiresAt TIMESTAMP NULL,
         newsletterConsent BOOLEAN NOT NULL DEFAULT false,
         applicationStatus ENUM('pending','accepted','rejected') NOT NULL DEFAULT 'pending',
+        finalAdmissionStatus ENUM('pending','admitted','not_admitted_after_interview') NOT NULL DEFAULT 'pending',
+        finalAdmissionEmailSentAt TIMESTAMP NULL,
+        finalAdmissionEmailError TEXT NULL,
         questionnaireAnswers TEXT NULL,
         submittedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         adminNote TEXT NULL,
@@ -106,6 +109,9 @@ export async function ensureDatabaseSchema() {
     await addColumnIfMissing(connection, "candidates", "passwordResetExpiresAt", "passwordResetExpiresAt TIMESTAMP NULL");
     await addColumnIfMissing(connection, "candidates", "questionnaireAnswers", "questionnaireAnswers TEXT NULL");
     await addColumnIfMissing(connection, "candidates", "submittedAt", "submittedAt TIMESTAMP NULL");
+    await addColumnIfMissing(connection, "candidates", "finalAdmissionStatus", "finalAdmissionStatus ENUM('pending','admitted','not_admitted_after_interview') NOT NULL DEFAULT 'pending'");
+    await addColumnIfMissing(connection, "candidates", "finalAdmissionEmailSentAt", "finalAdmissionEmailSentAt TIMESTAMP NULL");
+    await addColumnIfMissing(connection, "candidates", "finalAdmissionEmailError", "finalAdmissionEmailError TEXT NULL");
     if (await hasColumn(connection, "candidates", "passwordHash")) {
       await connection.query("ALTER TABLE candidates MODIFY COLUMN passwordHash VARCHAR(255) NULL");
     }

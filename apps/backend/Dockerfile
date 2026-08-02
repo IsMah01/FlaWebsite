@@ -17,6 +17,7 @@ COPY apps/backend/package*.json ./
 RUN npm ci --omit=dev
 COPY --from=build /app/dist ./dist
 COPY apps/frontend/public/images/logo.png ./public/images/logo.png
+COPY storage/final-admission/edition-18-final-acceptance.pdf ./storage/final-admission/edition-18-final-acceptance.pdf
 RUN mkdir -p storage/private/uploads
 EXPOSE 3000
 CMD ["npm", "start"]

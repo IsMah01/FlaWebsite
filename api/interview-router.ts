@@ -39,6 +39,19 @@ import {
 } from "./lib/interview-booking-window";
 import { classifyTransferOverlaps } from "./lib/interview-transfer";
 
+// The oral-interview campaign is over. This server-side guard also prevents
+// candidates from bypassing the closed page with a direct API call.
+const CANDIDATE_INTERVIEW_BOOKING_OPEN = false;
+
+function requireOpenCandidateInterviewBooking() {
+  if (!CANDIDATE_INTERVIEW_BOOKING_OPEN) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "La phase des entretiens oraux est terminee. Les reservations sont fermees.",
+    });
+  }
+}
+
 async function logInterviewAction(input: {
   actorAdminId: number;
   action: string;
@@ -58,6 +71,7 @@ async function logInterviewAction(input: {
 }
 
 async function requireAcceptedCandidate(req: Request) {
+  requireOpenCandidateInterviewBooking();
   const session = requireCandidateSession(req.headers.get("cookie") || "");
   const db = getDb();
   const [candidate] = await db
@@ -244,6 +258,7 @@ export const interviewRouter = createRouter({
   bookSlot: publicQuery
     .input(z.object({ slotId: z.number().int().positive() }))
     .mutation(async ({ input, ctx }) => {
+      requireOpenCandidateInterviewBooking();
       const session = requireCandidateSession(ctx.req.headers.get("cookie") || "");
       const connection = await getSqlPool().getConnection();
       let committed = false;

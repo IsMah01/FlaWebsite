@@ -116,6 +116,15 @@ export const candidateInvitations = mysqlTable("candidate_invitations", {
   status: mysqlEnum("status", ["pending", "activated", "revoked"])
     .default("pending")
     .notNull(),
+  finalAdmissionStatus: mysqlEnum("finalAdmissionStatus", [
+    "pending",
+    "admitted",
+    "not_admitted_after_interview",
+  ])
+    .default("pending")
+    .notNull(),
+  finalAdmissionEmailSentAt: timestamp("finalAdmissionEmailSentAt"),
+  finalAdmissionEmailError: text("finalAdmissionEmailError"),
   expiresAt: timestamp("expiresAt").notNull(),
   invitedByAdminId: int("invitedByAdminId").notNull(),
   emailSentAt: timestamp("emailSentAt"),

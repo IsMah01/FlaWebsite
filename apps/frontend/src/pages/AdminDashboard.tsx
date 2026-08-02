@@ -364,6 +364,35 @@ export default function AdminDashboard() {
     },
     onError: (err) => toast.error(err.message || "Impossible d'importer les candidats acceptés"),
   });
+  const importFinalAdmittedCandidates = trpc.admin.importFinalAdmittedCandidates.useMutation({
+    onSuccess: async ({ admittedCount, notAdmittedAfterInterviewCount, notFoundOrIneligible }) => {
+      const warning = notFoundOrIneligible.length
+        ? ` ${notFoundOrIneligible.length} e-mail(s) introuvable(s) ou non retenu(s) pour l'oral.`
+        : "";
+      toast.success(
+        `${admittedCount} admis definitif(s) et ${notAdmittedAfterInterviewCount} candidat(s) en liste d'attente apres entretien prepares.${warning}`,
+        { duration: 12000 },
+      );
+      await utils.admin.listCandidates.invalidate();
+    },
+    onError: (err) => toast.error(err.message || "Impossible d'importer les admis definitifs"),
+  });
+  const sendFinalAdmissionEmails = trpc.admin.sendFinalAdmissionEmails.useMutation({
+    onSuccess: async ({ targetedCount, sentCount, failedCount }) => {
+      const message = `${sentCount}/${targetedCount} e-mail(s) d'admission envoyes.${failedCount ? ` ${failedCount} echec(s).` : ""}`;
+      if (failedCount) toast.warning(message, { duration: 12000 });
+      else toast.success(message, { duration: 10000 });
+      await utils.admin.listCandidates.invalidate();
+    },
+    onError: (err) => toast.error(err.message || "Impossible d'envoyer les e-mails d'admission"),
+  });
+  const updateFinalAdmissionStatus = trpc.admin.updateFinalAdmissionStatus.useMutation({
+    onSuccess: async () => {
+      toast.success("Statut final mis à jour. Aucun e-mail n'a été envoyé.");
+      await utils.admin.listCandidates.invalidate();
+    },
+    onError: (err) => toast.error(err.message || "Impossible de modifier le statut final"),
+  });
   const rejectAllPendingCandidates = trpc.admin.rejectAllPendingCandidates.useMutation({
     onSuccess: async ({ rejectedCount, emailSentCount, emailFailedCount }) => {
       if (emailFailedCount > 0) {
@@ -428,6 +457,40 @@ export default function AdminDashboard() {
       // Mutation errors are displayed by onError.
     }
   }
+  async function importFinalAdmitted(file?: File) {
+    if (!file) return;
+    const lines = (await file.text()).replace(/^\uFEFF/, "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    const header = lines.shift()?.replace(/^"|"$/g, "").trim().toLowerCase();
+    if (!header || !["email", "e-mail", "adresse email", "adresse e-mail"].includes(header)) {
+      toast.error("Fichier refuse : la premiere ligne doit etre uniquement 'email'");
+      return;
+    }
+    const emailPattern = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
+    const invalidLines: number[] = [];
+    const emails = [...new Set(lines.map((line, index) => {
+      const email = line.replace(/^"|"$/g, "").trim().toLowerCase();
+      if (line.includes(";") || line.includes(",") || !emailPattern.test(email)) invalidLines.push(index + 2);
+      return email;
+    }))];
+    if (invalidLines.length) {
+      toast.error(`Fichier refuse : ligne(s) invalide(s) ${invalidLines.slice(0, 10).join(", ")}`);
+      return;
+    }
+    if (!emails.length || emails.length > 2000) {
+      toast.error(emails.length ? "Maximum 2 000 adresses e-mail" : "Le fichier ne contient aucun candidat");
+      return;
+    }
+    const oralCandidates = (candidates.data ?? []).filter((candidate) => candidate.applicationStatus === "accepted");
+    const oralEmails = new Set(oralCandidates.map((candidate) => candidate.email.toLowerCase()));
+    const admittedCount = emails.filter((email) => oralEmails.has(email)).length;
+    const notAdmittedCount = oralCandidates.length - admittedCount;
+    const unknownCount = emails.length - admittedCount;
+    const confirmed = window.confirm(
+      `Verification avant import final :\n\n${admittedCount} admis definitif(s)\n${notAdmittedCount} candidat(s) en liste d'attente apres entretien\n${unknownCount} e-mail(s) introuvable(s) ou non eligible(s)\n\nAucun e-mail ne sera envoye pendant l'import. Confirmer ?`,
+    );
+    if (confirmed) await importFinalAdmittedCandidates.mutateAsync({ emails });
+  }
+
   const setCandidateAmbassador = trpc.admin.setCandidateAmbassador.useMutation({
     onSuccess: async () => {
       toast.success("Statut ambassadeur mis à jour");
@@ -1174,6 +1237,37 @@ export default function AdminDashboard() {
                   {rejectAllPendingCandidates.isPending ? "Envoi des e-mails…" : `Refuser les ${pendingApplications} en traitement`}
                 </Button>
               ) : null}
+              {isSuperAdmin ? (
+                <>
+                  <label className="inline-flex h-10 cursor-pointer items-center justify-center rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800">
+                    <Upload className="ml-2 h-4 w-4" />
+                    {importFinalAdmittedCandidates.isPending ? "Importation…" : "Importer les admis définitifs (CSV)"}
+                    <input
+                      type="file"
+                      accept=".csv,text/csv"
+                      className="hidden"
+                      disabled={importFinalAdmittedCandidates.isPending || sendFinalAdmissionEmails.isPending}
+                      onChange={(event) => {
+                        void importFinalAdmitted(event.target.files?.[0]);
+                        event.target.value = "";
+                      }}
+                    />
+                  </label>
+                  <Button
+                    type="button"
+                    className="bg-blue-700 hover:bg-blue-800"
+                    disabled={sendFinalAdmissionEmails.isPending || !(candidates.data ?? []).some((candidate) => candidate.finalAdmissionStatus === "admitted" && !candidate.finalAdmissionEmailSentAt)}
+                    onClick={() => {
+                      const unsentAdmitted = (candidates.data ?? []).filter((candidate) => candidate.finalAdmissionStatus === "admitted" && !candidate.finalAdmissionEmailSentAt).length;
+                      if (window.confirm(`Envoyer maintenant l'e-mail et le PDF aux ${unsentAdmitted} admis définitif(s) ?\n\nAucun e-mail ne sera envoyé aux candidats non admis.`)) {
+                        sendFinalAdmissionEmails.mutate();
+                      }
+                    }}
+                  >
+                    {sendFinalAdmissionEmails.isPending ? "Envoi des e-mails…" : "Envoyer l'e-mail aux admis"}
+                  </Button>
+                </>
+              ) : null}
               <label className="inline-flex h-10 cursor-pointer items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground">
                 <Upload className="ml-2 h-4 w-4" />
                 {acceptCandidatesByEmail.isPending ? "Importation…" : "Importer les acceptés (CSV)"}
@@ -1246,7 +1340,25 @@ export default function AdminDashboard() {
                             <span className="text-slate-400">لا توجد أجوبة</span>
                           )}
                         </td>
-                        <td className="p-3">{candidate.applicationStatus ?? "pending"}</td>
+                        <td className="p-3">
+                          <div>{candidate.applicationStatus ?? "pending"}</div>
+                          {candidate.applicationStatus === "accepted" ? (
+                            <div className="mt-1 text-xs font-semibold text-slate-600">
+                              {candidate.finalAdmissionStatus === "admitted"
+                                ? "Admis définitivement"
+                                : candidate.finalAdmissionStatus === "not_admitted_after_interview"
+                                  ? "Liste d’attente après entretien"
+                                  : "Résultat final en attente"}
+                              {candidate.finalAdmissionStatus === "admitted"
+                                ? candidate.finalAdmissionEmailSentAt
+                                  ? " · e-mail envoyé"
+                                  : candidate.finalAdmissionEmailError
+                                    ? " · échec d'envoi"
+                                    : " · e-mail non envoyé"
+                                : ""}
+                            </div>
+                          ) : null}
+                        </td>
                         <td className="p-3">
                           <div className="flex flex-wrap gap-2">
                             <Button
@@ -1278,6 +1390,30 @@ export default function AdminDashboard() {
                             >
                               {candidate.isAmbassador ? "Retirer ambassadeur" : "Nommer ambassadeur"}
                             </Button>
+                            {isSuperAdmin && candidate.applicationStatus === "accepted" ? (
+                              <div className="mt-2 flex w-full flex-wrap gap-2 border-t pt-2">
+                                <Button
+                                  size="sm"
+                                  className="bg-emerald-700 hover:bg-emerald-800"
+                                  disabled={updateFinalAdmissionStatus.isPending || candidate.finalAdmissionStatus === "admitted"}
+                                  onClick={() => {
+                                    if (window.confirm(`Marquer ${candidate.firstName} ${candidate.lastName} comme admis définitif ? Aucun e-mail ne sera envoyé avant de cliquer sur le bouton d'envoi global.`)) {
+                                      updateFinalAdmissionStatus.mutate({ candidateId: candidate.id, status: "admitted" });
+                                    }
+                                  }}
+                                >
+                                  Admettre définitivement
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={updateFinalAdmissionStatus.isPending || candidate.finalAdmissionStatus === "not_admitted_after_interview" || !!candidate.finalAdmissionEmailSentAt}
+                                  onClick={() => updateFinalAdmissionStatus.mutate({ candidateId: candidate.id, status: "not_admitted_after_interview" })}
+                                >
+                                  Mettre en liste d’attente
+                                </Button>
+                              </div>
+                            ) : null}
                           </div>
                         </td>
                       </tr>

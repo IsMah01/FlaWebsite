@@ -16,6 +16,10 @@ const LOGO_PATHS = [
   join(process.cwd(), "apps", "frontend", "public", "images", "logo.png"),
   join(process.cwd(), "..", "frontend", "public", "images", "logo.png"),
 ];
+const FINAL_ADMISSION_PDF_PATHS = [
+  join(process.cwd(), "storage", "final-admission", "edition-18-final-acceptance.pdf"),
+  join(process.cwd(), "..", "..", "storage", "final-admission", "edition-18-final-acceptance.pdf"),
+];
 const AR_ORG = "\u0645\u0624\u0633\u0633\u0629 \u0623\u0637\u0631 \u0627\u0644\u063A\u062F";
 const AR_HELLO = "\u0645\u0631\u062D\u0628\u0627\u064B";
 const AR_CONFIRM_BODY =
@@ -103,6 +107,63 @@ async function sendMailWithRetry(
     attempts: maxAttempts,
     reason: lastError instanceof Error ? lastError.message : "SEND_FAILED",
   };
+}
+
+export async function sendCandidateFinalAdmissionEmail(input: { to: string; firstName: string }) {
+  if (!SMTP_HOST || !SMTP_USER) {
+    console.warn("[Email] SMTP not configured. Skipping final admission email.");
+    return { success: false as const, attempts: 0, reason: "SMTP_NOT_CONFIGURED" };
+  }
+  const pdfPath = FINAL_ADMISSION_PDF_PATHS.find((path) => existsSync(path));
+  if (!pdfPath) {
+    console.error("[Email] Final admission PDF is missing.");
+    return { success: false as const, attempts: 0, reason: "FINAL_ADMISSION_PDF_MISSING" };
+  }
+
+  const logo = getEmailLogo();
+  const safeFirstName = escapeEmailHtml(input.firstName);
+  const subject = "القبول النهائي في أكاديمية أطر الغد - دورة الأثر";
+  const html = `
+    <!doctype html>
+    <html lang="ar" dir="rtl">
+      <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${subject}</title></head>
+      <body dir="rtl" style="margin:0;padding:0;background:#f2f7f6;font-family:Tahoma,Arial,sans-serif;color:#173f39;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f2f7f6;width:100%;">
+          <tr><td align="center" style="padding:24px 12px;">
+            <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:600px;background:#fff;border-radius:16px;overflow:hidden;">
+              <tr><td align="center" style="padding:28px 24px 20px;border-bottom:1px solid #e5eeec;">
+                <img src="${logo.src}" width="190" alt="Future Leaders Foundation" style="display:block;width:190px;max-width:80%;height:auto;border:0;">
+              </td></tr>
+              <tr><td style="padding:32px;text-align:right;font-size:16px;line-height:2;">
+                <p style="margin:0 0 18px;">السلام عليكم ورحمة الله وبركاته،</p>
+                ${safeFirstName ? `<p style="margin:0 0 18px;">مرحباً ${safeFirstName}،</p>` : ""}
+                <p style="margin:0 0 18px;">تهنئكم إدارة أكاديمية أطر الغد لاجتيازكم الاختبارين الكتابي والشفوي بنجاح، وقبولكم في اللائحة الرئيسية للمشاركين، مما خول لكم الحصول على مقعد بين مشاركي الدورة الثامنة عشر <strong>«دورة الأثر»</strong>.</p>
+                <p style="margin:0;">وعليه، المرجو الاطلاع على باقي التفاصيل بالملف المرفق أدناه.</p>
+              </td></tr>
+              <tr><td align="center" style="padding:20px;background:#173f39;color:#dceae7;font-size:12px;line-height:1.8;">${AR_ORG}<br>Future Leaders Foundation</td></tr>
+            </table>
+          </td></tr>
+        </table>
+      </body>
+    </html>`;
+  const text = [
+    "السلام عليكم ورحمة الله وبركاته،",
+    safeFirstName ? `مرحباً ${input.firstName}،` : "",
+    "تهنئكم إدارة أكاديمية أطر الغد لاجتيازكم الاختبارين الكتابي والشفوي بنجاح، وقبولكم في اللائحة الرئيسية للمشاركين، مما خول لكم الحصول على مقعد بين مشاركي الدورة الثامنة عشر «دورة الأثر».",
+    "وعليه، المرجو الاطلاع على باقي التفاصيل بالملف المرفق أدناه.",
+  ].filter(Boolean).join("\n\n");
+
+  return sendMailWithRetry({
+    from: `"${AR_ORG}" <${SMTP_FROM}>`,
+    to: input.to,
+    subject,
+    html,
+    text,
+    attachments: [
+      ...logo.attachments,
+      { filename: "رسالة القبول النهائي - دورة الأثر.pdf", path: pdfPath, contentType: "application/pdf" },
+    ],
+  });
 }
 
 export async function sendConfirmationEmail(
