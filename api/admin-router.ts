@@ -837,6 +837,32 @@ export const adminRouter = createRouter({
       return { success: true };
     }),
 
+  listFinalAdmissionCandidates: superAdminQuery.query(async () => {
+    const [rows] = await getSqlPool().query<any[]>(
+      `SELECT c.id, c.firstName, c.lastName, c.email, c.phoneNumber,
+              c.finalAdmissionStatus, c.finalAdmissionEmailSentAt, c.finalAdmissionEmailError,
+              c.createdAt, c.updatedAt,
+              b.recommendation, b.communicationScore, b.motivationScore,
+              b.leadershipScore, b.evaluationNotes, b.evaluatedAt,
+              s.status AS interviewStatus, s.startTime AS interviewDate,
+              COALESCE(s.interviewerName, a.name) AS interviewerName
+       FROM candidates c
+       LEFT JOIN interview_bookings b ON b.candidateId = c.id
+       LEFT JOIN interview_slots s ON s.id = b.slotId
+       LEFT JOIN interview_candidate_assignments assignment ON assignment.candidateId = c.id
+       LEFT JOIN admin_users a ON a.id = assignment.adminId
+       WHERE c.applicationStatus = 'accepted'
+       ORDER BY c.lastName, c.firstName, c.id`,
+    );
+    return rows.map((row) => ({
+      ...row,
+      id: Number(row.id),
+      communicationScore: row.communicationScore === null ? null : Number(row.communicationScore),
+      motivationScore: row.motivationScore === null ? null : Number(row.motivationScore),
+      leadershipScore: row.leadershipScore === null ? null : Number(row.leadershipScore),
+    }));
+  }),
+
   listCandidates: adminQuery.query(async () => {
     const db = getDb();
     return db

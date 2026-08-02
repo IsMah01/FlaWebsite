@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
-import { CalendarClock, Download, FileText, LogOut, Mail, MessageSquareText, RefreshCw, ShieldCheck, Trash2, Upload, UserCog, Users } from "lucide-react";
+import { CalendarClock, Download, FileText, LogOut, Mail, MessageSquareText, RefreshCw, ShieldCheck, Trash2, Upload, UserCheck, UserCog, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -884,6 +884,11 @@ export default function AdminDashboard() {
             <p className="mt-1 text-sm text-slate-500">تم تسجيل الدخول باسم: {user.name || user.email || user.unionId}</p>
           </div>
           <div className="flex gap-2">
+            {isSuperAdmin ? <Link to="/admin/final-admissions">
+              <Button className="bg-emerald-700 hover:bg-emerald-800">
+                <UserCheck className="ml-2 h-4 w-4" /> Admissions finales
+              </Button>
+            </Link> : null}
             <Link to="/admin/interviews">
               <Button className="bg-[#4A9B8E] hover:bg-[#3D7A6F]">
                 <CalendarClock className="ml-2 h-4 w-4" /> المقابلات
@@ -1237,7 +1242,7 @@ export default function AdminDashboard() {
                   {rejectAllPendingCandidates.isPending ? "Envoi des e-mails…" : `Refuser les ${pendingApplications} en traitement`}
                 </Button>
               ) : null}
-              {isSuperAdmin ? (
+              {false && isSuperAdmin ? (
                 <>
                   <label className="inline-flex h-10 cursor-pointer items-center justify-center rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800">
                     <Upload className="ml-2 h-4 w-4" />
@@ -1390,7 +1395,7 @@ export default function AdminDashboard() {
                             >
                               {candidate.isAmbassador ? "Retirer ambassadeur" : "Nommer ambassadeur"}
                             </Button>
-                            {isSuperAdmin && candidate.applicationStatus === "accepted" ? (
+                            {false && isSuperAdmin && candidate.applicationStatus === "accepted" ? (
                               <div className="mt-2 flex w-full flex-wrap gap-2 border-t pt-2">
                                 <Button
                                   size="sm"

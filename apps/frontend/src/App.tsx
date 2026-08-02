@@ -22,6 +22,7 @@ import TermsOfService from "./pages/TermsOfService";
 import FlaInterviews from "./pages/FlaInterviews";
 import ActivateCandidate from "./pages/ActivateCandidate";
 import AdminCandidateInvitationsPage from "./pages/AdminCandidateInvitationsPage";
+import AdminFinalAdmissionsPage from "./pages/AdminFinalAdmissionsPage";
 import ScrollManager from "./components/ScrollManager";
 import { useViewerSession } from "./hooks/useViewerSession";
 
@@ -67,6 +68,7 @@ export default function App() {
         <Route path="/admin/interviews" element={<AdminInterviewsPage />} />
         <Route path="/admin/mini-admins" element={<AdminMiniAdminsPage />} />
         <Route path="/admin/candidate-invitations" element={<AdminCandidateInvitationsPage />} />
+        <Route path="/admin/final-admissions" element={<AdminFinalAdmissionsPage />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/admin/forgot-password" element={<ForgotPassword accountType="admin" />} />
         <Route path="/admin/reset-password" element={<ResetPassword accountType="admin" />} />
