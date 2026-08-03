@@ -108,7 +108,7 @@ export const uploadRouter = createRouter({
         fileName: z.string().min(1).max(255),
         mimeType: z.enum(["application/pdf", "image/jpeg", "image/png"]),
         data: z.string().min(1),
-        documentType: z.enum(["attestation", "idCard"]),
+        documentType: z.literal("idCard"),
       }),
     )
     .mutation(async ({ input, ctx }) => {

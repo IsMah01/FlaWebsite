@@ -262,10 +262,6 @@ export const candidateAuthRouter = createRouter({
           firstName: z.string().min(1, "الاسم مطلوب"),
           lastName: z.string().min(1, "اسم العائلة مطلوب"),
           studyStatus: z.enum(["student", "graduated", "master_student", "phd_student", "other"]),
-          attestationUrl: z
-            .string()
-            .regex(/^private:\/\/(attestation)-[a-f0-9-]+\.(pdf|jpg|jpeg|png)$/i)
-            .optional(),
           phoneNumber: z.string().min(1, "رقم الهاتف مطلوب"),
           email: z.string().email("بريد إلكتروني غير صالح"),
           password: strongPasswordSchema,
@@ -310,7 +306,7 @@ export const candidateAuthRouter = createRouter({
         firstName: input.firstName,
         lastName: input.lastName,
         studyStatus: input.studyStatus,
-        attestationUrl: input.attestationUrl || null,
+        attestationUrl: null,
         phoneNumber: input.phoneNumber,
         email: normalizedEmail,
         // Privileged flags must never come from a public registration request.

@@ -1,7 +1,7 @@
-﻿import { useState, useRef } from "react";
+﻿import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { motion } from "framer-motion";
-import { Eye, EyeOff, UserPlus, CheckCircle, FileText } from "lucide-react";
+import { Eye, EyeOff, UserPlus, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,15 +26,11 @@ export default function SignUp() {
     password: "",
     confirmPassword: "",
     newsletterConsent: false,
-    attestationUrl: "",
   });
-  const [uploadingAttestation, setUploadingAttestation] = useState(false);
-  const attestationRef = useRef<HTMLInputElement>(null);
   const passwordPolicyMessage = "يجب أن تتكون كلمة المرور من 8 أحرف على الأقل وأن تحتوي على حرف كبير واحد على الأقل.";
   const passwordPattern = /^(?=.*[A-Z]).{8,}$/;
   const daysLeft = getRegistrationCountdownDays();
 
-  const uploadMutation = trpc.upload.upload.useMutation();
   const registerMutation = trpc.candidateAuth.register.useMutation({
     onSuccess: (data) => {
       toast.success(`${data.message} يرجى أيضًا التحقق من مجلد الرسائل غير المرغوب فيها (Spam).`);
@@ -44,43 +40,6 @@ export default function SignUp() {
       toast.error(formatRateLimitError(err, "حدث خطأ أثناء التسجيل"));
     },
   });
-
-  const handleFileUpload = async (file: File) => {
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("يجب أن يكون حجم الملف أقل من 5 ميغابايت");
-      return;
-    }
-
-    const allowedTypes = ["application/pdf", "image/jpeg", "image/png"];
-    if (!allowedTypes.includes(file.type)) {
-      toast.error("نوع الملف غير مسموح. الصيغ المقبولة: PDF و JPG و PNG");
-      return;
-    }
-
-    setUploadingAttestation(true);
-
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      const base64 = (reader.result as string).split(",")[1];
-      try {
-        const result = await uploadMutation.mutateAsync({
-          fileName: file.name,
-          mimeType: file.type as "application/pdf" | "image/jpeg" | "image/png",
-          data: base64,
-          documentType: "attestation",
-        });
-        setFormData((prev) => ({ ...prev, attestationUrl: result.fileRef }));
-        toast.success("تم رفع شهادة التمدرس بنجاح");
-      } catch (error) {
-        toast.error(
-          error instanceof Error ? error.message : "حدث خطأ أثناء رفع الملف",
-        );
-      } finally {
-        setUploadingAttestation(false);
-      }
-    };
-    reader.readAsDataURL(file);
-  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,7 +59,6 @@ export default function SignUp() {
       firstName: formData.firstName,
       lastName: formData.lastName,
       studyStatus: formData.studyStatus as any,
-      attestationUrl: formData.attestationUrl || undefined,
       phoneNumber: formData.phoneNumber,
       email: formData.email.trim().toLowerCase(),
       password: formData.password,
@@ -160,15 +118,6 @@ export default function SignUp() {
                     <SelectItem value="other">أخرى</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-
-              <div>
-                <Label>رفع شهادة التمدرس</Label>
-                <input ref={attestationRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])} />
-                <Button type="button" variant="outline" onClick={() => attestationRef.current?.click()} disabled={uploadingAttestation} className={`w-full mt-1 ${formData.attestationUrl ? "border-green-500 text-green-600" : ""}`}>
-                  <FileText className="w-4 h-4 mr-2" />
-                  {uploadingAttestation ? "جاري الرفع..." : formData.attestationUrl ? "تم رفع الملف" : "رفع شهادة التمدرس"}
-                </Button>
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
