@@ -23,6 +23,7 @@ import FlaInterviews from "./pages/FlaInterviews";
 import ActivateCandidate from "./pages/ActivateCandidate";
 import AdminCandidateInvitationsPage from "./pages/AdminCandidateInvitationsPage";
 import AdminFinalAdmissionsPage from "./pages/AdminFinalAdmissionsPage";
+import Edition18Results from "./pages/Edition18Results";
 import ScrollManager from "./components/ScrollManager";
 import { useViewerSession } from "./hooks/useViewerSession";
 
@@ -58,6 +59,7 @@ export default function App() {
         <Route path="/edition/:id" element={<EditionDetail />} />
         <Route path="/activities/:slug" element={<ActivityDetail />} />
         <Route path="/news" element={<NewsPage />} />
+        <Route path="/resultats/edition-18" element={<Edition18Results />} />
         <Route path="/candidate-questionnaire" element={<CandidateQuestionnaire />} />
         <Route path="/interview" element={<InterviewBooking />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />

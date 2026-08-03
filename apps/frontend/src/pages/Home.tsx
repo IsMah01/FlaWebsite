@@ -13,6 +13,7 @@ import AmbassadorDiscussionZone from "@/components/AmbassadorDiscussionZone";
 import { useViewerSession } from "@/hooks/useViewerSession";
 import { CalendarCheck, ArrowLeft } from "lucide-react";
 import { Link } from "react-router";
+import ResultsAnnouncement from "@/components/ResultsAnnouncement";
 
 export default function Home() {
   const { viewer, hasAmbassadorView, isAmbassador, hasSubmittedQuestionnaire } = useViewerSession();
@@ -27,6 +28,7 @@ export default function Home() {
         {isInternalHome ? <HeroSection /> : <HomeGallerySection />}
         {hasAmbassadorView && viewer ? <AmbassadorDiscussionZone author={viewer.name} /> : null}
         {!hasAmbassadorView ? <AboutSection /> : null}
+        {!hasAmbassadorView ? <ResultsAnnouncement /> : null}
         {!hasAmbassadorView ? (
           <section className="bg-[#F3F8F7] px-4 py-14 sm:px-6" aria-labelledby="fla-interviews-title">
             <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-7 rounded-3xl border border-emerald-100 bg-white p-7 shadow-sm md:flex-row md:p-10" dir="rtl">

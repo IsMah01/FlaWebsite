@@ -5,6 +5,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { newsItems, pastEvents, upcomingEvents } from "@/data/news";
+import ResultsAnnouncement from "@/components/ResultsAnnouncement";
 
 function getCountdownDays(targetDate: string) {
   const target = new Date(`${targetDate}T00:00:00`);
@@ -58,6 +59,8 @@ export default function NewsPage() {
           </div>
         </div>
       </section>
+
+      <ResultsAnnouncement />
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-12 space-y-14">
         <section>
