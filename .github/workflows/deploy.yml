@@ -20,4 +20,6 @@ jobs:
             cd ${{ secrets.VPS_PATH }}
             git pull origin main
             docker compose up -d --build
+            docker compose exec -T nginx nginx -t
+            docker compose exec -T nginx nginx -s reload
             docker compose ps
