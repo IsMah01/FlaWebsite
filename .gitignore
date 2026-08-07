@@ -7,5 +7,7 @@ dist/
 coverage/
 .DS_Store
 Thumbs.db
+acceptation_mails/*.pdf
+acceptation_mails/send-results.jsonl
 storage/private/uploads/*
 !storage/private/uploads/.gitkeep
