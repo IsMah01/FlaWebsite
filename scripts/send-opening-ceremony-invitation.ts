@@ -20,10 +20,14 @@ if (shouldSend && (!smtpHost || !smtpUser || !smtpPass)) throw new Error("SMTP c
 
 const db = await mysql.createConnection(process.env.DATABASE_URL);
 const [rows] = await db.query<mysql.RowDataPacket[]>(
-  `SELECT firstName, email
-     FROM new_users
-    WHERE email IS NOT NULL AND LENGTH(TRIM(email)) > 0
-    ORDER BY id`,
+  `SELECT firstName, email FROM (
+     SELECT firstName, email, createdAt FROM new_users
+      WHERE email IS NOT NULL AND LENGTH(TRIM(email)) > 0
+     UNION ALL
+     SELECT COALESCE(NULLIF(SUBSTRING_INDEX(name, ' ', 1), ''), '') AS firstName, email, createdAt FROM users
+      WHERE email IS NOT NULL AND LENGTH(TRIM(email)) > 0
+   ) AS all_accounts
+   ORDER BY createdAt`,
 );
 await db.end();
 
