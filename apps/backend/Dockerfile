@@ -8,7 +8,8 @@ COPY api ./api
 COPY contracts ./contracts
 COPY db ./db
 COPY apps/backend/tsconfig.json ./tsconfig.json
-RUN npm run build
+COPY scripts/send-opening-ceremony-invitation.ts ./scripts/send-opening-ceremony-invitation.ts
+RUN npm run build && npx esbuild scripts/send-opening-ceremony-invitation.ts --platform=node --bundle --format=esm --outfile=dist/send-opening-ceremony-invitation.js --external:mysql2 --external:nodemailer --external:dotenv
 
 FROM node:20-alpine AS production
 WORKDIR /app
@@ -18,6 +19,7 @@ RUN npm ci --omit=dev
 COPY --from=build /app/dist ./dist
 COPY apps/frontend/public/images/logo.png ./public/images/logo.png
 COPY storage/final-admission/edition-18-final-acceptance.pdf ./storage/final-admission/edition-18-final-acceptance.pdf
+COPY storage/opening-ceremony/edition-18-invitation.jpeg ./storage/opening-ceremony/edition-18-invitation.jpeg
 RUN mkdir -p storage/private/uploads
 EXPOSE 3000
 CMD ["npm", "start"]

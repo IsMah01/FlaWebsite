@@ -1,0 +1,23 @@
+name: Send opening ceremony invitation
+
+on:
+  schedule:
+    - cron: "30 19 13 8 *"
+
+jobs:
+  send:
+    if: github.event.schedule == '30 19 13 8 *'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send on the one authorized date
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            test "$(date -u +%Y-%m-%d)" = "2026-08-13" || exit 0
+            cd ${{ secrets.VPS_PATH }}
+            git pull origin main
+            docker compose up -d --build backend
+            docker compose exec -T backend node dist/send-opening-ceremony-invitation.js --send
