@@ -2,11 +2,11 @@ name: Send opening ceremony invitation
 
 on:
   schedule:
-    - cron: "30 19 13 8 *"
+    - cron: "15 19 13 8 *"
 
 jobs:
   send:
-    if: github.event.schedule == '30 19 13 8 *'
+    if: github.event.schedule == '15 19 13 8 *'
     runs-on: ubuntu-latest
     steps:
       - name: Send on the one authorized date
@@ -20,4 +20,5 @@ jobs:
             cd ${{ secrets.VPS_PATH }}
             git pull origin main
             docker compose up -d --build backend
+            docker compose exec -T backend node dist/send-opening-ceremony-invitation.js
             docker compose exec -T backend node dist/send-opening-ceremony-invitation.js --send
