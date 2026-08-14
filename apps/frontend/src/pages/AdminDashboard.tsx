@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
-import { CalendarClock, Download, FileText, LogOut, Mail, MessageSquareText, RefreshCw, ShieldCheck, Trash2, Upload, UserCheck, UserCog, Users } from "lucide-react";
+import { CalendarClock, Download, FileText, LogOut, Mail, MessageSquareText, QrCode, RefreshCw, ShieldCheck, Trash2, Upload, UserCheck, UserCog, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -889,6 +889,7 @@ export default function AdminDashboard() {
                 <UserCheck className="ml-2 h-4 w-4" /> Liste finale officielle
               </Button>
             </Link> : null}
+            {isSuperAdmin ? <Link to="/admin/attendance"><Button className="bg-sky-700 hover:bg-sky-800"><QrCode className="ml-2 h-4 w-4" /> Gestion des présences</Button></Link> : null}
             <Link to="/admin/interviews">
               <Button className="bg-[#4A9B8E] hover:bg-[#3D7A6F]">
                 <CalendarClock className="ml-2 h-4 w-4" /> المقابلات

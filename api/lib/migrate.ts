@@ -139,6 +139,21 @@ export async function ensureDatabaseSchema() {
     await addColumnIfMissing(connection, "final_candidate_confirmations", "profileImageFile", "profileImageFile VARCHAR(255) NULL");
     await addColumnIfMissing(connection, "final_candidate_confirmations", "profileDescription", "profileDescription VARCHAR(500) NULL");
 
+    await connection.query(`CREATE TABLE IF NOT EXISTS attendance_sessions (
+      id INT AUTO_INCREMENT PRIMARY KEY, scheduleKey VARCHAR(120) NOT NULL UNIQUE,
+      title VARCHAR(500) NOT NULL, dayNumber INT NOT NULL, timeLabel VARCHAR(50) NOT NULL,
+      token VARCHAR(64) NOT NULL UNIQUE, isOpen BOOLEAN NOT NULL DEFAULT false,
+      openedAt TIMESTAMP NULL, closedAt TIMESTAMP NULL, createdByAdminId INT NOT NULL,
+      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )`);
+    await connection.query(`CREATE TABLE IF NOT EXISTS attendance_records (
+      id INT AUTO_INCREMENT PRIMARY KEY, sessionId INT NOT NULL, finalCandidateId INT NOT NULL,
+      checkedInAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY attendance_session_candidate_unique (sessionId, finalCandidateId),
+      INDEX attendance_session_index (sessionId), INDEX attendance_candidate_index (finalCandidateId)
+    )`);
+
     await connection.query(`
       CREATE TABLE IF NOT EXISTS editions (
         id INT AUTO_INCREMENT PRIMARY KEY,

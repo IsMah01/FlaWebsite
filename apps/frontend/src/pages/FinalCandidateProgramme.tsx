@@ -6,10 +6,10 @@ import { trpc } from "@/providers/trpc";
 
 const programmeUrl = "/api/final-candidate/programme";
 
-type ProgrammeEvent = { time: string; title: string; detail?: string; period: "morning" | "afternoon" | "evening" | "night" };
-type ProgrammeDay = { day: string; events: ProgrammeEvent[] };
+export type ProgrammeEvent = { time: string; title: string; detail?: string; period: "morning" | "afternoon" | "evening" | "night" };
+export type ProgrammeDay = { day: string; events: ProgrammeEvent[] };
 
-const programmeDays: ProgrammeDay[] = [
+export const programmeDays: ProgrammeDay[] = [
   { day: "اليوم الأول", events: [
     { time: "09:00 — 13:00", title: "الالتحاق والتسجيل", period: "morning" },
     { time: "14:30 — 16:00", title: "رحلة الأكاديمية", period: "afternoon" },

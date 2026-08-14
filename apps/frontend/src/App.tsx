@@ -28,6 +28,8 @@ import FinalCandidateConfirmation from "./pages/FinalCandidateConfirmation";
 import FinalCandidateProgramme from "./pages/FinalCandidateProgramme";
 import FinalCandidateProfile from "./pages/FinalCandidateProfile";
 import AdminFinalCandidatesPage from "./pages/AdminFinalCandidatesPage";
+import AdminAttendancePage from "./pages/AdminAttendancePage";
+import AttendanceCheckIn from "./pages/AttendanceCheckIn";
 import ScrollManager from "./components/ScrollManager";
 import { useViewerSession } from "./hooks/useViewerSession";
 
@@ -67,6 +69,7 @@ export default function App() {
         <Route path="/confirmation-finale" element={<FinalCandidateConfirmation />} />
         <Route path="/espace-candidat-final" element={<FinalCandidateProgramme />} />
         <Route path="/espace-candidat-final/profil" element={<FinalCandidateProfile />} />
+        <Route path="/presence/session/:token" element={<AttendanceCheckIn />} />
         <Route path="/candidate-questionnaire" element={<CandidateQuestionnaire />} />
         <Route path="/interview" element={<InterviewBooking />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
@@ -79,6 +82,7 @@ export default function App() {
         <Route path="/admin/candidate-invitations" element={<AdminCandidateInvitationsPage />} />
         <Route path="/admin/final-admissions" element={<AdminFinalAdmissionsPage />} />
         <Route path="/admin/final-candidates" element={<AdminFinalCandidatesPage />} />
+        <Route path="/admin/attendance" element={<AdminAttendancePage />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/admin/forgot-password" element={<ForgotPassword accountType="admin" />} />
         <Route path="/admin/reset-password" element={<ResetPassword accountType="admin" />} />
