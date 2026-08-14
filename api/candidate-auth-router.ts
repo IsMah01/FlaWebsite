@@ -805,6 +805,13 @@ export const candidateAuthRouter = createRouter({
         });
       }
 
+      const [finalConfirmationRows] = await getSqlPool().query<any[]>(
+        `SELECT status FROM final_candidate_confirmations
+         WHERE newUserId = ? AND email = ? LIMIT 1`,
+        [account.id, normalizedEmail],
+      );
+      const isFinalCandidate = finalConfirmationRows[0]?.status === "confirmed";
+
       const token = jwt.sign({ newUserId: account.id, email: account.email }, JWT_SECRET, { expiresIn: "7d" });
       ctx.resHeaders.append("set-cookie", buildCandidateCookie(token));
 
@@ -828,6 +835,7 @@ export const candidateAuthRouter = createRouter({
           lastName: account.lastName,
           email: account.email,
           isAmbassador: account.isAmbassador,
+          isFinalCandidate,
         },
       };
     }),

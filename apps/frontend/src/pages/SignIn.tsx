@@ -25,13 +25,15 @@ export default function SignIn() {
     onError: (err) => toast.error(rateLimit.blockFromError(err) || err.message || "تعذر إرسال رابط التأكيد"),
   });
   const loginMutation = trpc.candidateAuth.login.useMutation({
-    onSuccess: async () => {
+    onSuccess: async (data) => {
       rateLimit.clearBlock();
       await utils.candidateAuth.me.invalidate();
       await utils.auth.me.invalidate();
       toast.success("تم تسجيل الدخول بنجاح!");
       const redirectPath = searchParams.get("redirect");
-      navigate(redirectPath?.startsWith("/") && !redirectPath.startsWith("//") ? redirectPath : "/");
+      navigate(data.candidate.isFinalCandidate
+        ? "/espace-candidat-final"
+        : redirectPath?.startsWith("/") && !redirectPath.startsWith("//") ? redirectPath : "/");
     },
     onError: (err) => {
       setNeedsConfirmation(err.data?.code === "FORBIDDEN");
