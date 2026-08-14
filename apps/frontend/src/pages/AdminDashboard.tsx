@@ -884,7 +884,7 @@ export default function AdminDashboard() {
             <p className="mt-1 text-sm text-slate-500">تم تسجيل الدخول باسم: {user.name || user.email || user.unionId}</p>
           </div>
           <div className="flex gap-2">
-            {isSuperAdmin ? <Link to="/admin/final-admissions">
+            {isSuperAdmin ? <Link to="/admin/final-candidates">
               <Button className="bg-emerald-700 hover:bg-emerald-800">
                 <UserCheck className="ml-2 h-4 w-4" /> Liste finale officielle
               </Button>

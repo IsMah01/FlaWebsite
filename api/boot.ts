@@ -248,6 +248,19 @@ app.get("/api/final-candidate/profile-image/:fileName", async (c) => {
   }
 });
 
+app.get("/api/admin/final-candidate-profile/:fileName", async (c) => {
+  const adminId = await getInternalAdminId(c.req.raw);
+  const fileName = c.req.param("fileName");
+  if (!adminId) return c.json({ error: "Forbidden" }, 403);
+  if (!/^profile-\d+-[a-f0-9-]+\.(jpg|png)$/i.test(fileName)) return c.json({ error: "Invalid file name" }, 400);
+  try {
+    const [rows] = await getSqlPool().query<any[]>(`SELECT id FROM final_candidate_confirmations WHERE profileImageFile = ? LIMIT 1`, [fileName]);
+    if (!rows[0]) return c.json({ error: "Not found" }, 404);
+    const data = await readFile(path.resolve(process.cwd(), "storage", "private", "uploads", "final-profiles", fileName));
+    return new Response(data, { headers: { "Content-Type": fileName.endsWith(".png") ? "image/png" : "image/jpeg", "Cache-Control": "private, max-age=300", "X-Content-Type-Options": "nosniff" } });
+  } catch { return c.json({ error: "Not found" }, 404); }
+});
+
 app.get("/api/interviewer-images/:fileName", async (c) => {
   const fileName = c.req.param("fileName");
   if (!/^interviewer-\d+-[a-f0-9-]+\.(jpg|jpeg|png)$/i.test(fileName)) {

@@ -865,12 +865,17 @@ export const adminRouter = createRouter({
 
   listFinalCandidateConfirmations: superAdminQuery.query(async () => {
     const [rows] = await getSqlPool().query<any[]>(
-      `SELECT id, email, firstName, lastName, phoneNumber, status, confirmedAt, removedAt, createdAt
+      `SELECT id, email, firstName, lastName, phoneNumber, status, confirmedAt, removedAt, createdAt,
+              profileDescription, profileImageFile
        FROM final_candidate_confirmations
        ORDER BY CASE status WHEN 'confirmed' THEN 0 WHEN 'pending_email' THEN 1 ELSE 2 END,
                 confirmedAt DESC, createdAt DESC`,
     );
-    return rows.map((row) => ({ ...row, id: Number(row.id) }));
+    return rows.map((row) => ({
+      ...row,
+      id: Number(row.id),
+      profileImageUrl: row.profileImageFile ? `/api/admin/final-candidate-profile/${row.profileImageFile}` : null,
+    }));
   }),
 
   setFinalCandidateConfirmationStatus: superAdminQuery

@@ -27,6 +27,7 @@ import Edition18Results from "./pages/Edition18Results";
 import FinalCandidateConfirmation from "./pages/FinalCandidateConfirmation";
 import FinalCandidateProgramme from "./pages/FinalCandidateProgramme";
 import FinalCandidateProfile from "./pages/FinalCandidateProfile";
+import AdminFinalCandidatesPage from "./pages/AdminFinalCandidatesPage";
 import ScrollManager from "./components/ScrollManager";
 import { useViewerSession } from "./hooks/useViewerSession";
 
@@ -77,6 +78,7 @@ export default function App() {
         <Route path="/admin/mini-admins" element={<AdminMiniAdminsPage />} />
         <Route path="/admin/candidate-invitations" element={<AdminCandidateInvitationsPage />} />
         <Route path="/admin/final-admissions" element={<AdminFinalAdmissionsPage />} />
+        <Route path="/admin/final-candidates" element={<AdminFinalCandidatesPage />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/admin/forgot-password" element={<ForgotPassword accountType="admin" />} />
         <Route path="/admin/reset-password" element={<ResetPassword accountType="admin" />} />
