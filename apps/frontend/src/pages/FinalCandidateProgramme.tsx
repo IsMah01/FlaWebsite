@@ -1,4 +1,4 @@
-import { CalendarDays, Clock3, Download, ExternalLink, LockKeyhole, Moon, Sun, Sunset } from "lucide-react";
+import { CalendarDays, Download, ExternalLink, LockKeyhole, Moon, Sun, Sunset } from "lucide-react";
 import { Link } from "react-router";
 import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
@@ -93,14 +93,54 @@ const periodStyle = {
   night: { label: "الفترة الليلية", Icon: Moon, className: "border-indigo-200 bg-indigo-50 text-indigo-950", icon: "text-indigo-600" },
 };
 
+const scheduleSlots = [
+  { time: "08:00", end: "09:00", label: "وجبة الفطور" },
+  { time: "09:00", end: "10:30" },
+  { time: "11:00", end: "13:00" },
+  { time: "13:00", end: "14:30", label: "صلاة الظهر ووجبة الغذاء" },
+  { time: "14:30", end: "16:00" },
+  { time: "16:00", end: "17:30" },
+  { time: "17:30", end: "18:30", label: "صلاة العصر واللمجة" },
+  { time: "18:30", end: "20:00" },
+  { time: "20:00", end: "21:00", label: "صلاة المغرب ووجبة العشاء" },
+  { time: "21:00", end: "23:00" },
+];
+
+const eventGrid: Record<string, { start: number; span: number }> = {
+  "09:00 — 10:30": { start: 2, span: 1 }, "09:00 — 13:00": { start: 2, span: 2 },
+  "11:00 — 13:00": { start: 3, span: 1 }, "14:30 — 16:00": { start: 5, span: 1 },
+  "14:30 — 17:30": { start: 5, span: 2 }, "14:30 — 18:30": { start: 5, span: 3 },
+  "16:00 — 17:30": { start: 6, span: 1 }, "18:30 — 20:00": { start: 8, span: 1 },
+  "18:30 — 23:00": { start: 8, span: 3 }, "21:00 — 23:00": { start: 10, span: 1 },
+};
+
+const scheduleColumns = "110px 76px 180px 230px 82px 180px 180px 82px 190px 82px 180px";
+
 export default function FinalCandidateProgramme() {
   const access = trpc.candidateAuth.finalProgrammeAccess.useQuery(undefined, { retry: false });
   return <div className="min-h-screen bg-[#F4F8F7]" lang="ar" dir="rtl"><Navbar /><main className="mx-auto max-w-7xl px-4 pb-12 pt-24 sm:px-6">
     {access.isLoading ? <div className="flex min-h-[60vh] items-center justify-center"><div className="h-12 w-12 animate-spin rounded-full border-4 border-[#4A9B8E] border-t-transparent" /></div> : access.isError ? <section className="mx-auto mt-12 max-w-lg rounded-3xl border bg-white p-8 text-center shadow-sm"><LockKeyhole className="mx-auto h-14 w-14 text-amber-600" /><h1 className="mt-5 text-2xl font-black text-slate-900">فضاء خاص بالمشاركين المؤكدين</h1><p className="mt-3 leading-8 text-slate-600">{access.error.data?.code === "UNAUTHORIZED" ? "يرجى تسجيل الدخول بالحساب الذي استعملتموه لتأكيد مشاركتكم النهائية." : access.error.message}</p>{access.error.data?.code === "UNAUTHORIZED" ? <Link to="/signin?redirect=/espace-candidat-final"><Button className="mt-6 bg-[#4A9B8E] hover:bg-[#3D7A6F]">تسجيل الدخول</Button></Link> : <Link to="/"><Button className="mt-6" variant="outline">العودة إلى الرئيسية</Button></Link>}</section> : <>
       <header className="overflow-hidden rounded-3xl bg-[linear-gradient(135deg,#173f39,#4A9B8E)] p-6 text-white shadow-lg sm:p-9"><div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between"><div><div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-bold"><CalendarDays className="h-4 w-4" />أكاديمية أطر الغد — دورة الأثر</div><h1 className="mt-5 text-3xl font-black sm:text-4xl">البرنامج الكامل للدورة الثامنة عشرة</h1><p className="mt-3 max-w-3xl leading-8 text-white/85">مرحباً {access.data?.firstName} {access.data?.lastName}. هذه الصفحة خاصة بالمشاركين المؤكدين نهائياً، وتضم التخطيط الكامل لجميع أيام الأكاديمية.</p></div><div className="flex flex-wrap gap-3"><a href={programmeUrl} target="_blank" rel="noreferrer"><Button className="bg-white text-[#173f39] hover:bg-white/90"><ExternalLink className="ml-2 h-4 w-4" />فتح البرنامج</Button></a><a href={`${programmeUrl}?download=1`} download="programme-edition-18.pdf"><Button variant="outline" className="border-white/40 bg-white/10 text-white hover:bg-white/20 hover:text-white"><Download className="ml-2 h-4 w-4" />تحميل PDF</Button></a></div></div></header>
-      <section className="mt-6 rounded-3xl border bg-white p-5 shadow-sm sm:p-7">
-        <div className="flex flex-col gap-3 border-b pb-5 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-2xl font-black text-slate-900">تفاصيل البرنامج اليومي</h2><p className="mt-1 text-sm leading-6 text-slate-500">وجبة الفطور من 08:00 إلى 09:00، مع فترات الصلاة والوجبات حسب البرنامج التنظيمي.</p></div><div className="flex flex-wrap gap-2 text-xs">{Object.values(periodStyle).map(({ label, Icon, className }) => <span key={label} className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 font-bold ${className}`}><Icon className="h-3.5 w-3.5" />{label}</span>)}</div></div>
-        <div className="mt-6 grid gap-5 lg:grid-cols-2">{programmeDays.map((programmeDay, index) => <article key={programmeDay.day} className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/60"><header className="flex items-center justify-between bg-[#173f39] px-5 py-4 text-white"><h3 className="text-xl font-black">{programmeDay.day}</h3><span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 font-black">{index + 1}</span></header><div className="space-y-3 p-4">{programmeDay.events.map((event) => { const style = periodStyle[event.period]; const PeriodIcon = style.Icon; return <div key={`${event.time}-${event.title}`} className={`rounded-xl border p-4 ${style.className}`}><div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0"><div className="flex items-center gap-2"><PeriodIcon className={`h-4 w-4 shrink-0 ${style.icon}`} /><h4 className="font-black leading-7">{event.title}</h4></div>{event.detail ? <p className="mt-1.5 pr-6 text-sm leading-7 opacity-80">{event.detail}</p> : null}</div><span dir="ltr" className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white/80 px-3 py-1 text-xs font-bold shadow-sm"><Clock3 className="h-3.5 w-3.5" />{event.time}</span></div></div>; })}</div></article>)}</div>
+      <section className="mt-6 rounded-3xl border bg-white p-4 shadow-sm sm:p-6">
+        <div className="mb-5"><h2 className="text-2xl font-black text-slate-900">برنامج أكاديمية أطر الغد — دورة الأثر</h2><p className="mt-1 text-sm leading-6 text-slate-500">اسحبوا الجدول أفقياً للاطلاع على جميع الفترات والأنشطة.</p></div>
+        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-slate-100 p-2" dir="rtl">
+          <div className="min-w-[1690px] space-y-1.5">
+            <div className="grid gap-1.5" style={{ gridTemplateColumns: scheduleColumns }}>
+              <div className="rounded-xl bg-[#173f39] p-3 text-center font-black text-white">اليوم</div>
+              <div className="col-span-4 rounded-xl bg-[#F5B73E] p-3 text-center font-black text-slate-950">الفترة الصباحية</div>
+              <div className="col-span-3 rounded-xl bg-[#F2A238] p-3 text-center font-black text-slate-950">الفترة الزوالية</div>
+              <div className="col-span-2 rounded-xl bg-[#EE8A29] p-3 text-center font-black text-slate-950">الفترة المسائية</div>
+              <div className="rounded-xl bg-[#ED741F] p-3 text-center font-black text-slate-950">الفترة الليلية</div>
+            </div>
+            <div className="grid gap-1.5" style={{ gridTemplateColumns: scheduleColumns }}><div className="rounded-lg bg-slate-300" />{scheduleSlots.map((slot) => <div key={slot.time} dir="ltr" className="rounded-lg bg-slate-300 px-2 py-2 text-center text-xs font-black text-slate-800"><div>{slot.time}</div><div>{slot.end}</div></div>)}</div>
+            {programmeDays.map((programmeDay, index) => <div key={programmeDay.day} className="grid min-h-[142px] gap-1.5" style={{ gridTemplateColumns: scheduleColumns }}>
+              <div style={{ gridRow: 1 }} className="flex flex-col items-center justify-center rounded-xl bg-slate-300 p-3 text-center"><span className="text-lg font-black text-slate-900">{programmeDay.day}</span><span className="mt-1 text-xs font-bold text-slate-500">{index + 1}</span></div>
+              {[1, 4, 7, 9].map((slotIndex) => { const slot = scheduleSlots[slotIndex - 1]; return <div key={slotIndex} style={{ gridColumn: `${slotIndex + 1} / span 1`, gridRow: 1 }} className="flex items-center justify-center rounded-xl border border-cyan-100 bg-cyan-50 px-2 py-3 text-center text-xs font-bold leading-5 text-cyan-950 [writing-mode:vertical-rl]">{slot.label}</div>; })}
+              {programmeDay.events.map((event) => { const grid = eventGrid[event.time]; const style = periodStyle[event.period]; if (!grid) return null; return <div key={`${event.time}-${event.title}`} style={{ gridColumn: `${grid.start + 1} / span ${grid.span}`, gridRow: 1 }} className={`flex flex-col items-center justify-center rounded-xl border p-3 text-center shadow-sm ${style.className}`}><h4 className="font-black leading-6">{event.title}</h4>{event.detail ? <p className="mt-1 text-xs font-semibold leading-5 opacity-80">{event.detail}</p> : null}</div>; })}
+            </div>)}
+          </div>
+        </div>
+        <div className="mt-4 flex flex-wrap justify-center gap-2 text-xs">{Object.values(periodStyle).map(({ label, Icon, className }) => <span key={label} className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 font-bold ${className}`}><Icon className="h-3.5 w-3.5" />{label}</span>)}</div>
       </section>
     </>}
   </main></div>;
