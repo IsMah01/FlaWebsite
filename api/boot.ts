@@ -34,7 +34,7 @@ const securityHeaders = {
   "Referrer-Policy": "strict-origin-when-cross-origin",
   "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
   "Content-Security-Policy":
-    "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; frame-src https://www.youtube.com https://www.youtube-nocookie.com; child-src https://www.youtube.com https://www.youtube-nocookie.com; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; form-action 'self'",
+    "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; child-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; form-action 'self'",
 };
 
 function readCookie(cookieHeader: string | null | undefined, name: string) {
@@ -71,6 +71,10 @@ app.use("*", async (c, next) => {
   await next();
   for (const [name, value] of Object.entries(securityHeaders)) {
     c.header(name, value);
+  }
+  if (c.req.path === "/api/final-candidate/programme") {
+    c.header("X-Frame-Options", "SAMEORIGIN");
+    c.header("Content-Security-Policy", "default-src 'none'; frame-ancestors 'self'; sandbox");
   }
   if (c.req.path.startsWith("/api/")) {
     c.header("Cache-Control", "no-store");
@@ -181,6 +185,39 @@ app.get("/api/private-files/:fileName", async (c) => {
     });
   } catch {
     return c.json({ error: "File not found" }, 404);
+  }
+});
+
+app.get("/api/final-candidate/programme", async (c) => {
+  const token = readCookie(c.req.raw.headers.get("cookie"), "candidate_token");
+  const secret = process.env.APP_SECRET;
+  if (!token || !secret) return c.json({ error: "Authentication required" }, 401);
+  try {
+    const session = jwt.verify(token, secret) as { newUserId?: number; email?: string };
+    if (!session.newUserId || !session.email) return c.json({ error: "Invalid session" }, 401);
+    const [rows] = await getSqlPool().query<any[]>(
+      `SELECT id FROM final_candidate_confirmations
+       WHERE newUserId = ? AND email = ? AND status = 'confirmed' LIMIT 1`,
+      [session.newUserId, session.email.trim().toLowerCase()],
+    );
+    if (!rows[0]) return c.json({ error: "Forbidden" }, 403);
+    const candidates = [
+      path.resolve(process.cwd(), "storage", "candidate-programme", "programme-edition-18.pdf"),
+      path.resolve(process.cwd(), "..", "..", "storage", "candidate-programme", "programme-edition-18.pdf"),
+    ];
+    let data: Buffer | null = null;
+    for (const filePath of candidates) {
+      try { data = await readFile(filePath); break; } catch { /* Try the next runtime layout. */ }
+    }
+    if (!data) return c.json({ error: "Programme not found" }, 404);
+    return new Response(data, { headers: {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": "inline; filename=programme-edition-18.pdf",
+      "Cache-Control": "private, no-store",
+      "X-Content-Type-Options": "nosniff",
+    }});
+  } catch {
+    return c.json({ error: "Invalid session" }, 401);
   }
 });
 

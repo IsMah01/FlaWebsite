@@ -8,7 +8,7 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { viewer, isAuthenticated, logout, hasAmbassadorView } = useViewerSession();
+  const { viewer, isAuthenticated, logout, hasAmbassadorView, isFinalCandidate } = useViewerSession();
 
   const isHome = location.pathname === "/";
 
@@ -34,6 +34,7 @@ export default function Navbar() {
         ]
       : []),
     { label: "الأخبار", action: () => { navigate("/news"); setMenuOpen(false); } },
+    ...(isFinalCandidate ? [{ label: "برنامج الدورة 18", action: () => { navigate("/espace-candidat-final"); setMenuOpen(false); } }] : []),
     { label: "أنشطتنا", action: () => scrollToSection("activities") },
     ...(!hasAmbassadorView
       ? [

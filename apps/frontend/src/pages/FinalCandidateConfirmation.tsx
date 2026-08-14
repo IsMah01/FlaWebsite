@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { CheckCircle2, Eye, EyeOff, Loader2, Mail, Search, UserPlus } from "lucide-react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
 import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { trpc } from "@/providers/trpc";
 type Step = "email" | "existing" | "new" | "pending-email" | "success";
 
 export default function FinalCandidateConfirmation() {
+  const navigate = useNavigate();
   const [step, setStep] = useState<Step>("email");
   const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({ email: "", firstName: "", lastName: "", phoneNumber: "", password: "", confirmPassword: "" });
@@ -22,6 +23,7 @@ export default function FinalCandidateConfirmation() {
   const confirmExisting = trpc.candidateAuth.confirmExistingFinalCandidate.useMutation({
     onSuccess: (data) => {
       setStep(data.needsEmailConfirmation ? "pending-email" : "success");
+      if (!data.needsEmailConfirmation) setTimeout(() => navigate("/"), 2000);
       if (data.needsEmailConfirmation && !data.emailSent) toast.warning("L’e-mail n’a pas pu être envoyé. Contactez l’administration.");
     },
     onError: (error) => toast.error(error.message),
@@ -72,7 +74,7 @@ export default function FinalCandidateConfirmation() {
         </form> : null}
 
         {step === "pending-email" ? <div className="text-center"><Mail className="mx-auto h-12 w-12 text-[#4A9B8E]" /><h2 className="mt-4 text-xl font-bold">Confirmez votre adresse e-mail</h2><p className="mt-2 leading-6 text-slate-600">Nous avons envoyé un lien à <strong>{email}</strong>. Ouvrez cet e-mail et cliquez sur le bouton de confirmation.</p><div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-left text-sm leading-6 text-amber-900"><strong>Vous ne trouvez pas l’e-mail ?</strong><br />Patientez quelques minutes, puis vérifiez les dossiers Spam, Courrier indésirable et Promotions.</div><p className="mt-4 text-sm font-semibold text-slate-700">Votre participation sera confirmée automatiquement après le clic sur le lien reçu.</p></div> : null}
-        {step === "success" ? <div className="text-center"><CheckCircle2 className="mx-auto h-14 w-14 text-emerald-600" /><h2 className="mt-4 text-xl font-bold text-emerald-900">Votre participation est confirmée définitivement</h2><p className="mt-2 leading-6 text-slate-600">Votre adresse <strong>{email}</strong> figure maintenant dans la liste finale des candidats confirmés. Aucune autre action n’est nécessaire.</p></div> : null}
+        {step === "success" ? <div className="text-center"><CheckCircle2 className="mx-auto h-14 w-14 text-emerald-600" /><h2 className="mt-4 text-xl font-bold text-emerald-900">Votre participation est confirmée définitivement</h2><p className="mt-2 leading-6 text-slate-600">Votre adresse <strong>{email}</strong> figure maintenant dans la liste finale. Vous allez être redirigé vers la page d’accueil…</p><Link to="/"><Button className="mt-5 bg-emerald-700 hover:bg-emerald-800">Retour à l’accueil</Button></Link></div> : null}
       </section>
     </main>
   </div>;

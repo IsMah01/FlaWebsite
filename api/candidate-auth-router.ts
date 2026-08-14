@@ -203,8 +203,25 @@ export const candidateAuthRouter = createRouter({
            confirmedAt = CURRENT_TIMESTAMP, removedAt = NULL, removedByAdminId = NULL`,
         [normalizedEmail, account.id, account.firstName, account.lastName, account.phoneNumber || ""],
       );
+      const token = jwt.sign({ newUserId: account.id, email: normalizedEmail }, JWT_SECRET, { expiresIn: "7d" });
+      ctx.resHeaders.append("set-cookie", buildCandidateCookie(token));
       return { success: true, needsEmailConfirmation: false, emailSent: false };
     }),
+
+  finalProgrammeAccess: publicQuery.query(async ({ ctx }) => {
+    const session = requireCandidateSession(ctx.req.headers.get("cookie") || "");
+    const [rows] = await getSqlPool().query<any[]>(
+      `SELECT firstName, lastName, email, confirmedAt
+       FROM final_candidate_confirmations
+       WHERE newUserId = ? AND email = ? AND status = 'confirmed'
+       LIMIT 1`,
+      [session.newUserId, session.email.trim().toLowerCase()],
+    );
+    if (!rows[0]) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Cette page est réservée aux candidats confirmés définitivement." });
+    }
+    return rows[0];
+  }),
 
   registerFinalCandidate: publicQuery
     .input(z.object({
@@ -474,7 +491,11 @@ export const candidateAuthRouter = createRouter({
         }
 
         if (account[0].emailConfirmed) {
-          return { success: true, message: "تم تأكيد البريد الإلكتروني بنجاح" };
+          const [finalRows] = await getSqlPool().query<any[]>(
+            `SELECT status FROM final_candidate_confirmations WHERE email = ? LIMIT 1`,
+            [decoded.email.trim().toLowerCase()],
+          );
+          return { success: true, message: "تم تأكيد البريد الإلكتروني بنجاح", finalCandidateConfirmed: finalRows[0]?.status === "confirmed" };
         }
 
         if (account[0].confirmationToken !== tokenHash) {
@@ -493,7 +514,11 @@ export const candidateAuthRouter = createRouter({
           [decoded.email.trim().toLowerCase()],
         );
 
-        return { success: true, message: "تم تأكيد البريد الإلكتروني بنجاح" };
+        const [finalRows] = await getSqlPool().query<any[]>(
+          `SELECT status FROM final_candidate_confirmations WHERE email = ? LIMIT 1`,
+          [decoded.email.trim().toLowerCase()],
+        );
+        return { success: true, message: "تم تأكيد البريد الإلكتروني بنجاح", finalCandidateConfirmed: finalRows[0]?.status === "confirmed" };
       } catch {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -715,6 +740,10 @@ export const candidateAuthRouter = createRouter({
         .from(candidates)
         .where(eq(candidates.newUserId, account.id))
         .limit(1);
+      const [finalConfirmationRows] = await getSqlPool().query<any[]>(
+        `SELECT status FROM final_candidate_confirmations WHERE newUserId = ? AND email = ? LIMIT 1`,
+        [decoded.newUserId, decoded.email.trim().toLowerCase()],
+      );
 
       const valid = await bcrypt.compare(input.password, account.password);
       if (!valid) {
@@ -802,6 +831,7 @@ export const candidateAuthRouter = createRouter({
         studyStatus: account.studyStatus,
         hasSubmittedQuestionnaire: !!candidateRecord,
         applicationStatus: candidateRecord?.applicationStatus ?? null,
+        finalConfirmationStatus: finalConfirmationRows[0]?.status ?? null,
       };
     } catch {
       return null;

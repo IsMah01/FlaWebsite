@@ -400,7 +400,7 @@ export default function ActivityDetail() {
               <h2 className="text-xl md:text-2xl font-bold text-gray-900">الدورات الست عشرة</h2>
             </div>
             <EditionsGrid
-              editionNumbers={[17, 16, 15]}
+              editionNumbers={[18, 17, 16, 15]}
               badge="أكاديمية أطر الغد"
               title="الدورات السابقة لأكاديمية أطر الغد"
               description="تم نقل جميع الدورات السابقة من الصفحة الرئيسية إلى هذه الصفحة حتى تبقى تجربة التصفح أكثر تركيزا على الأنشطة."

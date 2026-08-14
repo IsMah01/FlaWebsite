@@ -13,6 +13,7 @@ export default function ConfirmEmail() {
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [message, setMessage] = useState("");
   const [email, setEmail] = useState("");
+  const [finalCandidateConfirmed, setFinalCandidateConfirmed] = useState(false);
 
   const resendMutation = trpc.candidateAuth.resendConfirmation.useMutation({
     onSuccess: (data) => setMessage(data.message),
@@ -23,6 +24,7 @@ export default function ConfirmEmail() {
     onSuccess: (data) => {
       setStatus("success");
       setMessage(data.message);
+      setFinalCandidateConfirmed(Boolean(data.finalCandidateConfirmed));
     },
     onError: (err) => {
       setStatus("error");
@@ -69,7 +71,7 @@ export default function ConfirmEmail() {
                 <h2 className="text-xl font-bold text-gray-900 mb-2">تم التأكيد بنجاح!</h2>
                 <p className="text-gray-500 mb-6">{message}</p>
                 <div className="space-y-3">
-                  <Link to="/signin?redirect=/candidate-questionnaire">
+                  <Link to={finalCandidateConfirmed ? "/signin?redirect=/" : "/signin?redirect=/candidate-questionnaire"}>
                     <Button className="w-full bg-[#4A9B8E] hover:bg-[#3D7A6F] text-white">
                       <Mail className="w-4 h-4 mr-2" />
                       تسجيل الدخول

@@ -167,6 +167,27 @@ export async function ensureDatabaseSchema() {
       await addColumnIfMissing(connection, "editions", column, definition);
     }
 
+    await connection.execute(
+      `INSERT INTO editions
+         (editionNumber, title, description, dateRange, eventDate, location, coverImage)
+       VALUES (18, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         title = VALUES(title),
+         description = VALUES(description),
+         dateRange = VALUES(dateRange),
+         eventDate = VALUES(eventDate),
+         location = VALUES(location),
+         coverImage = COALESCE(coverImage, VALUES(coverImage))`,
+      [
+        "الدورة الثامنة عشرة - دورة الأثر",
+        "الدورة الثامنة عشرة لأكاديمية أطر الغد، دورة الأثر، تجربة فكرية وتكوينية تجمع الشباب حول التعلم والقيادة والعمل الجماعي وصناعة أثر مستدام.",
+        "غشت 2026",
+        "ابتداءً من 14 غشت 2026",
+        "الرباط، المغرب",
+        "/images/edition-18-logo.jpeg",
+      ],
+    );
+
     await connection.query(`
       CREATE TABLE IF NOT EXISTS edition_images (
         id INT AUTO_INCREMENT PRIMARY KEY,

@@ -11,6 +11,7 @@ type ViewerSession =
       studyStatus?: string;
       hasSubmittedQuestionnaire: boolean;
       applicationStatus: "pending" | "accepted" | "rejected" | null;
+      finalConfirmationStatus: "pending_email" | "confirmed" | "removed" | null;
     }
   | {
       kind: "site-user";
@@ -77,6 +78,7 @@ export function useViewerSession() {
         hasSubmittedQuestionnaire:
           candidateQuery.data.hasSubmittedQuestionnaire,
         applicationStatus: candidateQuery.data.applicationStatus,
+        finalConfirmationStatus: candidateQuery.data.finalConfirmationStatus,
       };
     }
 
@@ -128,6 +130,8 @@ export function useViewerSession() {
     isCandidate: viewer?.kind === "candidate" && !viewer.isAmbassador,
     isAcceptedCandidate:
       viewer?.kind === "candidate" && viewer.applicationStatus === "accepted",
+    isFinalCandidate:
+      viewer?.kind === "candidate" && viewer.finalConfirmationStatus === "confirmed",
     isAuthenticated: !!viewer,
     isLoading:
       candidateQuery.isLoading ||
