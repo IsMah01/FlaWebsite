@@ -54,9 +54,17 @@ export default function AdminFinalAdmissionsPage() {
   const [pendingFileName, setPendingFileName] = useState("");
   const utils = trpc.useUtils();
   const candidates = trpc.admin.listFinalAdmissionCandidates.useQuery(undefined, { enabled: isSuperAdmin, retry: false });
+  const confirmations = trpc.admin.listFinalCandidateConfirmations.useQuery(undefined, { enabled: isSuperAdmin, retry: false });
+  const setConfirmationStatus = trpc.admin.setFinalCandidateConfirmationStatus.useMutation({
+    onSuccess: async () => {
+      toast.success("Liste des confirmations mise à jour.");
+      await utils.admin.listFinalCandidateConfirmations.invalidate();
+    },
+    onError: (error) => toast.error(error.message),
+  });
 
   const refresh = async () => {
-    await candidates.refetch();
+    await Promise.all([candidates.refetch(), confirmations.refetch()]);
     toast.success("Liste actualisée");
   };
   const updateStatus = trpc.admin.updateFinalAdmissionStatus.useMutation({
@@ -86,6 +94,10 @@ export default function AdminFinalAdmissionsPage() {
   });
 
   const allCandidates = candidates.data ?? [];
+  const allConfirmations = confirmations.data ?? [];
+  const confirmedParticipants = allConfirmations.filter((item) => item.status === "confirmed");
+  const pendingEmailParticipants = allConfirmations.filter((item) => item.status === "pending_email");
+  const removedParticipants = allConfirmations.filter((item) => item.status === "removed");
   const interviewers = useMemo(() => [...new Set(allCandidates.map((candidate) => candidate.interviewerName).filter(Boolean))].sort(), [allCandidates]);
   const filtered = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -142,16 +154,29 @@ export default function AdminFinalAdmissionsPage() {
       <div className="mx-auto max-w-[1500px] space-y-6">
         <header className="rounded-2xl border bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div><div className="flex items-center gap-2 text-[#4A9B8E]"><UserCheck className="h-6 w-6" /><span className="text-sm font-bold">Super administration</span></div><h1 className="mt-2 text-3xl font-black text-slate-900">Admissions finales</h1><p className="mt-1 text-slate-500">Tous les candidats retenus pour la phase des entretiens, sans filtre de date.</p></div>
+            <div><div className="flex items-center gap-2 text-[#4A9B8E]"><UserCheck className="h-6 w-6" /><span className="text-sm font-bold">Super administration</span></div><h1 className="mt-2 text-3xl font-black text-slate-900">Liste finale officielle</h1><p className="mt-1 text-slate-500">Cette liste est alimentée exclusivement par le lien public de confirmation définitive.</p></div>
             <div className="flex flex-wrap gap-2"><Link to="/admin"><Button variant="outline"><ArrowLeft className="mr-2 h-4 w-4" />Tableau de bord</Button></Link><Button variant="outline" onClick={refresh} disabled={candidates.isFetching}><RefreshCw className={`mr-2 h-4 w-4 ${candidates.isFetching ? "animate-spin" : ""}`} />Actualiser</Button><Button variant="outline" className="text-red-600" onClick={logout}><LogOut className="mr-2 h-4 w-4" />Déconnexion</Button></div>
           </div>
         </header>
 
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[
-            ["Phase orale", allCandidates.length, Users, "text-blue-700"], ["Décision en attente", undecided.length, RefreshCw, "text-slate-600"], ["Admis définitifs", admitted.length, CheckCircle2, "text-emerald-700"], ["Liste d’attente", waiting.length, Users, "text-amber-700"], ["E-mails à envoyer", unsentAdmitted.length, Mail, "text-violet-700"],
+            ["Confirmés définitivement", confirmedParticipants.length, CheckCircle2, "text-emerald-700"], ["E-mails à confirmer", pendingEmailParticipants.length, Mail, "text-amber-700"], ["Retirés par le super admin", removedParticipants.length, XCircle, "text-red-700"], ["Total des demandes", allConfirmations.length, Users, "text-blue-700"],
           ].map(([label, value, Icon, color]) => <div key={String(label)} className="rounded-2xl border bg-white p-5 shadow-sm"><Icon className={`h-6 w-6 ${color}`} /><p className="mt-3 text-sm text-slate-500">{String(label)}</p><p className="text-3xl font-black text-slate-900">{String(value)}</p></div>)}
         </section>
+
+        <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-sm">
+          <div className="flex flex-col gap-3 border-b bg-emerald-50 p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div><h2 className="text-xl font-bold text-emerald-950">Candidats acceptés — liste finale</h2><p className="mt-1 text-sm text-emerald-800">Seuls les statuts « Confirmé définitivement » appartiennent à la liste officielle · lien public : <strong>/confirmation-finale</strong></p></div>
+            <Button variant="outline" onClick={() => downloadText("liste-finale-officielle.csv", ["nom,email,telephone,date_confirmation", ...confirmedParticipants.map((item) => [csvCell(`${item.firstName} ${item.lastName}`), csvCell(item.email), csvCell(item.phoneNumber), csvCell(formatDate(item.confirmedAt))].join(","))].join("\n"))}><Download className="mr-2 h-4 w-4" />Exporter la liste finale</Button>
+          </div>
+          {confirmations.isLoading ? <div className="p-8 text-center text-slate-500">Chargement…</div> : !allConfirmations.length ? <div className="p-8 text-center text-slate-500">Aucune confirmation reçue pour le moment.</div> : <div className="max-h-[32rem] overflow-auto"><table className="w-full min-w-[850px] text-left text-sm"><thead className="sticky top-0 bg-slate-100"><tr><th className="p-3">Candidat</th><th className="p-3">Contact</th><th className="p-3">État</th><th className="p-3">Date</th><th className="p-3">Action super admin</th></tr></thead><tbody>{allConfirmations.map((item) => <tr key={item.id} className="border-t"><td className="p-3 font-semibold">{item.firstName} {item.lastName}</td><td className="p-3"><div>{item.email}</div><div className="text-slate-500">{item.phoneNumber || "—"}</div></td><td className="p-3">{item.status === "confirmed" ? <span className="rounded-full bg-emerald-100 px-3 py-1 font-semibold text-emerald-800">Confirmé définitivement</span> : item.status === "pending_email" ? <span className="rounded-full bg-amber-100 px-3 py-1 font-semibold text-amber-800">E-mail à confirmer</span> : <span className="rounded-full bg-red-100 px-3 py-1 font-semibold text-red-800">Retiré</span>}</td><td className="p-3">{formatDate(item.confirmedAt || item.createdAt)}</td><td className="p-3">{item.status === "confirmed" ? <Button size="sm" variant="destructive" disabled={setConfirmationStatus.isPending} onClick={() => { if (window.confirm(`Retirer ${item.firstName} ${item.lastName} de la liste définitive ?`)) setConfirmationStatus.mutate({ id: item.id, status: "removed" }); }}>Retirer</Button> : item.status === "removed" ? <Button size="sm" className="bg-emerald-700 hover:bg-emerald-800" disabled={setConfirmationStatus.isPending} onClick={() => setConfirmationStatus.mutate({ id: item.id, status: "confirmed" })}>Réintégrer</Button> : "—"}</td></tr>)}</tbody></table></div>}
+        </section>
+
+        <div className="rounded-2xl border border-slate-300 bg-slate-100 p-5">
+          <h2 className="text-lg font-bold text-slate-800">Historique de l’ancienne sélection</h2>
+          <p className="mt-1 text-sm text-slate-600">Les outils ci-dessous sont conservés uniquement pour consulter la phase d’entretien et les anciennes décisions. Ils ne déterminent plus la liste finale officielle.</p>
+        </div>
 
         <section className="rounded-2xl border bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between"><div><h2 className="flex items-center gap-2 text-xl font-bold"><FileSpreadsheet className="h-5 w-5 text-[#4A9B8E]" />Importer les admis définitifs</h2><p className="mt-1 text-sm text-slate-500">CSV UTF-8, une seule colonne « email ». L’import ne déclenche aucun e-mail.</p></div><Button variant="outline" onClick={() => downloadText("modele-admis-definitifs.csv", "email\nexemple@email.com\n")}><Download className="mr-2 h-4 w-4" />Télécharger le modèle</Button></div>

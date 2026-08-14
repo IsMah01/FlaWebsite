@@ -137,6 +137,126 @@ const newUserBaseSelection = {
 };
 
 export const candidateAuthRouter = createRouter({
+  finalConfirmationAccount: publicQuery
+    .input(z.object({ email: z.string().email() }))
+    .mutation(async ({ input, ctx }) => {
+      const normalizedEmail = input.email.trim().toLowerCase();
+      await enforceAuthRateLimit({
+        action: "candidate_login",
+        req: ctx.req,
+        email: normalizedEmail,
+        limit: 10,
+        ipLimit: 30,
+        windowMs: 60 * 1000,
+        message: "Trop de vérifications. Veuillez réessayer dans une minute.",
+      });
+      const [rows] = await getSqlPool().query<any[]>(
+        `SELECT emailConfirmed FROM new_users WHERE email = ? LIMIT 1`,
+        [normalizedEmail],
+      );
+      return { accountExists: Boolean(rows[0]), emailConfirmed: Boolean(rows[0]?.emailConfirmed) };
+    }),
+
+  confirmExistingFinalCandidate: publicQuery
+    .input(z.object({ email: z.string().email(), password: z.string().min(1).max(128) }))
+    .mutation(async ({ input, ctx }) => {
+      const normalizedEmail = input.email.trim().toLowerCase();
+      const { ip } = await enforceAuthRateLimit({
+        action: "candidate_login",
+        req: ctx.req,
+        email: normalizedEmail,
+        limit: 5,
+        windowMs: 60 * 1000,
+        message: "Trop de tentatives de connexion.",
+      });
+      const [rows] = await getSqlPool().query<any[]>(
+        `SELECT id, firstName, lastName, phoneNumber, password, emailConfirmed
+         FROM new_users WHERE email = ? LIMIT 1`,
+        [normalizedEmail],
+      );
+      const account = rows[0];
+      if (!account || !(await bcrypt.compare(input.password, account.password))) {
+        await securityLog("final_confirmation_bad_password", { ip, email: normalizedEmail });
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Adresse e-mail ou mot de passe incorrect." });
+      }
+      if (!account.emailConfirmed) {
+        const confirmation = createConfirmationToken(normalizedEmail);
+        await getSqlPool().execute(`UPDATE new_users SET confirmationToken = ? WHERE id = ?`, [confirmation.tokenHash, account.id]);
+        await getSqlPool().execute(
+          `INSERT INTO final_candidate_confirmations
+             (email, newUserId, firstName, lastName, phoneNumber, status)
+           VALUES (?, ?, ?, ?, ?, 'pending_email')
+           ON DUPLICATE KEY UPDATE newUserId = VALUES(newUserId), firstName = VALUES(firstName),
+             lastName = VALUES(lastName), phoneNumber = VALUES(phoneNumber), status = 'pending_email',
+             confirmedAt = NULL, removedAt = NULL, removedByAdminId = NULL`,
+          [normalizedEmail, account.id, account.firstName, account.lastName, account.phoneNumber || ""],
+        );
+        const emailResult = await sendConfirmationEmail(normalizedEmail, account.firstName, confirmation.token);
+        return { success: true, needsEmailConfirmation: true, emailSent: emailResult.success };
+      }
+      await getSqlPool().execute(
+        `INSERT INTO final_candidate_confirmations
+           (email, newUserId, firstName, lastName, phoneNumber, status, confirmedAt)
+         VALUES (?, ?, ?, ?, ?, 'confirmed', CURRENT_TIMESTAMP)
+         ON DUPLICATE KEY UPDATE newUserId = VALUES(newUserId), firstName = VALUES(firstName),
+           lastName = VALUES(lastName), phoneNumber = VALUES(phoneNumber), status = 'confirmed',
+           confirmedAt = CURRENT_TIMESTAMP, removedAt = NULL, removedByAdminId = NULL`,
+        [normalizedEmail, account.id, account.firstName, account.lastName, account.phoneNumber || ""],
+      );
+      return { success: true, needsEmailConfirmation: false, emailSent: false };
+    }),
+
+  registerFinalCandidate: publicQuery
+    .input(z.object({
+      email: z.string().email(),
+      firstName: z.string().trim().min(1).max(255),
+      lastName: z.string().trim().min(1).max(255),
+      phoneNumber: z.string().trim().min(1).max(50),
+      password: strongPasswordSchema,
+      confirmPassword: z.string(),
+    }).refine((value) => value.password === value.confirmPassword, {
+      message: "Les mots de passe ne correspondent pas.", path: ["confirmPassword"],
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const normalizedEmail = input.email.trim().toLowerCase();
+      await enforceAuthRateLimit({
+        action: "candidate_register", req: ctx.req, email: normalizedEmail,
+        limit: 5, ipLimit: 25, windowMs: 3 * 60 * 1000,
+        message: "Trop de créations de compte ont été demandées.",
+      });
+      const connection = await getSqlPool().getConnection();
+      try {
+        await connection.beginTransaction();
+        const [existing] = await connection.query<any[]>(`SELECT id FROM new_users WHERE email = ? LIMIT 1`, [normalizedEmail]);
+        if (existing[0]) throw new TRPCError({ code: "CONFLICT", message: "Un compte existe déjà avec cette adresse." });
+        const passwordHash = await bcrypt.hash(input.password, 12);
+        const confirmation = createConfirmationToken(normalizedEmail);
+        const [result] = await connection.execute<any>(
+          `INSERT INTO new_users
+             (firstName, lastName, studyStatus, phoneNumber, email, password, emailConfirmed, confirmationToken, newsletterConsent)
+           VALUES (?, ?, 'other', ?, ?, ?, false, ?, false)`,
+          [input.firstName, input.lastName, input.phoneNumber, normalizedEmail, passwordHash, confirmation.tokenHash],
+        );
+        await connection.execute(
+          `INSERT INTO final_candidate_confirmations
+             (email, newUserId, firstName, lastName, phoneNumber, status)
+           VALUES (?, ?, ?, ?, ?, 'pending_email')
+           ON DUPLICATE KEY UPDATE newUserId = VALUES(newUserId), firstName = VALUES(firstName),
+             lastName = VALUES(lastName), phoneNumber = VALUES(phoneNumber), status = 'pending_email',
+             confirmedAt = NULL, removedAt = NULL, removedByAdminId = NULL`,
+          [normalizedEmail, result.insertId, input.firstName, input.lastName, input.phoneNumber],
+        );
+        await connection.commit();
+        const emailResult = await sendConfirmationEmail(normalizedEmail, input.firstName, confirmation.token);
+        return { success: true, emailSent: emailResult.success };
+      } catch (error) {
+        await connection.rollback().catch(() => null);
+        throw error;
+      } finally {
+        connection.release();
+      }
+    }),
+
   candidateInvitation: publicQuery
     .input(z.object({ token: z.string().min(32).max(256) }))
     .query(async ({ input }) => {
@@ -366,6 +486,12 @@ export const candidateAuthRouter = createRouter({
 
         await db.update(newUsers).set({ emailConfirmed: true, confirmationToken: null }).where(eq(newUsers.email, decoded.email));
         await db.update(candidates).set({ emailConfirmed: true, confirmationToken: null }).where(eq(candidates.email, decoded.email));
+        await getSqlPool().execute(
+          `UPDATE final_candidate_confirmations
+           SET status = 'confirmed', confirmedAt = CURRENT_TIMESTAMP, removedAt = NULL, removedByAdminId = NULL
+           WHERE email = ? AND status = 'pending_email'`,
+          [decoded.email.trim().toLowerCase()],
+        );
 
         return { success: true, message: "تم تأكيد البريد الإلكتروني بنجاح" };
       } catch {

@@ -886,7 +886,7 @@ export default function AdminDashboard() {
           <div className="flex gap-2">
             {isSuperAdmin ? <Link to="/admin/final-admissions">
               <Button className="bg-emerald-700 hover:bg-emerald-800">
-                <UserCheck className="ml-2 h-4 w-4" /> Admissions finales
+                <UserCheck className="ml-2 h-4 w-4" /> Liste finale officielle
               </Button>
             </Link> : null}
             <Link to="/admin/interviews">

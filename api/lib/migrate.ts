@@ -117,6 +117,25 @@ export async function ensureDatabaseSchema() {
     }
 
     await connection.query(`
+      CREATE TABLE IF NOT EXISTS final_candidate_confirmations (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        email VARCHAR(320) NOT NULL UNIQUE,
+        newUserId INT NULL,
+        firstName VARCHAR(255) NOT NULL,
+        lastName VARCHAR(255) NOT NULL,
+        phoneNumber VARCHAR(50) NOT NULL DEFAULT '',
+        status ENUM('pending_email','confirmed','removed') NOT NULL DEFAULT 'pending_email',
+        confirmedAt TIMESTAMP NULL,
+        removedAt TIMESTAMP NULL,
+        removedByAdminId INT NULL,
+        createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX final_candidate_confirmations_status_index (status),
+        INDEX final_candidate_confirmations_new_user_index (newUserId)
+      )
+    `);
+
+    await connection.query(`
       CREATE TABLE IF NOT EXISTS editions (
         id INT AUTO_INCREMENT PRIMARY KEY,
         editionNumber INT NOT NULL UNIQUE,

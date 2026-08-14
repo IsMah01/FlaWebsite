@@ -863,6 +863,32 @@ export const adminRouter = createRouter({
     }));
   }),
 
+  listFinalCandidateConfirmations: superAdminQuery.query(async () => {
+    const [rows] = await getSqlPool().query<any[]>(
+      `SELECT id, email, firstName, lastName, phoneNumber, status, confirmedAt, removedAt, createdAt
+       FROM final_candidate_confirmations
+       ORDER BY CASE status WHEN 'confirmed' THEN 0 WHEN 'pending_email' THEN 1 ELSE 2 END,
+                confirmedAt DESC, createdAt DESC`,
+    );
+    return rows.map((row) => ({ ...row, id: Number(row.id) }));
+  }),
+
+  setFinalCandidateConfirmationStatus: superAdminQuery
+    .input(z.object({ id: z.number().int().positive(), status: z.enum(["confirmed", "removed"]) }))
+    .mutation(async ({ input, ctx }) => {
+      const [result] = await getSqlPool().execute<any>(
+        `UPDATE final_candidate_confirmations
+         SET status = ?,
+             confirmedAt = CASE WHEN ? = 'confirmed' THEN COALESCE(confirmedAt, CURRENT_TIMESTAMP) ELSE confirmedAt END,
+             removedAt = CASE WHEN ? = 'removed' THEN CURRENT_TIMESTAMP ELSE NULL END,
+             removedByAdminId = CASE WHEN ? = 'removed' THEN ? ELSE NULL END
+         WHERE id = ?`,
+        [input.status, input.status, input.status, input.status, ctx.adminUser.id, input.id],
+      );
+      if (!result.affectedRows) throw new TRPCError({ code: "NOT_FOUND", message: "Confirmation introuvable." });
+      return { success: true };
+    }),
+
   listCandidates: adminQuery.query(async () => {
     const db = getDb();
     return db
