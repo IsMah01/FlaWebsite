@@ -26,6 +26,7 @@ import AdminFinalAdmissionsPage from "./pages/AdminFinalAdmissionsPage";
 import Edition18Results from "./pages/Edition18Results";
 import FinalCandidateConfirmation from "./pages/FinalCandidateConfirmation";
 import FinalCandidateProgramme from "./pages/FinalCandidateProgramme";
+import FinalCandidateProfile from "./pages/FinalCandidateProfile";
 import ScrollManager from "./components/ScrollManager";
 import { useViewerSession } from "./hooks/useViewerSession";
 
@@ -64,6 +65,7 @@ export default function App() {
         <Route path="/resultats/edition-18" element={<Edition18Results />} />
         <Route path="/confirmation-finale" element={<FinalCandidateConfirmation />} />
         <Route path="/espace-candidat-final" element={<FinalCandidateProgramme />} />
+        <Route path="/espace-candidat-final/profil" element={<FinalCandidateProfile />} />
         <Route path="/candidate-questionnaire" element={<CandidateQuestionnaire />} />
         <Route path="/interview" element={<InterviewBooking />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
