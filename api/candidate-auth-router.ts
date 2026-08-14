@@ -740,11 +740,6 @@ export const candidateAuthRouter = createRouter({
         .from(candidates)
         .where(eq(candidates.newUserId, account.id))
         .limit(1);
-      const [finalConfirmationRows] = await getSqlPool().query<any[]>(
-        `SELECT status FROM final_candidate_confirmations WHERE newUserId = ? AND email = ? LIMIT 1`,
-        [decoded.newUserId, decoded.email.trim().toLowerCase()],
-      );
-
       const valid = await bcrypt.compare(input.password, account.password);
       if (!valid) {
         await securityLog("candidate_login_bad_password", {
@@ -819,6 +814,10 @@ export const candidateAuthRouter = createRouter({
         .from(candidates)
         .where(eq(candidates.newUserId, decoded.newUserId))
         .limit(1);
+      const [finalConfirmationRows] = await getSqlPool().query<any[]>(
+        `SELECT status FROM final_candidate_confirmations WHERE newUserId = ? AND email = ? LIMIT 1`,
+        [decoded.newUserId, decoded.email.trim().toLowerCase()],
+      );
 
       if (!account) return null;
 
