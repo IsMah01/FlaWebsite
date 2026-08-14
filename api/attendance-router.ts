@@ -5,6 +5,7 @@ import { TRPCError } from "@trpc/server";
 import { createRouter, publicQuery, superAdminQuery } from "./middleware";
 import { getSqlPool } from "./queries/connection";
 import { getClientIp, rateLimitOrThrow } from "./lib/abuse-protection";
+import { createCandidateSessionCookie } from "./candidate-auth-router";
 
 export const attendanceRouter = createRouter({
   listSessions: superAdminQuery.query(async () => {
@@ -21,7 +22,9 @@ export const attendanceRouter = createRouter({
     await getSqlPool().execute(`UPDATE attendance_sessions SET isOpen=false,closedAt=CURRENT_TIMESTAMP WHERE id=?`, [input.id]); return { success: true };
   }),
   sessionAttendance: superAdminQuery.input(z.object({ sessionId: z.number().int().positive() })).query(async ({ input }) => {
-    const [rows] = await getSqlPool().query<any[]>(`SELECT f.firstName,f.lastName,f.email,f.phoneNumber,r.checkedInAt FROM attendance_records r JOIN final_candidate_confirmations f ON f.id=r.finalCandidateId WHERE r.sessionId=? ORDER BY r.checkedInAt`, [input.sessionId]); return rows;
+    const [rows] = await getSqlPool().query<any[]>(`SELECT f.id,f.firstName,f.lastName,f.email,f.phoneNumber,r.checkedInAt FROM final_candidate_confirmations f LEFT JOIN attendance_records r ON r.finalCandidateId=f.id AND r.sessionId=? WHERE f.status='confirmed' ORDER BY r.checkedInAt IS NULL, r.checkedInAt, f.firstName, f.lastName`, [input.sessionId]);
+    const candidates = rows.map((row) => ({ ...row, id: Number(row.id), checkedInAt: row.checkedInAt ?? null }));
+    return { present: candidates.filter((candidate) => candidate.checkedInAt), absent: candidates.filter((candidate) => !candidate.checkedInAt), total: candidates.length };
   }),
   sessionInfo: publicQuery.input(z.object({ token: z.string().length(48) })).query(async ({ input }) => {
     const [rows] = await getSqlPool().query<any[]>(`SELECT id,title,dayNumber,timeLabel,isOpen FROM attendance_sessions WHERE token=? LIMIT 1`, [input.token]);
@@ -45,6 +48,7 @@ export const attendanceRouter = createRouter({
       }
       const [result] = await connection.execute<any>(`INSERT IGNORE INTO attendance_records (sessionId,finalCandidateId) VALUES (?,?)`, [sessions[0].id,finals[0].id]);
       await connection.commit();
+      ctx.resHeaders.append("set-cookie", createCandidateSessionCookie(Number(account.id), email));
       return { success: true, alreadyCheckedIn: result.affectedRows === 0 };
     } catch (error) {
       try { await connection.rollback(); } catch { /* connection may already be closed */ }

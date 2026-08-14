@@ -33,6 +33,11 @@ function buildCandidateCookie(token: string) {
   return `candidate_token=${token}; HttpOnly; Path=/; Max-Age=604800; SameSite=Lax${secureCookieSuffix()}`;
 }
 
+export function createCandidateSessionCookie(newUserId: number, email: string) {
+  const token = jwt.sign({ newUserId, email }, JWT_SECRET, { expiresIn: "7d" });
+  return buildCandidateCookie(token);
+}
+
 function clearCandidateCookie() {
   return `candidate_token=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax${secureCookieSuffix()}`;
 }
