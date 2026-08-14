@@ -1,7 +1,10 @@
-import { CalendarDays, Download, ExternalLink, LockKeyhole, Moon, Sun, Sunset } from "lucide-react";
+import { useEffect, useState } from "react";
+import { CalendarDays, Camera, Download, ExternalLink, LockKeyhole, Moon, Save, Sun, Sunset, UserRound } from "lucide-react";
 import { Link } from "react-router";
+import { toast } from "sonner";
 import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/providers/trpc";
 
 const programmeUrl = "/api/final-candidate/programme";
@@ -118,9 +121,33 @@ const scheduleColumns = "110px 76px 180px 230px 82px 180px 180px 82px 190px 82px
 
 export default function FinalCandidateProgramme() {
   const access = trpc.candidateAuth.finalProgrammeAccess.useQuery(undefined, { retry: false });
+  const utils = trpc.useUtils();
+  const [description, setDescription] = useState("");
+  const [image, setImage] = useState<{ mimeType: "image/jpeg" | "image/png"; data: string; preview: string } | null>(null);
+  useEffect(() => { if (access.data) setDescription(access.data.profileDescription || ""); }, [access.data]);
+  const updateProfile = trpc.candidateAuth.updateFinalCandidateProfile.useMutation({
+    onSuccess: async () => { toast.success("تم حفظ الملف الشخصي بنجاح"); setImage(null); await utils.candidateAuth.finalProgrammeAccess.invalidate(); },
+    onError: (error) => toast.error(error.message),
+  });
+
+  async function selectProfileImage(file?: File) {
+    if (!file) return;
+    if (!(["image/jpeg", "image/png"] as string[]).includes(file.type)) { toast.error("يرجى اختيار صورة JPG أو PNG"); return; }
+    if (file.size > 2 * 1024 * 1024) { toast.error("يجب ألا يتجاوز حجم الصورة 2 ميغابايت"); return; }
+    const dataUrl = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = reject; reader.readAsDataURL(file); });
+    setImage({ mimeType: file.type as "image/jpeg" | "image/png", data: dataUrl.split(",")[1], preview: dataUrl });
+  }
   return <div className="min-h-screen bg-[#F4F8F7]" lang="ar" dir="rtl"><Navbar /><main className="mx-auto max-w-7xl px-4 pb-12 pt-24 sm:px-6">
     {access.isLoading ? <div className="flex min-h-[60vh] items-center justify-center"><div className="h-12 w-12 animate-spin rounded-full border-4 border-[#4A9B8E] border-t-transparent" /></div> : access.isError ? <section className="mx-auto mt-12 max-w-lg rounded-3xl border bg-white p-8 text-center shadow-sm"><LockKeyhole className="mx-auto h-14 w-14 text-amber-600" /><h1 className="mt-5 text-2xl font-black text-slate-900">فضاء خاص بالمشاركين المؤكدين</h1><p className="mt-3 leading-8 text-slate-600">{access.error.data?.code === "UNAUTHORIZED" ? "يرجى تسجيل الدخول بالحساب الذي استعملتموه لتأكيد مشاركتكم النهائية." : access.error.message}</p>{access.error.data?.code === "UNAUTHORIZED" ? <Link to="/signin?redirect=/espace-candidat-final"><Button className="mt-6 bg-[#4A9B8E] hover:bg-[#3D7A6F]">تسجيل الدخول</Button></Link> : <Link to="/"><Button className="mt-6" variant="outline">العودة إلى الرئيسية</Button></Link>}</section> : <>
       <header className="overflow-hidden rounded-3xl bg-[linear-gradient(135deg,#173f39,#4A9B8E)] p-6 text-white shadow-lg sm:p-9"><div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between"><div><div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-bold"><CalendarDays className="h-4 w-4" />أكاديمية أطر الغد — دورة الأثر</div><h1 className="mt-5 text-3xl font-black sm:text-4xl">البرنامج الكامل للدورة الثامنة عشرة</h1><p className="mt-3 max-w-3xl leading-8 text-white/85">مرحباً {access.data?.firstName} {access.data?.lastName}. هذه الصفحة خاصة بالمشاركين المؤكدين نهائياً، وتضم التخطيط الكامل لجميع أيام الأكاديمية.</p></div><div className="flex flex-wrap gap-3"><a href={programmeUrl} target="_blank" rel="noreferrer"><Button className="bg-white text-[#173f39] hover:bg-white/90"><ExternalLink className="ml-2 h-4 w-4" />فتح البرنامج</Button></a><a href={`${programmeUrl}?download=1`} download="programme-edition-18.pdf"><Button variant="outline" className="border-white/40 bg-white/10 text-white hover:bg-white/20 hover:text-white"><Download className="ml-2 h-4 w-4" />تحميل PDF</Button></a></div></div></header>
+
+      <section className="mt-6 overflow-hidden rounded-3xl border bg-white shadow-sm">
+        <div className="border-b bg-[linear-gradient(135deg,#f0faf7,#ffffff)] px-5 py-5 sm:px-7"><div className="flex items-center gap-3"><UserRound className="h-6 w-6 text-[#4A9B8E]" /><div><h2 className="text-2xl font-black text-slate-900">ملفي الشخصي</h2><p className="mt-1 text-sm text-slate-500">أضيفوا صورتكم ونبذة قصيرة للتعريف بأنفسكم.</p></div></div></div>
+        <div className="grid gap-7 p-5 sm:p-7 lg:grid-cols-[240px_1fr] lg:items-start">
+          <div className="text-center"><div className="relative mx-auto h-44 w-44 overflow-hidden rounded-full border-4 border-white bg-[#EAF7F3] shadow-lg">{image?.preview || access.data?.profileImageUrl ? <img src={image?.preview || access.data?.profileImageUrl || ""} alt="الصورة الشخصية" className="h-full w-full object-cover" /> : <UserRound className="h-full w-full p-10 text-[#4A9B8E]/45" />}</div><label className="mx-auto mt-4 inline-flex cursor-pointer items-center gap-2 rounded-xl border border-[#4A9B8E]/30 bg-white px-4 py-2 text-sm font-bold text-[#1f5148] transition hover:bg-[#EAF7F3]"><Camera className="h-4 w-4" />اختيار صورة<input type="file" accept="image/jpeg,image/png" className="hidden" onChange={(event) => { void selectProfileImage(event.target.files?.[0]); event.target.value = ""; }} /></label><p className="mt-2 text-xs text-slate-400">JPG أو PNG · أقل من 2 MB</p></div>
+          <div><div className="rounded-2xl bg-slate-50 p-4"><p className="text-sm text-slate-500">الاسم الكامل</p><p className="mt-1 text-lg font-black text-slate-900">{access.data?.firstName} {access.data?.lastName}</p><p className="mt-1 text-sm text-slate-500" dir="ltr">{access.data?.email}</p></div><label htmlFor="profile-description" className="mt-5 block text-sm font-bold text-slate-800">نبذة تعريفية</label><Textarea id="profile-description" value={description} maxLength={500} onChange={(event) => setDescription(event.target.value)} placeholder="عرّف بنفسك، تخصصك، اهتماماتك وطموحاتك…" className="mt-2 min-h-32 resize-y text-right leading-7" /><div className="mt-2 flex items-center justify-between text-xs text-slate-400"><span>{description.length} / 500</span><span>يمكنكم تعديل الملف في أي وقت</span></div><Button className="mt-4 bg-[#4A9B8E] hover:bg-[#3D7A6F]" disabled={updateProfile.isPending} onClick={() => updateProfile.mutate({ description, image: image ? { mimeType: image.mimeType, data: image.data } : undefined })}><Save className="ml-2 h-4 w-4" />{updateProfile.isPending ? "جارٍ الحفظ…" : "حفظ الملف الشخصي"}</Button></div>
+        </div>
+      </section>
       <section className="mt-6 rounded-3xl border bg-white p-4 shadow-sm sm:p-6">
         <div className="mb-5"><h2 className="text-2xl font-black text-slate-900">برنامج أكاديمية أطر الغد — دورة الأثر</h2><p className="mt-1 text-sm leading-6 text-slate-500">اسحبوا الجدول أفقياً للاطلاع على جميع الفترات والأنشطة.</p></div>
         <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-slate-100 p-2" dir="rtl">

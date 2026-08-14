@@ -128,12 +128,16 @@ export async function ensureDatabaseSchema() {
         confirmedAt TIMESTAMP NULL,
         removedAt TIMESTAMP NULL,
         removedByAdminId INT NULL,
+        profileImageFile VARCHAR(255) NULL,
+        profileDescription VARCHAR(500) NULL,
         createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         INDEX final_candidate_confirmations_status_index (status),
         INDEX final_candidate_confirmations_new_user_index (newUserId)
       )
     `);
+    await addColumnIfMissing(connection, "final_candidate_confirmations", "profileImageFile", "profileImageFile VARCHAR(255) NULL");
+    await addColumnIfMissing(connection, "final_candidate_confirmations", "profileDescription", "profileDescription VARCHAR(500) NULL");
 
     await connection.query(`
       CREATE TABLE IF NOT EXISTS editions (

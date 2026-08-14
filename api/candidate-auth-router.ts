@@ -11,6 +11,10 @@ import { sendConfirmationEmail, sendPasswordResetEmail } from "./lib/email";
 import { upsertUser } from "./queries/users";
 import { getClientIp, rateLimitOrThrow, securityLog } from "./lib/abuse-protection";
 import { secureCookieSuffix } from "./lib/cookie-security";
+import { mkdir, unlink, writeFile } from "node:fs/promises";
+import path from "node:path";
+
+const FINAL_PROFILE_DIR = path.resolve(process.cwd(), "storage", "private", "uploads", "final-profiles");
 
 const JWT_SECRET = process.env.APP_SECRET;
 
@@ -211,7 +215,7 @@ export const candidateAuthRouter = createRouter({
   finalProgrammeAccess: publicQuery.query(async ({ ctx }) => {
     const session = requireCandidateSession(ctx.req.headers.get("cookie") || "");
     const [rows] = await getSqlPool().query<any[]>(
-      `SELECT firstName, lastName, email, confirmedAt
+      `SELECT firstName, lastName, email, confirmedAt, profileImageFile, profileDescription
        FROM final_candidate_confirmations
        WHERE newUserId = ? AND email = ? AND status = 'confirmed'
        LIMIT 1`,
@@ -220,8 +224,49 @@ export const candidateAuthRouter = createRouter({
     if (!rows[0]) {
       throw new TRPCError({ code: "FORBIDDEN", message: "Cette page est réservée aux candidats confirmés définitivement." });
     }
-    return rows[0];
+    return {
+      ...rows[0],
+      profileImageUrl: rows[0].profileImageFile ? `/api/final-candidate/profile-image/${rows[0].profileImageFile}` : null,
+    };
   }),
+
+  updateFinalCandidateProfile: publicQuery
+    .input(z.object({
+      description: z.string().trim().max(500),
+      image: z.object({ mimeType: z.enum(["image/jpeg", "image/png"]), data: z.string().min(1) }).optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const session = requireCandidateSession(ctx.req.headers.get("cookie") || "");
+      const [rows] = await getSqlPool().query<any[]>(
+        `SELECT id, profileImageFile FROM final_candidate_confirmations
+         WHERE newUserId = ? AND email = ? AND status = 'confirmed' LIMIT 1`,
+        [session.newUserId, session.email.trim().toLowerCase()],
+      );
+      const profile = rows[0];
+      if (!profile) throw new TRPCError({ code: "FORBIDDEN", message: "هذه الصفحة مخصصة للمشاركين المؤكدين نهائياً." });
+      await rateLimitOrThrow({ key: `final-profile:${session.newUserId}`, limit: 10, windowMs: 60 * 60 * 1000, message: "تم إجراء تعديلات كثيرة. يرجى المحاولة لاحقاً." });
+
+      let nextImageFile: string | null = profile.profileImageFile || null;
+      if (input.image) {
+        const buffer = Buffer.from(input.image.data, "base64");
+        if (!buffer.length || buffer.length > 2 * 1024 * 1024) throw new TRPCError({ code: "BAD_REQUEST", message: "يجب ألا يتجاوز حجم الصورة 2 ميغابايت." });
+        const isJpeg = buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+        const isPng = buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]));
+        if ((input.image.mimeType === "image/jpeg" && !isJpeg) || (input.image.mimeType === "image/png" && !isPng)) throw new TRPCError({ code: "BAD_REQUEST", message: "الصورة غير صالحة. استعملوا ملف JPG أو PNG." });
+        await mkdir(FINAL_PROFILE_DIR, { recursive: true, mode: 0o700 });
+        nextImageFile = `profile-${session.newUserId}-${crypto.randomUUID()}${input.image.mimeType === "image/png" ? ".png" : ".jpg"}`;
+        await writeFile(path.join(FINAL_PROFILE_DIR, nextImageFile), buffer, { mode: 0o600 });
+      }
+
+      await getSqlPool().execute(
+        `UPDATE final_candidate_confirmations SET profileDescription = ?, profileImageFile = ? WHERE id = ?`,
+        [input.description || null, nextImageFile, profile.id],
+      );
+      if (input.image && profile.profileImageFile && profile.profileImageFile !== nextImageFile) {
+        await unlink(path.join(FINAL_PROFILE_DIR, profile.profileImageFile)).catch(() => undefined);
+      }
+      return { success: true, profileImageUrl: nextImageFile ? `/api/final-candidate/profile-image/${nextImageFile}` : null };
+    }),
 
   registerFinalCandidate: publicQuery
     .input(z.object({

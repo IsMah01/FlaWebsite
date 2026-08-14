@@ -221,6 +221,33 @@ app.get("/api/final-candidate/programme", async (c) => {
   }
 });
 
+app.get("/api/final-candidate/profile-image/:fileName", async (c) => {
+  const token = readCookie(c.req.raw.headers.get("cookie"), "candidate_token");
+  const secret = process.env.APP_SECRET;
+  const fileName = c.req.param("fileName");
+  if (!token || !secret) return c.json({ error: "Authentication required" }, 401);
+  if (!/^profile-\d+-[a-f0-9-]+\.(jpg|png)$/i.test(fileName)) return c.json({ error: "Invalid file name" }, 400);
+  try {
+    const session = jwt.verify(token, secret) as { newUserId?: number; email?: string };
+    if (!session.newUserId || !session.email) return c.json({ error: "Invalid session" }, 401);
+    const [rows] = await getSqlPool().query<any[]>(
+      `SELECT id FROM final_candidate_confirmations
+       WHERE newUserId = ? AND email = ? AND status = 'confirmed' AND profileImageFile = ? LIMIT 1`,
+      [session.newUserId, session.email.trim().toLowerCase(), fileName],
+    );
+    if (!rows[0]) return c.json({ error: "Forbidden" }, 403);
+    const filePath = path.resolve(process.cwd(), "storage", "private", "uploads", "final-profiles", fileName);
+    const data = await readFile(filePath);
+    return new Response(data, { headers: {
+      "Content-Type": fileName.toLowerCase().endsWith(".png") ? "image/png" : "image/jpeg",
+      "Cache-Control": "private, max-age=300",
+      "X-Content-Type-Options": "nosniff",
+    }});
+  } catch {
+    return c.json({ error: "Image not found" }, 404);
+  }
+});
+
 app.get("/api/interviewer-images/:fileName", async (c) => {
   const fileName = c.req.param("fileName");
   if (!/^interviewer-\d+-[a-f0-9-]+\.(jpg|jpeg|png)$/i.test(fileName)) {
