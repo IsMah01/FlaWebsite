@@ -153,6 +153,14 @@ export async function ensureDatabaseSchema() {
       UNIQUE KEY attendance_session_candidate_unique (sessionId, finalCandidateId),
       INDEX attendance_session_index (sessionId), INDEX attendance_candidate_index (finalCandidateId)
     )`);
+    await connection.query(`CREATE TABLE IF NOT EXISTS attendance_audit_logs (
+      id INT AUTO_INCREMENT PRIMARY KEY, sessionId INT NOT NULL,
+      finalCandidateId INT NULL, adminId INT NOT NULL,
+      action ENUM('open','close','manual_add','manual_remove') NOT NULL,
+      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      INDEX attendance_audit_session_index (sessionId),
+      INDEX attendance_audit_admin_index (adminId)
+    )`);
 
     await connection.query(`
       CREATE TABLE IF NOT EXISTS editions (
