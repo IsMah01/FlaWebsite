@@ -74,7 +74,7 @@ app.use("*", async (c, next) => {
   }
   if (c.req.path === "/api/final-candidate/programme") {
     c.header("X-Frame-Options", "SAMEORIGIN");
-    c.header("Content-Security-Policy", "default-src 'none'; frame-ancestors 'self'; sandbox");
+    c.header("Content-Security-Policy", "default-src 'none'; frame-ancestors 'self'");
   }
   if (c.req.path.startsWith("/api/")) {
     c.header("Cache-Control", "no-store");
