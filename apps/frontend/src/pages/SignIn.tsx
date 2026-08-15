@@ -68,14 +68,14 @@ export default function SignIn() {
   return (
     <div className="min-h-screen bg-[#F8FAF9]">
       <Navbar />
-      <div className="flex min-h-[calc(100vh-80px)] items-center justify-center px-4 pt-24 pb-12">
+      <div className="flex min-h-[calc(100dvh-64px)] items-center justify-center px-3 pb-8 pt-20 sm:px-4 sm:pb-12 sm:pt-24">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
           className="w-full max-w-md"
         >
-          <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm md:p-8">
+          <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:p-6 md:p-8">
             <div className="mb-8 text-center">
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#4A9B8E]/10">
                 <LogIn className="h-8 w-8 text-[#4A9B8E]" />

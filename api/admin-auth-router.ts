@@ -10,6 +10,10 @@ import { adminUsers } from "@db/schema";
 import { sendPasswordResetEmail } from "./lib/email";
 import { getClientIp, rateLimitOrThrow, securityLog } from "./lib/abuse-protection";
 import { secureCookieSuffix } from "./lib/cookie-security";
+import { mkdir, unlink, writeFile } from "node:fs/promises";
+import path from "node:path";
+
+const ADMIN_PROFILE_DIR = path.resolve(process.cwd(), "storage", "private", "uploads", "admin-profiles");
 
 const ADMIN_COOKIE_NAME = "admin_token";
 const ADMIN_TOKEN_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
@@ -77,6 +81,29 @@ async function enforceAuthRateLimit(options: {
 }
 
 export const adminAuthRouter = createRouter({
+  profile: publicQuery.query(async ({ ctx }) => {
+    if (!ctx.adminUser || ctx.adminUser.role !== "interview_admin") throw new TRPCError({ code: "FORBIDDEN", message: "Accès réservé aux mini-admins." });
+    return { name: ctx.adminUser.name, email: ctx.adminUser.email, phoneNumber: ctx.adminUser.phoneNumber, description: ctx.adminUser.profileDescription || "", profileImageUrl: ctx.adminUser.profileImageRef ? `/api/admin/profile-image/${ctx.adminUser.profileImageRef}` : null };
+  }),
+  updateProfile: publicQuery.input(z.object({ description: z.string().trim().max(500), image: z.object({ mimeType: z.enum(["image/jpeg", "image/png"]), data: z.string().min(1) }).optional() })).mutation(async ({ input, ctx }) => {
+    if (!ctx.adminUser || ctx.adminUser.role !== "interview_admin") throw new TRPCError({ code: "FORBIDDEN", message: "Accès réservé aux mini-admins." });
+    await rateLimitOrThrow({ key: `mini-admin-profile:${ctx.adminUser.id}`, limit: 10, windowMs: 60 * 60 * 1000, message: "Trop de modifications. Réessayez plus tard." });
+    let imageRef = ctx.adminUser.profileImageRef || null;
+    if (input.image) {
+      const buffer = Buffer.from(input.image.data, "base64");
+      if (!buffer.length || buffer.length > 2 * 1024 * 1024) throw new TRPCError({ code: "BAD_REQUEST", message: "L’image ne doit pas dépasser 2 Mo." });
+      const jpeg = buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+      const png = buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]));
+      if ((input.image.mimeType === "image/jpeg" && !jpeg) || (input.image.mimeType === "image/png" && !png)) throw new TRPCError({ code: "BAD_REQUEST", message: "Image JPG ou PNG invalide." });
+      await mkdir(ADMIN_PROFILE_DIR, { recursive: true, mode: 0o700 });
+      const nextRef = `admin-${ctx.adminUser.id}-${crypto.randomUUID()}${input.image.mimeType === "image/png" ? ".png" : ".jpg"}`;
+      await writeFile(path.join(ADMIN_PROFILE_DIR, nextRef), buffer, { mode: 0o600 });
+      if (imageRef) await unlink(path.join(ADMIN_PROFILE_DIR, imageRef)).catch(() => undefined);
+      imageRef = nextRef;
+    }
+    await getDb().update(adminUsers).set({ profileDescription: input.description || null, profileImageRef: imageRef }).where(eq(adminUsers.id, ctx.adminUser.id));
+    return { success: true };
+  }),
   requestPasswordReset: publicQuery
     .input(z.object({ email: z.string().email() }))
     .mutation(async ({ input, ctx }) => {
