@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useSearchParams } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import { motion } from "framer-motion";
 import { CheckCircle, XCircle, Loader2, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,12 +8,14 @@ import { trpc } from "@/providers/trpc";
 import Navbar from "@/components/Navbar";
 
 export default function ConfirmEmail() {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token");
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [message, setMessage] = useState("");
   const [email, setEmail] = useState("");
   const [finalCandidateConfirmed, setFinalCandidateConfirmed] = useState(false);
+  const [candidateSessionStarted, setCandidateSessionStarted] = useState(false);
 
   const resendMutation = trpc.candidateAuth.resendConfirmation.useMutation({
     onSuccess: (data) => setMessage(data.message),
@@ -25,6 +27,8 @@ export default function ConfirmEmail() {
       setStatus("success");
       setMessage(data.message);
       setFinalCandidateConfirmed(Boolean(data.finalCandidateConfirmed));
+      setCandidateSessionStarted(Boolean(data.candidateSessionStarted));
+      if (data.candidateSessionStarted) window.setTimeout(() => navigate("/espace-candidat-final", { replace: true }), 1800);
     },
     onError: (err) => {
       setStatus("error");
@@ -71,10 +75,10 @@ export default function ConfirmEmail() {
                 <h2 className="text-xl font-bold text-gray-900 mb-2">تم التأكيد بنجاح!</h2>
                 <p className="text-gray-500 mb-6">{message}</p>
                 <div className="space-y-3">
-                  <Link to={finalCandidateConfirmed ? "/signin?redirect=/" : "/signin?redirect=/candidate-questionnaire"}>
+                  <Link to={candidateSessionStarted ? "/espace-candidat-final" : finalCandidateConfirmed ? "/signin?redirect=/espace-candidat-final" : "/signin?redirect=/candidate-questionnaire"}>
                     <Button className="w-full bg-[#4A9B8E] hover:bg-[#3D7A6F] text-white">
                       <Mail className="w-4 h-4 mr-2" />
-                      تسجيل الدخول
+                      {candidateSessionStarted ? "الدخول إلى فضاء المشاركين" : "تسجيل الدخول"}
                     </Button>
                   </Link>
                 </div>

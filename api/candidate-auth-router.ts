@@ -195,6 +195,13 @@ export const candidateAuthRouter = createRouter({
         await securityLog("final_confirmation_bad_password", { ip, email: normalizedEmail });
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Adresse e-mail ou mot de passe incorrect." });
       }
+      const [existingFinalRows] = await getSqlPool().query<any[]>(
+        `SELECT status FROM final_candidate_confirmations WHERE email = ? LIMIT 1`,
+        [normalizedEmail],
+      );
+      if (existingFinalRows[0]?.status === "removed") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Votre participation a été retirée de la liste finale. Veuillez contacter l’administration." });
+      }
       if (!account.emailConfirmed) {
         const confirmation = createConfirmationToken(normalizedEmail);
         await getSqlPool().execute(`UPDATE new_users SET confirmationToken = ? WHERE id = ?`, [confirmation.tokenHash, account.id]);
@@ -338,6 +345,8 @@ export const candidateAuthRouter = createRouter({
       const connection = await getSqlPool().getConnection();
       try {
         await connection.beginTransaction();
+        const [removedFinalRows] = await connection.query<any[]>(`SELECT status FROM final_candidate_confirmations WHERE email = ? LIMIT 1 FOR UPDATE`, [normalizedEmail]);
+        if (removedFinalRows[0]?.status === "removed") throw new TRPCError({ code: "FORBIDDEN", message: "Votre participation a été retirée de la liste finale. Veuillez contacter l’administration." });
         const [existing] = await connection.query<any[]>(`SELECT id FROM new_users WHERE email = ? LIMIT 1`, [normalizedEmail]);
         if (existing[0]) throw new TRPCError({ code: "CONFLICT", message: "Un compte existe déjà avec cette adresse." });
         const passwordHash = await bcrypt.hash(input.password, 12);
@@ -562,7 +571,7 @@ export const candidateAuthRouter = createRouter({
 
   confirmEmail: publicQuery
     .input(z.object({ token: z.string() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const db = getDb();
       try {
         const decoded = jwt.verify(input.token, JWT_SECRET) as { email: string };
@@ -589,7 +598,8 @@ export const candidateAuthRouter = createRouter({
             `SELECT status FROM final_candidate_confirmations WHERE email = ? LIMIT 1`,
             [decoded.email.trim().toLowerCase()],
           );
-          return { success: true, message: "تم تأكيد البريد الإلكتروني بنجاح", finalCandidateConfirmed: finalRows[0]?.status === "confirmed" };
+          const finalCandidateConfirmed = finalRows[0]?.status === "confirmed";
+          return { success: true, message: "تم تأكيد البريد الإلكتروني بنجاح", finalCandidateConfirmed, candidateSessionStarted: false };
         }
 
         if (account[0].confirmationToken !== tokenHash) {
@@ -612,7 +622,12 @@ export const candidateAuthRouter = createRouter({
           `SELECT status FROM final_candidate_confirmations WHERE email = ? LIMIT 1`,
           [decoded.email.trim().toLowerCase()],
         );
-        return { success: true, message: "تم تأكيد البريد الإلكتروني بنجاح", finalCandidateConfirmed: finalRows[0]?.status === "confirmed" };
+        const finalCandidateConfirmed = finalRows[0]?.status === "confirmed";
+        if (finalCandidateConfirmed) {
+          const sessionToken = jwt.sign({ newUserId: account[0].id, email: decoded.email.trim().toLowerCase() }, JWT_SECRET, { expiresIn: "7d" });
+          ctx.resHeaders.append("set-cookie", buildCandidateCookie(sessionToken));
+        }
+        return { success: true, message: "تم تأكيد البريد الإلكتروني بنجاح", finalCandidateConfirmed, candidateSessionStarted: finalCandidateConfirmed };
       } catch {
         throw new TRPCError({
           code: "BAD_REQUEST",
