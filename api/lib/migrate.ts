@@ -148,6 +148,7 @@ export async function ensureDatabaseSchema() {
       updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )`);
     await addColumnIfMissing(connection, "attendance_sessions", "startsAt", "startsAt DATETIME NULL");
+    await addColumnIfMissing(connection, "attendance_sessions", "delayMinutes", "delayMinutes INT NOT NULL DEFAULT 0");
     await connection.query(`UPDATE attendance_sessions SET startsAt=DATE_SUB(STR_TO_DATE(CONCAT('2026-08-',LPAD(13+dayNumber,2,'0'),' ',LEFT(timeLabel,5)),'%Y-%m-%d %H:%i'),INTERVAL 1 HOUR) WHERE startsAt IS NULL`);
     await connection.query(`CREATE TABLE IF NOT EXISTS attendance_records (
       id INT AUTO_INCREMENT PRIMARY KEY, sessionId INT NOT NULL, finalCandidateId INT NOT NULL,
@@ -158,11 +159,13 @@ export async function ensureDatabaseSchema() {
     await connection.query(`CREATE TABLE IF NOT EXISTS attendance_audit_logs (
       id INT AUTO_INCREMENT PRIMARY KEY, sessionId INT NOT NULL,
       finalCandidateId INT NULL, adminId INT NOT NULL,
-      action ENUM('open','close','manual_add','manual_remove') NOT NULL,
+      action ENUM('open','close','manual_add','manual_remove','delay_update') NOT NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       INDEX attendance_audit_session_index (sessionId),
       INDEX attendance_audit_admin_index (adminId)
     )`);
+    await connection.query(`ALTER TABLE attendance_audit_logs MODIFY action ENUM('open','close','manual_add','manual_remove','delay_update') NOT NULL`);
+    await addColumnIfMissing(connection, "attendance_audit_logs", "details", "details VARCHAR(255) NULL");
     await connection.query(`CREATE TABLE IF NOT EXISTS candidate_point_entries (
       id INT AUTO_INCREMENT PRIMARY KEY, finalCandidateId INT NOT NULL,
       sourceKey VARCHAR(160) NOT NULL, actionType VARCHAR(60) NOT NULL,

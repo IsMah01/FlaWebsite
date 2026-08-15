@@ -43,11 +43,11 @@ async function rebuildSessionAutomaticPoints(sessionId: number) {
 export const attendanceRouter = createRouter({
   listSessions: adminQuery.query(async () => {
     const [rows] = await getSqlPool().query<any[]>(`SELECT s.*, COUNT(r.id) attendanceCount FROM attendance_sessions s LEFT JOIN attendance_records r ON r.sessionId=s.id GROUP BY s.id ORDER BY s.dayNumber, s.id`);
-    return rows.map((row) => ({ ...row, id: Number(row.id), dayNumber: Number(row.dayNumber), attendanceCount: Number(row.attendanceCount) }));
+    return rows.map((row) => ({ ...row, id: Number(row.id), dayNumber: Number(row.dayNumber), delayMinutes: Number(row.delayMinutes ?? 0), attendanceCount: Number(row.attendanceCount) }));
   }),
   openSession: adminQuery.input(z.object({ scheduleKey: z.string().min(1).max(120), title: z.string().min(1).max(500), dayNumber: z.number().int().min(1).max(10), timeLabel: z.string().min(1).max(50), startsAt: z.string().datetime() })).mutation(async ({ input, ctx }) => {
     const token = crypto.randomBytes(24).toString("hex");
-    await getSqlPool().execute(`INSERT INTO attendance_sessions (scheduleKey,title,dayNumber,timeLabel,startsAt,token,isOpen,openedAt,closedAt,createdByAdminId) VALUES (?,?,?,?,?,?,true,CURRENT_TIMESTAMP,NULL,?) ON DUPLICATE KEY UPDATE title=VALUES(title),dayNumber=VALUES(dayNumber),timeLabel=VALUES(timeLabel),startsAt=VALUES(startsAt),isOpen=true,openedAt=CURRENT_TIMESTAMP,closedAt=NULL,createdByAdminId=VALUES(createdByAdminId)`, [input.scheduleKey,input.title,input.dayNumber,input.timeLabel,new Date(input.startsAt),token,ctx.adminUser!.id]);
+    await getSqlPool().execute(`INSERT INTO attendance_sessions (scheduleKey,title,dayNumber,timeLabel,startsAt,token,isOpen,openedAt,closedAt,createdByAdminId) VALUES (?,?,?,?,?,?,true,CURRENT_TIMESTAMP,NULL,?) ON DUPLICATE KEY UPDATE title=VALUES(title),dayNumber=VALUES(dayNumber),timeLabel=VALUES(timeLabel),startsAt=DATE_ADD(VALUES(startsAt),INTERVAL delayMinutes MINUTE),isOpen=true,openedAt=CURRENT_TIMESTAMP,closedAt=NULL,createdByAdminId=VALUES(createdByAdminId)`, [input.scheduleKey,input.title,input.dayNumber,input.timeLabel,new Date(input.startsAt),token,ctx.adminUser!.id]);
     const [rows] = await getSqlPool().query<any[]>(`SELECT id, token FROM attendance_sessions WHERE scheduleKey=? LIMIT 1`, [input.scheduleKey]);
     await rebuildSessionAutomaticPoints(Number(rows[0].id));
     await getSqlPool().execute(`INSERT INTO attendance_audit_logs (sessionId,adminId,action) VALUES (?,?,'open')`, [rows[0].id, ctx.adminUser!.id]);
@@ -56,7 +56,7 @@ export const attendanceRouter = createRouter({
   prepareSessions: adminQuery.input(z.object({ sessions: z.array(z.object({ scheduleKey: z.string().min(1).max(120), title: z.string().min(1).max(500), dayNumber: z.number().int().min(1).max(10), timeLabel: z.string().min(1).max(50), startsAt: z.string().datetime() })).min(1).max(100) })).mutation(async ({ input, ctx }) => {
     for (const session of input.sessions) {
       const token = crypto.randomBytes(24).toString("hex");
-      await getSqlPool().execute(`INSERT INTO attendance_sessions (scheduleKey,title,dayNumber,timeLabel,startsAt,token,isOpen,createdByAdminId) VALUES (?,?,?,?,?,?,false,?) ON DUPLICATE KEY UPDATE title=VALUES(title),dayNumber=VALUES(dayNumber),timeLabel=VALUES(timeLabel),startsAt=VALUES(startsAt)`, [session.scheduleKey, session.title, session.dayNumber, session.timeLabel, new Date(session.startsAt), token, ctx.adminUser!.id]);
+      await getSqlPool().execute(`INSERT INTO attendance_sessions (scheduleKey,title,dayNumber,timeLabel,startsAt,token,isOpen,createdByAdminId) VALUES (?,?,?,?,?,?,false,?) ON DUPLICATE KEY UPDATE title=VALUES(title),dayNumber=VALUES(dayNumber),timeLabel=VALUES(timeLabel),startsAt=DATE_ADD(VALUES(startsAt),INTERVAL delayMinutes MINUTE)`, [session.scheduleKey, session.title, session.dayNumber, session.timeLabel, new Date(session.startsAt), token, ctx.adminUser!.id]);
       const [sessionRows] = await getSqlPool().query<any[]>(`SELECT id FROM attendance_sessions WHERE scheduleKey=? LIMIT 1`, [session.scheduleKey]);
       await rebuildSessionAutomaticPoints(Number(sessionRows[0].id));
     }
@@ -71,11 +71,29 @@ export const attendanceRouter = createRouter({
     await getSqlPool().execute(`INSERT INTO attendance_audit_logs (sessionId,adminId,action) VALUES (?,?,'close')`, [input.id, ctx.adminUser!.id]);
     return { success: true };
   }),
+  setSessionDelay: adminQuery.input(z.object({ id: z.number().int().positive(), delayMinutes: z.number().int().min(0).max(240) })).mutation(async ({ input, ctx }) => {
+    const connection = await getSqlPool().getConnection();
+    try {
+      await connection.beginTransaction();
+      const [rows] = await connection.query<any[]>(`SELECT id,delayMinutes FROM attendance_sessions WHERE id=? LIMIT 1 FOR UPDATE`, [input.id]);
+      if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "الحصة غير موجودة." });
+      const previousDelay = Number(rows[0].delayMinutes ?? 0);
+      const difference = input.delayMinutes - previousDelay;
+      await connection.execute(`UPDATE attendance_sessions SET startsAt=DATE_ADD(startsAt,INTERVAL ? MINUTE),delayMinutes=? WHERE id=?`, [difference, input.delayMinutes, input.id]);
+      await connection.execute(`INSERT INTO attendance_audit_logs (sessionId,adminId,action,details) VALUES (?,?,'delay_update',?)`, [input.id, ctx.adminUser!.id, `delay:${previousDelay}->${input.delayMinutes}`]);
+      await connection.commit();
+      await rebuildSessionAutomaticPoints(input.id);
+      return { success: true, delayMinutes: input.delayMinutes };
+    } catch (error) {
+      try { await connection.rollback(); } catch { /* connection may already be closed */ }
+      throw error;
+    } finally { connection.release(); }
+  }),
   sessionAttendance: adminQuery.input(z.object({ sessionId: z.number().int().positive() })).query(async ({ input }) => {
     const [rows] = await getSqlPool().query<any[]>(`SELECT f.id,f.firstName,f.lastName,f.email,f.phoneNumber,r.checkedInAt FROM final_candidate_confirmations f LEFT JOIN attendance_records r ON r.finalCandidateId=f.id AND r.sessionId=? WHERE f.status='confirmed' ORDER BY r.checkedInAt IS NULL, r.checkedInAt, f.firstName, f.lastName`, [input.sessionId]);
     const candidates = rows.map((row) => ({ ...row, id: Number(row.id), checkedInAt: row.checkedInAt ?? null }));
-    const [sessionRows] = await getSqlPool().query<any[]>(`SELECT id,title,isOpen,openedAt,closedAt FROM attendance_sessions WHERE id=? LIMIT 1`, [input.sessionId]);
-    const [logRows] = await getSqlPool().query<any[]>(`SELECT l.id,l.action,l.createdAt,a.name adminName,f.firstName,f.lastName FROM attendance_audit_logs l JOIN admin_users a ON a.id=l.adminId LEFT JOIN final_candidate_confirmations f ON f.id=l.finalCandidateId WHERE l.sessionId=? ORDER BY l.createdAt DESC,l.id DESC LIMIT 100`, [input.sessionId]);
+    const [sessionRows] = await getSqlPool().query<any[]>(`SELECT id,title,isOpen,openedAt,closedAt,delayMinutes FROM attendance_sessions WHERE id=? LIMIT 1`, [input.sessionId]);
+    const [logRows] = await getSqlPool().query<any[]>(`SELECT l.id,l.action,l.details,l.createdAt,a.name adminName,f.firstName,f.lastName FROM attendance_audit_logs l JOIN admin_users a ON a.id=l.adminId LEFT JOIN final_candidate_confirmations f ON f.id=l.finalCandidateId WHERE l.sessionId=? ORDER BY l.createdAt DESC,l.id DESC LIMIT 100`, [input.sessionId]);
     return { present: candidates.filter((candidate) => candidate.checkedInAt), absent: candidates.filter((candidate) => !candidate.checkedInAt), total: candidates.length, session: sessionRows[0] ? { ...sessionRows[0], id: Number(sessionRows[0].id), isOpen: Boolean(sessionRows[0].isOpen) } : null, logs: logRows.map((row) => ({ ...row, id: Number(row.id) })) };
   }),
   setManualAttendance: adminQuery.input(z.object({ sessionId: z.number().int().positive(), finalCandidateId: z.number().int().positive(), present: z.boolean() })).mutation(async ({ input, ctx }) => {
