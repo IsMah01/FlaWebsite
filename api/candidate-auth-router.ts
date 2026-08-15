@@ -246,10 +246,11 @@ export const candidateAuthRouter = createRouter({
     const session = requireCandidateSession(ctx.req.headers.get("cookie") || "");
     const [candidates] = await getSqlPool().query<any[]>(`SELECT id FROM final_candidate_confirmations WHERE newUserId=? AND email=? AND status='confirmed' LIMIT 1`, [session.newUserId, session.email.trim().toLowerCase()]);
     if (!candidates[0]) throw new TRPCError({ code: "FORBIDDEN", message: "هذه المهام مخصصة للمشاركين المؤكدين نهائياً." });
-    const [dayRows] = await getSqlPool().query<any[]>(`SELECT DATEDIFF(DATE(CONVERT_TZ(UTC_TIMESTAMP(),'+00:00','+01:00')),'2026-08-14')+1 currentDay`);
+    const [dayRows] = await getSqlPool().query<any[]>(`SELECT DATEDIFF(DATE(CONVERT_TZ(UTC_TIMESTAMP(),'+00:00','+01:00')),'2026-08-14')+1 currentDay, TIME_FORMAT(TIME(CONVERT_TZ(UTC_TIMESTAMP(),'+00:00','+01:00')),'%H:%i') currentTime`);
     const currentDay = Number(dayRows[0].currentDay);
+    const currentTime = String(dayRows[0].currentTime);
     const [rows] = await getSqlPool().query<any[]>(`SELECT dayNumber,taskKey,completedAt FROM candidate_daily_tasks WHERE finalCandidateId=? ORDER BY dayNumber,completedAt`, [candidates[0].id]);
-    return { currentDay, editionActive: currentDay >= 1 && currentDay <= 10, tasks: Object.entries(DAILY_TASKS).map(([key,label]) => ({ key, label })), completions: rows.map((row) => ({ dayNumber: Number(row.dayNumber), taskKey: String(row.taskKey), completedAt: row.completedAt })) };
+    return { currentDay, currentTime, editionActive: currentDay >= 1 && currentDay <= 10, tasks: Object.entries(DAILY_TASKS).map(([key,label]) => ({ key, label, available: key !== "fajr_prayer" || (currentTime >= "05:15" && currentTime <= "06:00") })), completions: rows.map((row) => ({ dayNumber: Number(row.dayNumber), taskKey: String(row.taskKey), completedAt: row.completedAt })) };
   }),
 
   setDailyTask: publicQuery.input(z.object({ dayNumber: z.number().int().min(1).max(10), taskKey: z.enum(["fajr_prayer","morning_adhkar","quran_wird","evening_adhkar","sleep_adhkar"]), completed: z.boolean() })).mutation(async ({ input, ctx }) => {
@@ -259,8 +260,10 @@ export const candidateAuthRouter = createRouter({
       await connection.beginTransaction();
       const [candidates] = await connection.query<any[]>(`SELECT id FROM final_candidate_confirmations WHERE newUserId=? AND email=? AND status='confirmed' LIMIT 1 FOR UPDATE`, [session.newUserId, session.email.trim().toLowerCase()]);
       if (!candidates[0]) throw new TRPCError({ code: "FORBIDDEN", message: "هذه المهام مخصصة للمشاركين المؤكدين نهائياً." });
-      const [dayRows] = await connection.query<any[]>(`SELECT DATEDIFF(DATE(CONVERT_TZ(UTC_TIMESTAMP(),'+00:00','+01:00')),'2026-08-14')+1 currentDay`);
+      const [dayRows] = await connection.query<any[]>(`SELECT DATEDIFF(DATE(CONVERT_TZ(UTC_TIMESTAMP(),'+00:00','+01:00')),'2026-08-14')+1 currentDay, TIME_FORMAT(TIME(CONVERT_TZ(UTC_TIMESTAMP(),'+00:00','+01:00')),'%H:%i') currentTime`);
       if (Number(dayRows[0].currentDay) !== input.dayNumber) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "يمكن تسجيل مهام اليوم الحالي فقط." });
+      const currentTime = String(dayRows[0].currentTime);
+      if (input.taskKey === "fajr_prayer" && (currentTime < "05:15" || currentTime > "06:00")) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "يمكن تسجيل صلاة الصبح فقط بين 05:15 و06:00 بتوقيت المغرب." });
       const sourceKey = `daily-task:${input.dayNumber}:${input.taskKey}`;
       if (input.completed) {
         await connection.execute(`INSERT IGNORE INTO candidate_daily_tasks (finalCandidateId,dayNumber,taskKey) VALUES (?,?,?)`, [candidates[0].id,input.dayNumber,input.taskKey]);
