@@ -893,6 +893,7 @@ export default function AdminDashboard() {
             </Link> : null}
             {user?.role === "admin" ? <Link to="/admin/attendance"><Button className="bg-sky-700 hover:bg-sky-800"><QrCode className="ml-2 h-4 w-4" /> Gestion des présences</Button></Link> : null}
             {user?.role === "admin" ? <Link to="/admin/scores"><Button className="bg-amber-600 hover:bg-amber-700"><Award className="ml-2 h-4 w-4" /> Gestion des points</Button></Link> : null}
+            {isSuperAdmin ? <Link to="/admin/daily-forms"><Button className="bg-indigo-700 hover:bg-indigo-800"><FileText className="ml-2 h-4 w-4" /> Formulaires quotidiens</Button></Link> : null}
             <Link to="/admin/interviews">
               <Button className="bg-[#4A9B8E] hover:bg-[#3D7A6F]">
                 <CalendarClock className="ml-2 h-4 w-4" /> المقابلات

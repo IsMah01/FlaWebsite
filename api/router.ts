@@ -9,6 +9,7 @@ import { adminAuthRouter } from "./admin-auth-router";
 import { ambassadorRouter } from "./ambassador-router";
 import { interviewRouter } from "./interview-router";
 import { attendanceRouter } from "./attendance-router";
+import { dailyFormsRouter } from "./daily-forms-router";
 
 export const appRouter = createRouter({
   ping: publicQuery.query(() => ({ ok: true, ts: Date.now() })),
@@ -23,6 +24,7 @@ export const appRouter = createRouter({
   ambassador: ambassadorRouter,
   interview: interviewRouter,
   attendance: attendanceRouter,
+  dailyForms: dailyFormsRouter,
 });
 
 export type AppRouter = typeof appRouter;

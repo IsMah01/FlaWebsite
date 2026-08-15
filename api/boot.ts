@@ -284,22 +284,46 @@ app.post("/api/webhooks/google-forms", async (c) => {
   }
 
   try {
-    const body = await c.req.json<{ email?: unknown; formKey?: unknown }>();
+    const body = await c.req.json<{ email?: unknown; formKey?: unknown; formUrl?: unknown }>();
     const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
     const formKey = typeof body.formKey === "string" ? body.formKey.trim() : "";
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || formKey !== "friday-14") {
+    const formUrl = typeof body.formUrl === "string" ? body.formUrl.trim() : "";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || (!formKey && !formUrl)) {
       return c.json({ error: "Invalid payload" }, 400);
     }
+    const [forms] = await getSqlPool().query<any[]>(
+      `SELECT formKey,title,publishedAt,(CURRENT_TIMESTAMP<=DATE_ADD(publishedAt,INTERVAL 24 HOUR)) withinFullPoints
+       FROM candidate_daily_forms WHERE isActive=true AND (formKey=? OR formUrl=?) LIMIT 1`,
+      [formKey, formUrl],
+    );
+    if (!forms[0]) return c.json({ error: "Active form not found" }, 404);
     const [candidates] = await getSqlPool().query<any[]>(
       `SELECT id FROM final_candidate_confirmations WHERE email=? AND status='confirmed' LIMIT 1`,
       [email],
     );
     if (!candidates[0]) return c.json({ error: "Confirmed candidate not found" }, 404);
-    await getSqlPool().execute(
-      `INSERT INTO candidate_daily_form_submissions (finalCandidateId,formKey,email)
-       VALUES (?,?,?) ON DUPLICATE KEY UPDATE email=VALUES(email),submittedAt=CURRENT_TIMESTAMP`,
-      [candidates[0].id, formKey, email],
-    );
+    const connection = await getSqlPool().getConnection();
+    try {
+      await connection.beginTransaction();
+      await connection.execute(
+        `INSERT INTO candidate_daily_form_submissions (finalCandidateId,formKey,email)
+         VALUES (?,?,?) ON DUPLICATE KEY UPDATE email=VALUES(email)`,
+        [candidates[0].id, forms[0].formKey, email],
+      );
+      const awardedPoints = Boolean(forms[0].withinFullPoints) ? 5 : 3;
+      await connection.execute(
+        `INSERT INTO candidate_point_entries (finalCandidateId,sourceKey,actionType,points,title,detail)
+         VALUES (?,?,'daily_form',?,?,?)
+         ON DUPLICATE KEY UPDATE title=VALUES(title),detail=VALUES(detail)`,
+        [candidates[0].id, `daily-form:${forms[0].formKey}`, awardedPoints, forms[0].title, awardedPoints === 5 ? "إرسال الاستمارة خلال 24 ساعة" : "إرسال الاستمارة بعد مرور 24 ساعة"],
+      );
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
     return c.json({ success: true });
   } catch {
     return c.json({ error: "Invalid JSON payload" }, 400);

@@ -146,6 +146,17 @@ export async function ensureDatabaseSchema() {
       INDEX candidate_daily_task_candidate_index (finalCandidateId),
       INDEX candidate_daily_task_day_index (dayNumber)
     )`);
+    await connection.query(`CREATE TABLE IF NOT EXISTS candidate_daily_forms (
+      id INT AUTO_INCREMENT PRIMARY KEY, formKey VARCHAR(80) NOT NULL UNIQUE,
+      title VARCHAR(255) NOT NULL, formUrl VARCHAR(1000) NOT NULL,
+      publishedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      isActive BOOLEAN NOT NULL DEFAULT true, createdByAdminId INT NULL,
+      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY candidate_daily_form_url_unique (formUrl(512)),
+      INDEX candidate_daily_form_active_index (isActive,publishedAt)
+    )`);
+    await connection.execute(`INSERT IGNORE INTO candidate_daily_forms (formKey,title,formUrl)
+      VALUES ('friday-14','استمارة يوم الجمعة 14 غشت','https://forms.gle/c5iioAUv39cs8L2q6')`);
     await connection.query(`CREATE TABLE IF NOT EXISTS candidate_daily_form_submissions (
       id INT AUTO_INCREMENT PRIMARY KEY, finalCandidateId INT NOT NULL,
       formKey VARCHAR(80) NOT NULL, email VARCHAR(320) NOT NULL,
@@ -192,6 +203,9 @@ export async function ensureDatabaseSchema() {
       INDEX candidate_point_awarded_index (awardedAt)
     )`);
     await addColumnIfMissing(connection, "candidate_point_entries", "awardedByAdminId", "awardedByAdminId INT NULL");
+    await connection.query(`INSERT IGNORE INTO candidate_point_entries (finalCandidateId,sourceKey,actionType,points,title,detail,awardedAt)
+      SELECT finalCandidateId,CONCAT('daily-form:',formKey),'daily_form',5,'استمارة يوم الجمعة','إتمام وإرسال الاستمارة اليومية',submittedAt
+      FROM candidate_daily_form_submissions`);
     await connection.query(`DELETE p FROM candidate_point_entries p
       JOIN attendance_records r ON p.finalCandidateId=r.finalCandidateId
         AND p.sourceKey IN (CONCAT('attendance:',r.sessionId),CONCAT('punctuality:',r.sessionId))

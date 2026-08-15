@@ -33,6 +33,7 @@ import AttendanceCheckIn from "./pages/AttendanceCheckIn";
 import FinalCandidateScores from "./pages/FinalCandidateScores";
 import AdminScoresPage from "./pages/AdminScoresPage";
 import MiniAdminProfilePage from "./pages/MiniAdminProfilePage";
+import AdminDailyFormsPage from "./pages/AdminDailyFormsPage";
 import ScrollManager from "./components/ScrollManager";
 import { useViewerSession } from "./hooks/useViewerSession";
 
@@ -88,6 +89,7 @@ export default function App() {
         <Route path="/admin/final-candidates" element={<AdminFinalCandidatesPage />} />
         <Route path="/admin/attendance" element={<AdminAttendancePage />} />
         <Route path="/admin/scores" element={<AdminScoresPage />} />
+        <Route path="/admin/daily-forms" element={<AdminDailyFormsPage />} />
         <Route path="/admin/profile" element={<MiniAdminProfilePage />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/admin/forgot-password" element={<ForgotPassword accountType="admin" />} />
