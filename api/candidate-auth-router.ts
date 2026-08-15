@@ -15,6 +15,13 @@ import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const FINAL_PROFILE_DIR = path.resolve(process.cwd(), "storage", "private", "uploads", "final-profiles");
+const DAILY_TASKS = {
+  fajr_prayer: "صلاة الصبح",
+  morning_adhkar: "أذكار الصباح",
+  quran_wird: "الورد القرآني",
+  evening_adhkar: "أذكار المساء",
+  sleep_adhkar: "أذكار النوم",
+} as const;
 
 const JWT_SECRET = process.env.APP_SECRET;
 
@@ -233,6 +240,38 @@ export const candidateAuthRouter = createRouter({
       ...rows[0],
       profileImageUrl: rows[0].profileImageFile ? `/api/final-candidate/profile-image/${rows[0].profileImageFile}` : null,
     };
+  }),
+
+  dailyTasks: publicQuery.query(async ({ ctx }) => {
+    const session = requireCandidateSession(ctx.req.headers.get("cookie") || "");
+    const [candidates] = await getSqlPool().query<any[]>(`SELECT id FROM final_candidate_confirmations WHERE newUserId=? AND email=? AND status='confirmed' LIMIT 1`, [session.newUserId, session.email.trim().toLowerCase()]);
+    if (!candidates[0]) throw new TRPCError({ code: "FORBIDDEN", message: "هذه المهام مخصصة للمشاركين المؤكدين نهائياً." });
+    const [dayRows] = await getSqlPool().query<any[]>(`SELECT DATEDIFF(DATE(CONVERT_TZ(UTC_TIMESTAMP(),'+00:00','+01:00')),'2026-08-14')+1 currentDay`);
+    const currentDay = Number(dayRows[0].currentDay);
+    const [rows] = await getSqlPool().query<any[]>(`SELECT dayNumber,taskKey,completedAt FROM candidate_daily_tasks WHERE finalCandidateId=? ORDER BY dayNumber,completedAt`, [candidates[0].id]);
+    return { currentDay, editionActive: currentDay >= 1 && currentDay <= 10, tasks: Object.entries(DAILY_TASKS).map(([key,label]) => ({ key, label })), completions: rows.map((row) => ({ dayNumber: Number(row.dayNumber), taskKey: String(row.taskKey), completedAt: row.completedAt })) };
+  }),
+
+  setDailyTask: publicQuery.input(z.object({ dayNumber: z.number().int().min(1).max(10), taskKey: z.enum(["fajr_prayer","morning_adhkar","quran_wird","evening_adhkar","sleep_adhkar"]), completed: z.boolean() })).mutation(async ({ input, ctx }) => {
+    const session = requireCandidateSession(ctx.req.headers.get("cookie") || "");
+    const connection = await getSqlPool().getConnection();
+    try {
+      await connection.beginTransaction();
+      const [candidates] = await connection.query<any[]>(`SELECT id FROM final_candidate_confirmations WHERE newUserId=? AND email=? AND status='confirmed' LIMIT 1 FOR UPDATE`, [session.newUserId, session.email.trim().toLowerCase()]);
+      if (!candidates[0]) throw new TRPCError({ code: "FORBIDDEN", message: "هذه المهام مخصصة للمشاركين المؤكدين نهائياً." });
+      const [dayRows] = await connection.query<any[]>(`SELECT DATEDIFF(DATE(CONVERT_TZ(UTC_TIMESTAMP(),'+00:00','+01:00')),'2026-08-14')+1 currentDay`);
+      if (Number(dayRows[0].currentDay) !== input.dayNumber) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "يمكن تسجيل مهام اليوم الحالي فقط." });
+      const sourceKey = `daily-task:${input.dayNumber}:${input.taskKey}`;
+      if (input.completed) {
+        await connection.execute(`INSERT IGNORE INTO candidate_daily_tasks (finalCandidateId,dayNumber,taskKey) VALUES (?,?,?)`, [candidates[0].id,input.dayNumber,input.taskKey]);
+        await connection.execute(`INSERT INTO candidate_point_entries (finalCandidateId,sourceKey,actionType,points,title,detail) VALUES (?,?,'daily_task',1,?,'إتمام مهمة اليوم') ON DUPLICATE KEY UPDATE title=VALUES(title),detail=VALUES(detail)`, [candidates[0].id,sourceKey,DAILY_TASKS[input.taskKey]]);
+      } else {
+        await connection.execute(`DELETE FROM candidate_daily_tasks WHERE finalCandidateId=? AND dayNumber=? AND taskKey=?`, [candidates[0].id,input.dayNumber,input.taskKey]);
+        await connection.execute(`DELETE FROM candidate_point_entries WHERE finalCandidateId=? AND sourceKey=?`, [candidates[0].id,sourceKey]);
+      }
+      await connection.commit();
+      return { success: true };
+    } catch (error) { try { await connection.rollback(); } catch { /* ignored */ } throw error; } finally { connection.release(); }
   }),
 
   updateFinalCandidateProfile: publicQuery

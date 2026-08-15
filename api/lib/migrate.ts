@@ -138,6 +138,14 @@ export async function ensureDatabaseSchema() {
     `);
     await addColumnIfMissing(connection, "final_candidate_confirmations", "profileImageFile", "profileImageFile VARCHAR(255) NULL");
     await addColumnIfMissing(connection, "final_candidate_confirmations", "profileDescription", "profileDescription VARCHAR(500) NULL");
+    await connection.query(`CREATE TABLE IF NOT EXISTS candidate_daily_tasks (
+      id INT AUTO_INCREMENT PRIMARY KEY, finalCandidateId INT NOT NULL,
+      dayNumber INT NOT NULL, taskKey VARCHAR(40) NOT NULL,
+      completedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY candidate_daily_task_unique (finalCandidateId,dayNumber,taskKey),
+      INDEX candidate_daily_task_candidate_index (finalCandidateId),
+      INDEX candidate_daily_task_day_index (dayNumber)
+    )`);
 
     await connection.query(`CREATE TABLE IF NOT EXISTS attendance_sessions (
       id INT AUTO_INCREMENT PRIMARY KEY, scheduleKey VARCHAR(120) NOT NULL UNIQUE,

@@ -1,5 +1,6 @@
-import { Award, CalendarCheck2, CalendarDays, CheckCircle2, Download, ExternalLink, LockKeyhole, MapPin, Moon, ShieldCheck, Sparkles, Sun, Sunset, UserRound } from "lucide-react";
+import { Award, CalendarCheck2, CalendarDays, Check, CheckCircle2, Download, ExternalLink, ListChecks, LockKeyhole, MapPin, Moon, ShieldCheck, Sparkles, Sun, Sunset, UserRound } from "lucide-react";
 import { Link } from "react-router";
+import { toast } from "sonner";
 import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/providers/trpc";
@@ -136,6 +137,7 @@ export default function FinalCandidateProgramme() {
         <div className="group rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-lg"><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700"><CalendarDays className="h-5 w-5" /></div><p className="mt-4 text-sm font-bold text-slate-500">موعد الانطلاق</p><p className="mt-1 text-xl font-black text-slate-900">ابتداءً من 14 غشت 2026</p></div>
         <div className="group rounded-2xl border border-sky-100 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-lg"><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-100 text-sky-700"><MapPin className="h-5 w-5" /></div><p className="mt-4 text-sm font-bold text-slate-500">المدينة</p><p className="mt-1 text-xl font-black text-slate-900">الرباط، المغرب</p></div>
       </section>
+      <DailyTasksCard />
       <section className="mt-6 rounded-3xl border bg-white p-4 shadow-sm sm:p-6">
         <div className="mb-5"><h2 className="text-xl font-black text-slate-900 sm:text-2xl">برنامج أكاديمية أطر الغد — دورة الأثر</h2><p className="mt-1 hidden text-sm leading-6 text-slate-500 md:block">اسحبوا الجدول أفقياً للاطلاع على جميع الفترات والأنشطة.</p><p className="mt-1 text-sm leading-6 text-slate-500 md:hidden">اضغطوا على اليوم لعرض برنامجه.</p></div>
         <div className="space-y-3 md:hidden">
@@ -165,4 +167,12 @@ export default function FinalCandidateProgramme() {
       </section>
     </>}
   </main></div>;
+}
+
+function DailyTasksCard() {
+  const daily = trpc.candidateAuth.dailyTasks.useQuery(undefined, { retry: false, refetchInterval: 30000 });
+  const utils = trpc.useUtils();
+  const toggle = trpc.candidateAuth.setDailyTask.useMutation({ onSuccess: async (_, input) => { toast.success(input.completed ? "تم إنجاز المهمة وإضافة نقطة" : "تم إلغاء المهمة وسحب النقطة"); await Promise.all([utils.candidateAuth.dailyTasks.invalidate(), utils.attendance.candidateScoreDashboard.invalidate()]); }, onError: (error) => toast.error(error.message) });
+  const completed = new Set((daily.data?.completions ?? []).filter((item) => item.dayNumber === daily.data?.currentDay).map((item) => item.taskKey));
+  return <section className="mt-6 overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-sm sm:rounded-3xl"><div className="bg-[linear-gradient(120deg,#173f39,#4A9B8E)] p-5 text-white sm:p-6"><div className="flex items-center gap-3"><div className="rounded-xl bg-white/15 p-2.5"><ListChecks className="h-6 w-6"/></div><div><h2 className="text-xl font-black sm:text-2xl">مهام اليوم</h2><p className="mt-1 text-sm text-white/75">أنجزوا مهامكم اليومية واكسبوا نقطة عن كل مهمة.</p></div></div>{daily.data?.editionActive ? <div className="mt-4 flex items-center justify-between rounded-xl bg-white/10 px-4 py-2 text-sm font-bold"><span>اليوم {daily.data.currentDay} من 10</span><span>{completed.size} / 5 نقاط</span></div> : null}</div><div className="grid gap-3 p-4 sm:grid-cols-2 sm:p-6 lg:grid-cols-5">{daily.isLoading ? <p className="col-span-full py-6 text-center text-slate-500">جارٍ تحميل المهام…</p> : !daily.data?.editionActive ? <p className="col-span-full rounded-xl bg-amber-50 p-5 text-center font-bold text-amber-800">المهام اليومية متاحة خلال أيام الأكاديمية فقط.</p> : daily.data.tasks.map((task) => { const checked = completed.has(task.key); const busy = toggle.isPending && toggle.variables?.taskKey === task.key; return <button key={task.key} type="button" disabled={toggle.isPending} onClick={() => toggle.mutate({ dayNumber: daily.data.currentDay, taskKey: task.key, completed: !checked })} className={`flex min-h-24 items-center gap-3 rounded-2xl border p-4 text-right transition active:scale-[.98] sm:flex-col sm:justify-center sm:text-center ${checked ? "border-emerald-300 bg-emerald-50 text-emerald-900" : "border-slate-200 bg-white text-slate-700 hover:border-emerald-200 hover:bg-emerald-50/40"}`}><span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${checked ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-400"}`}>{checked ? <Check className="h-6 w-6"/> : <span className="h-5 w-5 rounded-md border-2 border-current"/>}</span><span><span className="block font-black">{task.label}</span><span className={`mt-1 block text-xs ${checked ? "text-emerald-700" : "text-slate-400"}`}>{busy ? "جارٍ الحفظ…" : checked ? "+1 نقطة · تم الإنجاز" : "+1 نقطة"}</span></span></button>; })}</div></section>;
 }
