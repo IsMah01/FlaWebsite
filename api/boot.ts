@@ -28,6 +28,12 @@ import {
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
+function normalizeWebhookEmail(value: unknown) {
+  return typeof value === "string"
+    ? value.normalize("NFKC").replace(/[\u200B-\u200D\u2060\uFEFF]/g, "").trim().toLowerCase()
+    : "";
+}
+
 const securityHeaders = {
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "DENY",
@@ -285,7 +291,7 @@ app.post("/api/webhooks/google-forms", async (c) => {
 
   try {
     const body = await c.req.json<{ email?: unknown; formKey?: unknown; formUrl?: unknown }>();
-    const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+    const email = normalizeWebhookEmail(body.email);
     const formKey = typeof body.formKey === "string" ? body.formKey.trim() : "";
     const formUrl = typeof body.formUrl === "string" ? body.formUrl.trim() : "";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || (!formKey && !formUrl)) {
@@ -298,24 +304,25 @@ app.post("/api/webhooks/google-forms", async (c) => {
     );
     if (!forms[0]) return c.json({ error: "Active form not found" }, 404);
     const [candidates] = await getSqlPool().query<any[]>(
-      `SELECT id FROM final_candidate_confirmations WHERE email=? AND status='confirmed' LIMIT 1`,
-      [email],
+      `SELECT id,email FROM final_candidate_confirmations WHERE status='confirmed'`,
     );
-    if (!candidates[0]) return c.json({ error: "Confirmed candidate not found" }, 404);
+    const matchingCandidates = candidates.filter((candidate) => normalizeWebhookEmail(candidate.email) === email);
+    if (matchingCandidates.length !== 1) return c.json({ error: "Confirmed candidate not found" }, 404);
+    const candidate = matchingCandidates[0];
     const connection = await getSqlPool().getConnection();
     try {
       await connection.beginTransaction();
       await connection.execute(
         `INSERT INTO candidate_daily_form_submissions (finalCandidateId,formKey,email)
          VALUES (?,?,?) ON DUPLICATE KEY UPDATE email=VALUES(email)`,
-        [candidates[0].id, forms[0].formKey, email],
+        [candidate.id, forms[0].formKey, email],
       );
       const awardedPoints = Boolean(forms[0].withinFullPoints) ? 5 : 3;
       await connection.execute(
         `INSERT INTO candidate_point_entries (finalCandidateId,sourceKey,actionType,points,title,detail)
          VALUES (?,?,'daily_form',?,?,?)
          ON DUPLICATE KEY UPDATE title=VALUES(title),detail=VALUES(detail)`,
-        [candidates[0].id, `daily-form:${forms[0].formKey}`, awardedPoints, forms[0].title, awardedPoints === 5 ? "إرسال الاستمارة خلال 24 ساعة" : "إرسال الاستمارة بعد مرور 24 ساعة"],
+        [candidate.id, `daily-form:${forms[0].formKey}`, awardedPoints, forms[0].title, awardedPoints === 5 ? "إرسال الاستمارة خلال 24 ساعة" : "إرسال الاستمارة بعد مرور 24 ساعة"],
       );
       await connection.commit();
     } catch (error) {
