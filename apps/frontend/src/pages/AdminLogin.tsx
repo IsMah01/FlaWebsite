@@ -22,7 +22,7 @@ export default function AdminLogin() {
       utils.candidateAuth.me.setData(undefined, undefined);
       await utils.auth.me.invalidate();
       toast.success("تسجيل دخول الإدارة ناجح!");
-      navigate(data.admin.role === "interview_admin" ? "/admin/interviews" : "/admin");
+      navigate(data.admin.role === "interview_admin" ? "/admin/profile" : "/admin");
     },
     onError: (err) => toast.error(rateLimit.blockFromError(err) || err.message || "Email ou mot de passe incorrect."),
   });

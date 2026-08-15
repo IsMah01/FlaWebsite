@@ -321,6 +321,7 @@ export async function ensureDatabaseSchema() {
     await addColumnIfMissing(connection, "admin_users", "profileImageRef", "profileImageRef TEXT NULL");
     await addColumnIfMissing(connection, "admin_users", "profileDescription", "profileDescription TEXT NULL");
     await addColumnIfMissing(connection, "admin_users", "phoneNumber", "phoneNumber VARCHAR(50) NULL");
+    await addColumnIfMissing(connection, "admin_users", "permissions", "permissions JSON NULL");
     await addColumnIfMissing(connection, "interview_slots", "googleEventId", "googleEventId VARCHAR(255) NULL");
     await addColumnIfMissing(connection, "interview_slots", "calendarSyncStatus", "calendarSyncStatus ENUM('synced','failed') NOT NULL DEFAULT 'synced'");
     await addColumnIfMissing(connection, "interview_slots", "calendarSyncError", "calendarSyncError TEXT NULL");

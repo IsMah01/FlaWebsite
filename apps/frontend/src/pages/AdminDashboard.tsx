@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router";
+import { Link, Navigate } from "react-router";
 import { Award, CalendarClock, Download, FileText, LogOut, Mail, MessageSquareText, QrCode, RefreshCw, ShieldCheck, Trash2, Upload, UserCheck, UserCog, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -303,7 +303,7 @@ export default function AdminDashboard() {
   const [userFilterField, setUserFilterField] = useState<UserFilterField>("all");
   const [ambassadorMessageAuthorFilter, setAmbassadorMessageAuthorFilter] = useState("");
   const [ambassadorMessageDateFilter, setAmbassadorMessageDateFilter] = useState("");
-  const isAdmin = user?.role === "admin";
+  const isAdmin = user?.role === "admin" && user.adminRole !== "interview_admin";
   const isSuperAdmin = user?.adminRole === "super_admin";
 
 
@@ -835,6 +835,8 @@ export default function AdminDashboard() {
     return null;
   }
 
+  if (user.adminRole === "interview_admin") return <Navigate to="/admin/profile" replace/>;
+
   if (!isAdmin) {
     return (
       <div dir="rtl" lang="ar" className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
@@ -889,8 +891,8 @@ export default function AdminDashboard() {
                 <UserCheck className="ml-2 h-4 w-4" /> Liste finale officielle
               </Button>
             </Link> : null}
-            {user?.role === "admin" && user.adminRole !== "interview_admin" ? <Link to="/admin/attendance"><Button className="bg-sky-700 hover:bg-sky-800"><QrCode className="ml-2 h-4 w-4" /> Gestion des présences</Button></Link> : null}
-            {user?.role === "admin" && user.adminRole !== "interview_admin" ? <Link to="/admin/scores"><Button className="bg-amber-600 hover:bg-amber-700"><Award className="ml-2 h-4 w-4" /> Gestion des points</Button></Link> : null}
+            {user?.role === "admin" ? <Link to="/admin/attendance"><Button className="bg-sky-700 hover:bg-sky-800"><QrCode className="ml-2 h-4 w-4" /> Gestion des présences</Button></Link> : null}
+            {user?.role === "admin" ? <Link to="/admin/scores"><Button className="bg-amber-600 hover:bg-amber-700"><Award className="ml-2 h-4 w-4" /> Gestion des points</Button></Link> : null}
             <Link to="/admin/interviews">
               <Button className="bg-[#4A9B8E] hover:bg-[#3D7A6F]">
                 <CalendarClock className="ml-2 h-4 w-4" /> المقابلات

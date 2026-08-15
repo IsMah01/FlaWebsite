@@ -83,6 +83,20 @@ function requireRole(role: string) {
 }
 
 export const authedQuery = t.procedure.use(requireAuth);
+function hasAdminPermission(adminUser: { role: string; permissions?: unknown }, permission: string) {
+  if (adminUser.role !== "interview_admin") return true;
+  const value = adminUser.permissions;
+  if (Array.isArray(value)) return value.includes(permission);
+  if (typeof value !== "string") return false;
+  try { const parsed = JSON.parse(value); return Array.isArray(parsed) && parsed.includes(permission); } catch { return false; }
+}
+
+function permissionQuery(permission: "interviews" | "attendance" | "scores") {
+  return authedQuery.use(t.middleware(async ({ ctx, next }) => {
+    if (ctx.user.role !== "admin" || !ctx.adminUser || !hasAdminPermission(ctx.adminUser, permission)) throw new TRPCError({ code: "FORBIDDEN", message: ErrorMessages.insufficientRole });
+    return next({ ctx: { ...ctx, adminUser: ctx.adminUser } });
+  }));
+}
 export const adminQuery = authedQuery.use(
   t.middleware(async ({ ctx, next }) => {
     if (ctx.user.role !== "admin" || !ctx.adminUser || ctx.adminUser.role === "interview_admin") {
@@ -92,14 +106,9 @@ export const adminQuery = authedQuery.use(
   }),
 );
 
-export const interviewAdminQuery = authedQuery.use(
-  t.middleware(async ({ ctx, next }) => {
-    if (ctx.user.role !== "admin" || !ctx.adminUser || !["admin", "super_admin", "interview_admin"].includes(ctx.adminUser.role)) {
-      throw new TRPCError({ code: "FORBIDDEN", message: ErrorMessages.insufficientRole });
-    }
-    return next({ ctx: { ...ctx, adminUser: ctx.adminUser } });
-  }),
-);
+export const interviewAdminQuery = permissionQuery("interviews");
+export const attendanceAdminQuery = permissionQuery("attendance");
+export const scoresAdminQuery = permissionQuery("scores");
 
 export const superAdminQuery = adminQuery.use(
   t.middleware(async ({ ctx, next }) => {

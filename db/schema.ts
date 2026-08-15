@@ -386,6 +386,7 @@ export const adminUsers = mysqlTable("admin_users", {
   passwordResetExpiresAt: timestamp("passwordResetExpiresAt"),
   profileImageRef: text("profileImageRef"),
   profileDescription: text("profileDescription"),
+  permissions: text("permissions"),
   role: mysqlEnum("role", ["admin", "super_admin", "interview_admin"]).default("admin").notNull(),
   isActive: boolean("isActive").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

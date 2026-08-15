@@ -95,6 +95,10 @@ export default function AdminMiniAdminsPage() {
     onError: (error) =>
       toast.error(error.message || "Impossible de modifier ce compte"),
   });
+  const setPermissions = trpc.admin.setInterviewAdminPermissions.useMutation({
+    onSuccess: async () => { toast.success("Permissions mises à jour"); await utils.admin.listInterviewAdmins.invalidate(); },
+    onError: (error) => toast.error(error.message || "Impossible de modifier les permissions"),
+  });
   const deleteAdmin = trpc.admin.deleteInterviewAdmin.useMutation({
     onSuccess: async (_, variables) => {
       toast.success("Mini-admin supprimé");
@@ -120,7 +124,7 @@ export default function AdminMiniAdminsPage() {
     return (
       <Navigate
         to={
-          user.adminRole === "interview_admin" ? "/admin/interviews" : "/admin"
+          user.adminRole === "interview_admin" ? "/admin/profile" : "/admin"
         }
         replace
       />
@@ -429,6 +433,16 @@ export default function AdminMiniAdminsPage() {
                         placeholder="Inchangé"
                       />
                     </div>
+                  </div>
+                  <div className="rounded-xl border bg-slate-50 p-3 lg:col-span-full">
+                    <p className="mb-3 text-sm font-bold">Interfaces autorisées</p>
+                    <div className="flex flex-wrap gap-5">
+                      {([{ key: "interviews", label: "Entretiens" }, { key: "attendance", label: "Présences" }, { key: "scores", label: "Points" }] as const).map((permission) => {
+                        const permissions = entry.permissions ?? [];
+                        return <label key={permission.key} className="flex items-center gap-2 text-sm"><Switch checked={permissions.includes(permission.key)} disabled={setPermissions.isPending && setPermissions.variables?.id === entry.id} onCheckedChange={(checked) => setPermissions.mutate({ id: entry.id, permissions: checked ? [...permissions, permission.key] : permissions.filter((item) => item !== permission.key) })}/><span>{permission.label}</span></label>;
+                      })}
+                    </div>
+                    <p className="mt-2 text-xs text-slate-500">Sans permission, ce mini-admin accède uniquement à son profil.</p>
                   </div>
                   <div className="flex min-w-48 items-center justify-between gap-3 lg:pb-0.5">
                     <div>

@@ -483,7 +483,7 @@ export const adminRouter = createRouter({
 
   listInterviewAdmins: superAdminQuery.query(async () => {
     const [rows] = await getSqlPool().query<any[]>(`
-      SELECT admins.id, admins.name, admins.email, admins.phoneNumber, admins.isActive, admins.createdAt,
+      SELECT admins.id, admins.name, admins.email, admins.phoneNumber, admins.permissions, admins.isActive, admins.createdAt,
         COUNT(DISTINCT assignments.candidateId) AS assignedCandidates,
         COUNT(DISTINCT CASE WHEN slots.status = 'scheduled' THEN slots.id END) AS scheduledSlots,
         COUNT(DISTINCT bookings.id) AS bookedInterviews
@@ -492,11 +492,12 @@ export const adminRouter = createRouter({
       LEFT JOIN interview_slots slots ON slots.createdByAdminId = admins.id
       LEFT JOIN interview_bookings bookings ON bookings.slotId = slots.id
       WHERE admins.role = 'interview_admin'
-      GROUP BY admins.id, admins.name, admins.email, admins.isActive, admins.createdAt
+      GROUP BY admins.id, admins.name, admins.email, admins.phoneNumber, admins.permissions, admins.isActive, admins.createdAt
       ORDER BY admins.createdAt DESC
     `);
     return rows.map((row) => ({
       ...row,
+      permissions: (() => { try { return Array.isArray(row.permissions) ? row.permissions : JSON.parse(row.permissions || "[]"); } catch { return []; } })(),
       assignedCandidates: Number(row.assignedCandidates),
       scheduledSlots: Number(row.scheduledSlots),
       bookedInterviews: Number(row.bookedInterviews),
@@ -551,6 +552,14 @@ export const adminRouter = createRouter({
         }
       }
       await db.update(adminUsers).set({ isActive: input.isActive }).where(eq(adminUsers.id, target.id));
+      return { success: true };
+    }),
+
+  setInterviewAdminPermissions: superAdminQuery
+    .input(z.object({ id: z.number().int().positive(), permissions: z.array(z.enum(["interviews", "attendance", "scores"])).max(3) }))
+    .mutation(async ({ input }) => {
+      const [result] = await getSqlPool().execute<any>("UPDATE admin_users SET permissions=? WHERE id=? AND role='interview_admin'", [JSON.stringify([...new Set(input.permissions)]), input.id]);
+      if (result.affectedRows !== 1) throw new TRPCError({ code: "NOT_FOUND", message: "Mini-admin introuvable." });
       return { success: true };
     }),
 

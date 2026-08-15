@@ -1,4 +1,4 @@
-import { ArrowRight, CalendarClock, LogOut } from "lucide-react";
+import { ArrowRight, Award, CalendarClock, LogOut, QrCode, UserRound } from "lucide-react";
 import { Link, Navigate } from "react-router";
 import AdminInterviews from "@/components/AdminInterviews";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ export default function AdminInterviewsPage() {
   });
   const isAdmin = user?.role === "admin";
   const isInterviewAdmin = user?.adminRole === "interview_admin";
+  const canAccessInterviews = !isInterviewAdmin || user?.adminPermissions?.includes("interviews");
 
   if (isLoading) {
     return (
@@ -21,6 +22,7 @@ export default function AdminInterviewsPage() {
   }
 
   if (!isAdmin) return <Navigate to="/admin/login" replace />;
+  if (!canAccessInterviews) return <Navigate to="/admin/profile" replace />;
 
   return (
     <div dir="rtl" lang="ar" className="min-h-screen bg-slate-50 p-4 md:p-8">
@@ -37,6 +39,9 @@ export default function AdminInterviewsPage() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            {user.adminPermissions?.includes("attendance") || !isInterviewAdmin ? <Link to="/admin/attendance"><Button className="bg-sky-700 hover:bg-sky-800"><QrCode className="ml-2 h-4 w-4" /> إدارة الحضور</Button></Link> : null}
+            {user.adminPermissions?.includes("scores") || !isInterviewAdmin ? <Link to="/admin/scores"><Button className="bg-amber-600 hover:bg-amber-700"><Award className="ml-2 h-4 w-4" /> إدارة النقاط</Button></Link> : null}
+            {isInterviewAdmin ? <Link to="/admin/profile"><Button variant="outline"><UserRound className="ml-2 h-4 w-4"/>الملف الشخصي</Button></Link> : null}
             {!isInterviewAdmin ? <Link to="/admin">
               <Button variant="outline">
                 <ArrowRight className="ml-2 h-4 w-4" /> العودة إلى لوحة الإدارة
