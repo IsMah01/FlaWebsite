@@ -147,6 +147,8 @@ export async function ensureDatabaseSchema() {
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )`);
+    await addColumnIfMissing(connection, "attendance_sessions", "startsAt", "startsAt DATETIME NULL");
+    await connection.query(`UPDATE attendance_sessions SET startsAt=DATE_SUB(STR_TO_DATE(CONCAT('2026-08-',LPAD(13+dayNumber,2,'0'),' ',LEFT(timeLabel,5)),'%Y-%m-%d %H:%i'),INTERVAL 1 HOUR) WHERE startsAt IS NULL`);
     await connection.query(`CREATE TABLE IF NOT EXISTS attendance_records (
       id INT AUTO_INCREMENT PRIMARY KEY, sessionId INT NOT NULL, finalCandidateId INT NOT NULL,
       checkedInAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -161,6 +163,28 @@ export async function ensureDatabaseSchema() {
       INDEX attendance_audit_session_index (sessionId),
       INDEX attendance_audit_admin_index (adminId)
     )`);
+    await connection.query(`CREATE TABLE IF NOT EXISTS candidate_point_entries (
+      id INT AUTO_INCREMENT PRIMARY KEY, finalCandidateId INT NOT NULL,
+      sourceKey VARCHAR(160) NOT NULL, actionType VARCHAR(60) NOT NULL,
+      points INT NOT NULL, title VARCHAR(500) NOT NULL, detail VARCHAR(500) NULL,
+      awardedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY candidate_point_source_unique (finalCandidateId, sourceKey),
+      INDEX candidate_point_candidate_index (finalCandidateId),
+      INDEX candidate_point_awarded_index (awardedAt)
+    )`);
+    await addColumnIfMissing(connection, "candidate_point_entries", "awardedByAdminId", "awardedByAdminId INT NULL");
+    await connection.query(`DELETE p FROM candidate_point_entries p
+      JOIN attendance_records r ON p.finalCandidateId=r.finalCandidateId
+        AND p.sourceKey IN (CONCAT('attendance:',r.sessionId),CONCAT('punctuality:',r.sessionId))
+      WHERE p.awardedByAdminId IS NULL AND p.detail<>'حضور أضيف من طرف الإدارة'`);
+    await connection.query(`INSERT IGNORE INTO candidate_point_entries (finalCandidateId,sourceKey,actionType,points,title,detail,awardedAt)
+      SELECT r.finalCandidateId,CONCAT('attendance:',r.sessionId),'attendance',5,s.title,'نقاط الوصول في الوقت المسموح',r.checkedInAt
+      FROM attendance_records r JOIN attendance_sessions s ON s.id=r.sessionId
+      WHERE s.startsAt IS NOT NULL AND r.checkedInAt BETWEEN DATE_SUB(s.startsAt,INTERVAL 15 MINUTE) AND DATE_ADD(s.startsAt,INTERVAL 10 MINUTE)`);
+    await connection.query(`INSERT IGNORE INTO candidate_point_entries (finalCandidateId,sourceKey,actionType,points,title,detail,awardedAt)
+      SELECT r.finalCandidateId,CONCAT('punctuality:',r.sessionId),'punctuality',5,s.title,'مكافأة الوصول خلال 15 دقيقة قبل البداية',r.checkedInAt
+      FROM attendance_records r JOIN attendance_sessions s ON s.id=r.sessionId
+      WHERE s.startsAt IS NOT NULL AND r.checkedInAt>=DATE_SUB(s.startsAt,INTERVAL 15 MINUTE) AND r.checkedInAt<s.startsAt`);
 
     await connection.query(`
       CREATE TABLE IF NOT EXISTS editions (
