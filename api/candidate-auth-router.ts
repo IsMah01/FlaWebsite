@@ -250,7 +250,8 @@ export const candidateAuthRouter = createRouter({
     const currentDay = Number(dayRows[0].currentDay);
     const currentTime = String(dayRows[0].currentTime);
     const [rows] = await getSqlPool().query<any[]>(`SELECT dayNumber,taskKey,completedAt FROM candidate_daily_tasks WHERE finalCandidateId=? ORDER BY dayNumber,completedAt`, [candidates[0].id]);
-    return { currentDay, currentTime, editionActive: currentDay >= 1 && currentDay <= 10, tasks: Object.entries(DAILY_TASKS).map(([key,label]) => ({ key, label, available: key !== "fajr_prayer" || (currentTime >= "05:15" && currentTime <= "06:00") })), completions: rows.map((row) => ({ dayNumber: Number(row.dayNumber), taskKey: String(row.taskKey), completedAt: row.completedAt })) };
+    const [formRows] = await getSqlPool().query<any[]>(`SELECT formKey,submittedAt FROM candidate_daily_form_submissions WHERE finalCandidateId=? ORDER BY submittedAt`, [candidates[0].id]);
+    return { currentDay, currentTime, editionActive: currentDay >= 1 && currentDay <= 10, tasks: Object.entries(DAILY_TASKS).map(([key,label]) => ({ key, label, available: key !== "fajr_prayer" || (currentTime >= "05:15" && currentTime <= "06:00") })), completions: rows.map((row) => ({ dayNumber: Number(row.dayNumber), taskKey: String(row.taskKey), completedAt: row.completedAt })), formSubmissions: formRows.map((row) => ({ formKey: String(row.formKey), submittedAt: row.submittedAt })) };
   }),
 
   setDailyTask: publicQuery.input(z.object({ dayNumber: z.number().int().min(1).max(10), taskKey: z.enum(["fajr_prayer","morning_adhkar","quran_wird","evening_adhkar","sleep_adhkar"]), completed: z.boolean() })).mutation(async ({ input, ctx }) => {

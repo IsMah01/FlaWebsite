@@ -174,12 +174,14 @@ function DailyTasksCard() {
 }
 
 const dailyForms = [
-  { date: "الجمعة 14 غشت", title: "استمارة يوم الجمعة", url: "https://forms.gle/c5iioAUv39cs8L2q6" },
+  { key: "friday-14", date: "الجمعة 14 غشت", title: "استمارة يوم الجمعة", url: "https://forms.gle/c5iioAUv39cs8L2q6" },
 ];
 
 function DailyFormsCard() {
+  const daily = trpc.candidateAuth.dailyTasks.useQuery(undefined, { retry: false, refetchInterval: 30000 });
+  const submitted = new Set((daily.data?.formSubmissions ?? []).map((form) => form.formKey));
   return <section className="mt-6 rounded-2xl border border-sky-200 bg-white p-4 shadow-sm sm:rounded-3xl sm:p-6">
     <div className="flex items-center gap-3"><div className="rounded-xl bg-sky-100 p-2.5 text-sky-700"><ListChecks className="h-6 w-6" /></div><div><h2 className="text-xl font-black text-slate-900 sm:text-2xl">استمارات الأيام</h2><p className="mt-1 text-sm leading-6 text-slate-500">يرجى تعبئة استمارة كل يوم، وستظهر الاستمارات الجديدة هنا حسب ترتيب الأيام.</p></div></div>
-    <div className="mt-5 space-y-3">{dailyForms.map((form) => <a key={form.url} href={form.url} target="_blank" rel="noreferrer" className="flex min-h-20 items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:border-sky-300 hover:bg-sky-50 active:scale-[.99]"><div><p className="text-xs font-bold text-sky-700">{form.date}</p><h3 className="mt-1 font-black text-slate-900">{form.title}</h3></div><span className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-sky-700 px-4 py-2.5 text-sm font-bold text-white"><ExternalLink className="h-4 w-4" />تعبئة الاستمارة</span></a>)}</div>
+    <div className="mt-5 space-y-3">{dailyForms.map((form) => { const isSubmitted = submitted.has(form.key); return <a key={form.url} href={form.url} target="_blank" rel="noreferrer" className={`flex min-h-20 items-center justify-between gap-4 rounded-2xl border p-4 transition active:scale-[.99] ${isSubmitted ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-slate-50 hover:border-sky-300 hover:bg-sky-50"}`}><div><p className={`text-xs font-bold ${isSubmitted ? "text-emerald-700" : "text-sky-700"}`}>{form.date}</p><h3 className="mt-1 font-black text-slate-900">{form.title}</h3>{isSubmitted ? <p className="mt-1 text-xs font-bold text-emerald-700">تم إرسال الاستمارة بنجاح</p> : null}</div><span className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-white ${isSubmitted ? "bg-emerald-600" : "bg-sky-700"}`}>{isSubmitted ? <CheckCircle2 className="h-4 w-4" /> : <ExternalLink className="h-4 w-4" />}{isSubmitted ? "تم الإرسال" : "تعبئة الاستمارة"}</span></a>; })}</div>
   </section>;
 }

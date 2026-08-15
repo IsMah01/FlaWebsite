@@ -274,6 +274,38 @@ app.get("/api/admin/final-candidate-profile/:fileName", async (c) => {
   } catch { return c.json({ error: "Not found" }, 404); }
 });
 
+app.post("/api/webhooks/google-forms", async (c) => {
+  const configuredSecret = process.env.GOOGLE_FORMS_WEBHOOK_SECRET || "";
+  const providedSecret = c.req.header("X-Form-Secret") || "";
+  const configuredBuffer = Buffer.from(configuredSecret);
+  const providedBuffer = Buffer.from(providedSecret);
+  if (!configuredSecret || configuredBuffer.length !== providedBuffer.length || !crypto.timingSafeEqual(configuredBuffer, providedBuffer)) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  try {
+    const body = await c.req.json<{ email?: unknown; formKey?: unknown }>();
+    const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+    const formKey = typeof body.formKey === "string" ? body.formKey.trim() : "";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || formKey !== "friday-14") {
+      return c.json({ error: "Invalid payload" }, 400);
+    }
+    const [candidates] = await getSqlPool().query<any[]>(
+      `SELECT id FROM final_candidate_confirmations WHERE email=? AND status='confirmed' LIMIT 1`,
+      [email],
+    );
+    if (!candidates[0]) return c.json({ error: "Confirmed candidate not found" }, 404);
+    await getSqlPool().execute(
+      `INSERT INTO candidate_daily_form_submissions (finalCandidateId,formKey,email)
+       VALUES (?,?,?) ON DUPLICATE KEY UPDATE email=VALUES(email),submittedAt=CURRENT_TIMESTAMP`,
+      [candidates[0].id, formKey, email],
+    );
+    return c.json({ success: true });
+  } catch {
+    return c.json({ error: "Invalid JSON payload" }, 400);
+  }
+});
+
 app.get("/api/interviewer-images/:fileName", async (c) => {
   const fileName = c.req.param("fileName");
   if (!/^interviewer-\d+-[a-f0-9-]+\.(jpg|jpeg|png)$/i.test(fileName)) {

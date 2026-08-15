@@ -146,6 +146,14 @@ export async function ensureDatabaseSchema() {
       INDEX candidate_daily_task_candidate_index (finalCandidateId),
       INDEX candidate_daily_task_day_index (dayNumber)
     )`);
+    await connection.query(`CREATE TABLE IF NOT EXISTS candidate_daily_form_submissions (
+      id INT AUTO_INCREMENT PRIMARY KEY, finalCandidateId INT NOT NULL,
+      formKey VARCHAR(80) NOT NULL, email VARCHAR(320) NOT NULL,
+      submittedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY candidate_daily_form_unique (finalCandidateId,formKey),
+      INDEX candidate_daily_form_candidate_index (finalCandidateId),
+      INDEX candidate_daily_form_key_index (formKey)
+    )`);
 
     await connection.query(`CREATE TABLE IF NOT EXISTS attendance_sessions (
       id INT AUTO_INCREMENT PRIMARY KEY, scheduleKey VARCHAR(120) NOT NULL UNIQUE,
