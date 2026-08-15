@@ -137,8 +137,14 @@ export default function FinalCandidateProgramme() {
         <div className="group rounded-2xl border border-sky-100 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-lg"><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-100 text-sky-700"><MapPin className="h-5 w-5" /></div><p className="mt-4 text-sm font-bold text-slate-500">المدينة</p><p className="mt-1 text-xl font-black text-slate-900">الرباط، المغرب</p></div>
       </section>
       <section className="mt-6 rounded-3xl border bg-white p-4 shadow-sm sm:p-6">
-        <div className="mb-5"><h2 className="text-2xl font-black text-slate-900">برنامج أكاديمية أطر الغد — دورة الأثر</h2><p className="mt-1 text-sm leading-6 text-slate-500">اسحبوا الجدول أفقياً للاطلاع على جميع الفترات والأنشطة.</p></div>
-        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-slate-100 p-2" dir="rtl">
+        <div className="mb-5"><h2 className="text-xl font-black text-slate-900 sm:text-2xl">برنامج أكاديمية أطر الغد — دورة الأثر</h2><p className="mt-1 hidden text-sm leading-6 text-slate-500 md:block">اسحبوا الجدول أفقياً للاطلاع على جميع الفترات والأنشطة.</p><p className="mt-1 text-sm leading-6 text-slate-500 md:hidden">اضغطوا على اليوم لعرض برنامجه.</p></div>
+        <div className="space-y-3 md:hidden">
+          {programmeDays.map((programmeDay, index) => <details key={programmeDay.day} className="group overflow-hidden rounded-2xl border border-slate-200 bg-white" open={index === 0}>
+            <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 bg-slate-100 px-4 py-3"><div><span className="font-black text-slate-900">{programmeDay.day}</span><span className="mr-2 text-xs font-bold text-slate-500">اليوم {index + 1}</span></div><span className="text-xl text-[#4A9B8E] transition group-open:rotate-180">⌄</span></summary>
+            <div className="space-y-2 p-3">{programmeDay.events.map((event) => { const style = periodStyle[event.period]; const Icon = style.Icon; return <article key={`${event.time}-${event.title}`} className={`rounded-xl border p-3 ${style.className}`}><div className="flex items-center justify-between gap-3"><span className="inline-flex items-center gap-1 text-xs font-black"><Icon className="h-3.5 w-3.5"/>{style.label}</span><time className="shrink-0 rounded-full bg-white/70 px-2.5 py-1 text-xs font-black" dir="ltr">{event.time}</time></div><h3 className="mt-2 font-black leading-6">{event.title}</h3>{event.detail ? <p className="mt-1 text-sm font-semibold leading-6 opacity-80">{event.detail}</p> : null}</article>; })}</div>
+          </details>)}
+        </div>
+        <div className="hidden overflow-x-auto rounded-2xl border border-slate-200 bg-slate-100 p-2 md:block" dir="rtl">
           <div className="min-w-[1690px] space-y-1.5">
             <div className="grid gap-1.5" style={{ gridTemplateColumns: scheduleColumns }}>
               <div className="rounded-xl bg-[#173f39] p-3 text-center font-black text-white">اليوم</div>
@@ -155,7 +161,7 @@ export default function FinalCandidateProgramme() {
             </div>)}
           </div>
         </div>
-        <div className="mt-4 flex flex-wrap justify-center gap-2 text-xs">{Object.values(periodStyle).map(({ label, Icon, className }) => <span key={label} className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 font-bold ${className}`}><Icon className="h-3.5 w-3.5" />{label}</span>)}</div>
+        <div className="mt-4 hidden flex-wrap justify-center gap-2 text-xs md:flex">{Object.values(periodStyle).map(({ label, Icon, className }) => <span key={label} className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 font-bold ${className}`}><Icon className="h-3.5 w-3.5" />{label}</span>)}</div>
       </section>
     </>}
   </main></div>;
