@@ -1,4 +1,4 @@
-import { Award, Check, CheckCircle2, Download, ExternalLink, ListChecks, LockKeyhole, Moon, Sparkles, Sun, Sunset, UserRound } from "lucide-react";
+import { AlertTriangle, Award, Check, CheckCircle2, Download, ExternalLink, ListChecks, LockKeyhole, Moon, Sparkles, Sun, Sunset, UserRound } from "lucide-react";
 import { Link } from "react-router";
 import { toast } from "sonner";
 import Navbar from "@/components/Navbar";
@@ -133,7 +133,7 @@ export default function FinalCandidateProgramme() {
       </header>
 
       <DailyTasksCard />
-      <DailyFormsCard />
+      <DailyFormsCard accountEmail={access.data?.email ?? ""} />
       <section className="mt-6 rounded-3xl border bg-white p-4 shadow-sm sm:p-6">
         <div className="mb-5"><h2 className="text-xl font-black text-slate-900 sm:text-2xl">برنامج أكاديمية أطر الغد — دورة الأثر</h2><p className="mt-1 hidden text-sm leading-6 text-slate-500 md:block">اسحبوا الجدول أفقياً للاطلاع على جميع الفترات والأنشطة.</p><p className="mt-1 text-sm leading-6 text-slate-500 md:hidden">اضغطوا على اليوم لعرض برنامجه.</p></div>
         <div className="space-y-3 md:hidden">
@@ -173,13 +173,14 @@ function DailyTasksCard() {
   return <section className="mt-6 overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-sm sm:rounded-3xl"><div className="bg-[linear-gradient(120deg,#173f39,#4A9B8E)] p-5 text-white sm:p-6"><div className="flex items-center gap-3"><div className="rounded-xl bg-white/15 p-2.5"><ListChecks className="h-6 w-6"/></div><div><h2 className="text-xl font-black sm:text-2xl">مهام اليوم</h2><p className="mt-1 text-sm text-white/75">أنجزوا مهامكم اليومية واكسبوا نقطة عن كل مهمة.</p></div></div>{daily.data?.editionActive ? <div className="mt-4 flex items-center justify-between rounded-xl bg-white/10 px-4 py-2 text-sm font-bold"><span>اليوم {daily.data.currentDay} من 10</span><span>{completed.size} / 5 نقاط</span></div> : null}</div><div className="grid gap-3 p-4 sm:grid-cols-2 sm:p-6 lg:grid-cols-5">{daily.isLoading ? <p className="col-span-full py-6 text-center text-slate-500">جارٍ تحميل المهام…</p> : !daily.data?.editionActive ? <p className="col-span-full rounded-xl bg-amber-50 p-5 text-center font-bold text-amber-800">المهام اليومية متاحة خلال أيام الأكاديمية فقط.</p> : daily.data.tasks.map((task) => { const checked = completed.has(task.key); const busy = toggle.isPending && toggle.variables?.taskKey === task.key; const unavailable = !task.available; return <button key={task.key} type="button" disabled={toggle.isPending || unavailable} onClick={() => toggle.mutate({ dayNumber: daily.data.currentDay, taskKey: task.key, completed: !checked })} className={`flex min-h-24 items-center gap-3 rounded-2xl border p-4 text-right transition sm:flex-col sm:justify-center sm:text-center ${unavailable ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 opacity-70" : checked ? "border-emerald-300 bg-emerald-50 text-emerald-900 active:scale-[.98]" : "border-slate-200 bg-white text-slate-700 hover:border-emerald-200 hover:bg-emerald-50/40 active:scale-[.98]"}`}><span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${checked ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-400"}`}>{checked ? <Check className="h-6 w-6"/> : <span className="h-5 w-5 rounded-md border-2 border-current"/>}</span><span><span className="block font-black">{task.label}</span><span className={`mt-1 block text-xs ${checked ? "text-emerald-700" : "text-slate-400"}`}>{busy ? "جارٍ الحفظ…" : unavailable ? "متاحة من 05:15 إلى 06:45" : checked ? "+1 نقطة · تم الإنجاز" : "+1 نقطة"}</span></span></button>; })}</div></section>;
 }
 
-function DailyFormsCard() {
+function DailyFormsCard({ accountEmail }: { accountEmail: string }) {
   const daily = trpc.candidateAuth.dailyTasks.useQuery(undefined, { retry: false, refetchInterval: 30000 });
   const submitted = new Set((daily.data?.formSubmissions ?? []).map((form) => form.formKey));
   const pendingForms = (daily.data?.dailyForms ?? []).filter((form) => !submitted.has(form.formKey));
   if (daily.isLoading || daily.isError || pendingForms.length === 0) return null;
   return <section className="mt-6 rounded-2xl border border-sky-200 bg-white p-4 shadow-sm sm:rounded-3xl sm:p-6">
     <div className="flex items-center gap-3"><div className="rounded-xl bg-sky-100 p-2.5 text-sky-700"><ListChecks className="h-6 w-6" /></div><div><h2 className="text-xl font-black text-slate-900 sm:text-2xl">استمارات الأيام</h2><p className="mt-1 text-sm leading-6 text-slate-500">يرجى تعبئة استمارة كل يوم، وستظهر الاستمارات الجديدة هنا حسب ترتيب الأيام.</p></div></div>
+    <div className="mt-5 flex items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-950"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" /><div><p className="font-black">تنبيه مهم قبل تعبئة الاستمارة</p><p className="mt-1 text-sm leading-7">يجب استعمال نفس البريد الإلكتروني المسجل في حسابكم على المنصة حتى يتم احتساب إرسالكم تلقائياً.</p>{accountEmail ? <p className="mt-2 break-all rounded-lg bg-white px-3 py-2 text-left font-bold" dir="ltr">{accountEmail}</p> : null}</div></div>
     <div className="mt-5 space-y-3">{pendingForms.map((form) => <a key={form.formKey} href={form.formUrl} target="_blank" rel="noreferrer" className="flex min-h-20 items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:border-sky-300 hover:bg-sky-50 active:scale-[.99]"><div><p className="text-xs font-bold text-sky-700">استمارة متاحة</p><h3 className="mt-1 font-black text-slate-900">{form.title}</h3><p className="mt-1 text-xs text-slate-500">5 نقاط خلال أول 24 ساعة، ثم 3 نقاط بعد ذلك.</p></div><span className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-sky-700 px-4 py-2.5 text-sm font-bold text-white"><ExternalLink className="h-4 w-4" />تعبئة الاستمارة</span></a>)}</div>
   </section>;
 }
