@@ -16,13 +16,13 @@ async function recordAttendance(token: string, finalCandidateId: number) {
       throw new TRPCError({ code: "PRECONDITION_FAILED", message: "تم إغلاق تسجيل الحضور لهذه الحصة." });
     }
     const startsAtMs = sessions[0].startsAt ? new Date(sessions[0].startsAt).getTime() : null; const serverNowMs = new Date(sessions[0].serverNow).getTime();
-    if (startsAtMs === null || serverNowMs < startsAtMs - 15 * 60 * 1000) throw new TRPCError({ code:"PRECONDITION_FAILED", message:"سيفتح رابط تسجيل الحضور قبل بداية الحصة بـ15 دقيقة." });
+    if (startsAtMs === null || serverNowMs < startsAtMs - 20 * 60 * 1000) throw new TRPCError({ code:"PRECONDITION_FAILED", message:"سيفتح رابط تسجيل الحضور قبل بداية الحصة بـ20 دقيقة." });
     const [result] = await connection.execute<any>(`INSERT IGNORE INTO attendance_records (sessionId,finalCandidateId) VALUES (?,?)`, [sessions[0].id, finalCandidateId]);
     const [records] = await connection.query<any[]>(`SELECT checkedInAt FROM attendance_records WHERE sessionId=? AND finalCandidateId=? LIMIT 1`, [sessions[0].id, finalCandidateId]);
-    const checkedInAt = new Date(records[0].checkedInAt).getTime(); const withinScoringWindow = checkedInAt >= startsAtMs - 15 * 60 * 1000 && checkedInAt <= startsAtMs + 10 * 60 * 1000; const punctual = checkedInAt < startsAtMs;
+    const checkedInAt = new Date(records[0].checkedInAt).getTime(); const withinScoringWindow = checkedInAt >= startsAtMs - 20 * 60 * 1000 && checkedInAt <= startsAtMs + 10 * 60 * 1000; const punctual = checkedInAt < startsAtMs;
     if (withinScoringWindow) await connection.execute(`INSERT INTO candidate_point_entries (finalCandidateId,sourceKey,actionType,points,title,detail,awardedAt) VALUES (?,?,'attendance',5,?,'نقاط الوصول في الوقت المسموح',?) ON DUPLICATE KEY UPDATE title=VALUES(title),detail=VALUES(detail)`, [finalCandidateId, `attendance:${sessions[0].id}`, sessions[0].title, records[0].checkedInAt]);
     if (withinScoringWindow && punctual) {
-      await connection.execute(`INSERT INTO candidate_point_entries (finalCandidateId,sourceKey,actionType,points,title,detail,awardedAt) VALUES (?,?,'punctuality',5,?,'مكافأة الوصول خلال 15 دقيقة قبل البداية',?) ON DUPLICATE KEY UPDATE title=VALUES(title),detail=VALUES(detail)`, [finalCandidateId, `punctuality:${sessions[0].id}`, sessions[0].title, records[0].checkedInAt]);
+      await connection.execute(`INSERT INTO candidate_point_entries (finalCandidateId,sourceKey,actionType,points,title,detail,awardedAt) VALUES (?,?,'punctuality',5,?,'مكافأة الوصول خلال 20 دقيقة قبل البداية',?) ON DUPLICATE KEY UPDATE title=VALUES(title),detail=VALUES(detail)`, [finalCandidateId, `punctuality:${sessions[0].id}`, sessions[0].title, records[0].checkedInAt]);
     }
     await connection.commit();
     return { success: true as const, alreadyCheckedIn: result.affectedRows === 0, awardedPoints: result.affectedRows === 0 ? 0 : (withinScoringWindow ? 5 + (punctual ? 5 : 0) : 0), punctual: withinScoringWindow && punctual };
@@ -36,8 +36,8 @@ async function recordAttendance(token: string, finalCandidateId: number) {
 
 async function rebuildSessionAutomaticPoints(sessionId: number) {
   await getSqlPool().execute(`DELETE p FROM candidate_point_entries p JOIN attendance_records r ON p.finalCandidateId=r.finalCandidateId AND p.sourceKey IN (CONCAT('attendance:',r.sessionId),CONCAT('punctuality:',r.sessionId)) WHERE r.sessionId=? AND p.awardedByAdminId IS NULL AND p.detail<>'حضور أضيف من طرف الإدارة'`, [sessionId]);
-  await getSqlPool().execute(`INSERT IGNORE INTO candidate_point_entries (finalCandidateId,sourceKey,actionType,points,title,detail,awardedAt) SELECT r.finalCandidateId,CONCAT('attendance:',r.sessionId),'attendance',5,s.title,'نقاط الوصول في الوقت المسموح',r.checkedInAt FROM attendance_records r JOIN attendance_sessions s ON s.id=r.sessionId WHERE r.sessionId=? AND s.startsAt IS NOT NULL AND r.checkedInAt BETWEEN DATE_SUB(s.startsAt,INTERVAL 15 MINUTE) AND DATE_ADD(s.startsAt,INTERVAL 10 MINUTE)`, [sessionId]);
-  await getSqlPool().execute(`INSERT IGNORE INTO candidate_point_entries (finalCandidateId,sourceKey,actionType,points,title,detail,awardedAt) SELECT r.finalCandidateId,CONCAT('punctuality:',r.sessionId),'punctuality',5,s.title,'مكافأة الوصول خلال 15 دقيقة قبل البداية',r.checkedInAt FROM attendance_records r JOIN attendance_sessions s ON s.id=r.sessionId WHERE r.sessionId=? AND s.startsAt IS NOT NULL AND r.checkedInAt>=DATE_SUB(s.startsAt,INTERVAL 15 MINUTE) AND r.checkedInAt<s.startsAt`, [sessionId]);
+  await getSqlPool().execute(`INSERT IGNORE INTO candidate_point_entries (finalCandidateId,sourceKey,actionType,points,title,detail,awardedAt) SELECT r.finalCandidateId,CONCAT('attendance:',r.sessionId),'attendance',5,s.title,'نقاط الوصول في الوقت المسموح',r.checkedInAt FROM attendance_records r JOIN attendance_sessions s ON s.id=r.sessionId WHERE r.sessionId=? AND s.startsAt IS NOT NULL AND r.checkedInAt BETWEEN DATE_SUB(s.startsAt,INTERVAL 20 MINUTE) AND DATE_ADD(s.startsAt,INTERVAL 10 MINUTE)`, [sessionId]);
+  await getSqlPool().execute(`INSERT IGNORE INTO candidate_point_entries (finalCandidateId,sourceKey,actionType,points,title,detail,awardedAt) SELECT r.finalCandidateId,CONCAT('punctuality:',r.sessionId),'punctuality',5,s.title,'مكافأة الوصول خلال 20 دقيقة قبل البداية',r.checkedInAt FROM attendance_records r JOIN attendance_sessions s ON s.id=r.sessionId WHERE r.sessionId=? AND s.startsAt IS NOT NULL AND r.checkedInAt>=DATE_SUB(s.startsAt,INTERVAL 20 MINUTE) AND r.checkedInAt<s.startsAt`, [sessionId]);
 }
 
 export const attendanceRouter = createRouter({
@@ -124,7 +124,7 @@ export const attendanceRouter = createRouter({
   sessionInfo: publicQuery.input(z.object({ token: z.string().length(48) })).query(async ({ input }) => {
     const [rows] = await getSqlPool().query<any[]>(`SELECT id,title,dayNumber,timeLabel,isOpen,startsAt,delayMinutes,CURRENT_TIMESTAMP serverNow FROM attendance_sessions WHERE token=? LIMIT 1`, [input.token]);
     if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "رمز الحضور غير صالح." });
-    const checkInOpensAt=rows[0].startsAt?new Date(new Date(rows[0].startsAt).getTime()-15*60*1000):null; const canCheckIn=Boolean(rows[0].isOpen)&&Boolean(checkInOpensAt)&&new Date(rows[0].serverNow).getTime()>=checkInOpensAt!.getTime();
+    const checkInOpensAt=rows[0].startsAt?new Date(new Date(rows[0].startsAt).getTime()-20*60*1000):null; const canCheckIn=Boolean(rows[0].isOpen)&&Boolean(checkInOpensAt)&&new Date(rows[0].serverNow).getTime()>=checkInOpensAt!.getTime();
     return { ...rows[0], id: Number(rows[0].id), dayNumber: Number(rows[0].dayNumber), delayMinutes: Number(rows[0].delayMinutes ?? 0), isOpen: Boolean(rows[0].isOpen), canCheckIn, checkInOpensAt };
   }),
   candidateScoreDashboard: publicQuery.query(async ({ ctx }) => {
@@ -144,7 +144,7 @@ export const attendanceRouter = createRouter({
       ...(detailRows.filter((row) => row.actionType === "punctuality").length >= 3 ? [{ key: "punctual", label: "دقيق المواعيد", description: "حققتم ثلاث مكافآت للالتزام بالوقت" }] : []),
       ...(current.rank <= 3 && current.totalPoints > 0 ? [{ key: "top_three", label: "ضمن الثلاثة الأوائل", description: "أنتم ضمن صدارة الترتيب" }] : []),
     ];
-    return { candidate: { id: Number(finals[0].id), firstName: finals[0].firstName, lastName: finals[0].lastName, totalPoints: current.totalPoints, rank: current.rank }, ranking, details: detailRows.map((row) => ({ ...row, id: Number(row.id), points: Number(row.points) })), participantCount: ranking.length, progress: { attendedSessions, totalSessions }, badges, rules: { earlyArrivalPoints: 10, onTimePoints: 5, earlyWindowMinutes: 15, gracePeriodMinutes: 10, latePoints: 0 } };
+    return { candidate: { id: Number(finals[0].id), firstName: finals[0].firstName, lastName: finals[0].lastName, totalPoints: current.totalPoints, rank: current.rank }, ranking, details: detailRows.map((row) => ({ ...row, id: Number(row.id), points: Number(row.points) })), participantCount: ranking.length, progress: { attendedSessions, totalSessions }, badges, rules: { earlyArrivalPoints: 10, onTimePoints: 5, earlyWindowMinutes: 20, gracePeriodMinutes: 10, latePoints: 0 } };
   }),
   adminScoreDashboard: scoresAdminQuery.query(async () => {
     const [rankingRows] = await getSqlPool().query<any[]>(`SELECT f.id,f.firstName,f.lastName,f.email,COALESCE(SUM(p.points),0) totalPoints,COUNT(p.id) entryCount FROM final_candidate_confirmations f LEFT JOIN candidate_point_entries p ON p.finalCandidateId=f.id WHERE f.status='confirmed' GROUP BY f.id,f.firstName,f.lastName,f.email ORDER BY totalPoints DESC,f.firstName,f.lastName`);
