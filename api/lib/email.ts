@@ -408,6 +408,54 @@ export async function sendCandidateQuestionnaireReminderEmail(
   }
 }
 
+export async function sendCandidateEmailChangedEmail(input: {
+  to: string;
+  firstName: string;
+  previousEmail: string;
+}) {
+  if (!SMTP_HOST || !SMTP_USER) {
+    console.warn("[Email] SMTP not configured. Skipping candidate email-change notification.");
+    return { success: false, reason: "SMTP_NOT_CONFIGURED" };
+  }
+
+  const logo = getEmailLogo();
+  const signInUrl = `${PUBLIC_APP_URL}/signin`;
+  const safeFirstName = escapeEmailHtml(input.firstName || "");
+  const safePreviousEmail = escapeEmailHtml(input.previousEmail);
+  const safeNewEmail = escapeEmailHtml(input.to);
+  const html = `
+    <div dir="rtl" lang="ar" style="margin:0;padding:28px 12px;background:#f3f7f6;font-family:Arial,Tahoma,sans-serif;color:#173f39;">
+      <div style="max-width:620px;margin:0 auto;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 18px 45px rgba(23,63,57,.12);">
+        <div style="background:linear-gradient(135deg,#1f5148,#4A9B8E);padding:30px;color:#ffffff;">
+          <img src="${logo.src}" width="170" alt="Future Leaders Foundation" style="display:block;width:170px;max-width:100%;height:auto;margin:0 0 20px auto;background:#ffffff;border-radius:12px;padding:9px;">
+          <h1 style="margin:0;font-size:26px;line-height:1.5;">تم تغيير بريد حسابكم الإلكتروني</h1>
+        </div>
+        <div style="padding:30px;font-size:16px;line-height:1.9;">
+          <p>مرحباً ${safeFirstName}،</p>
+          <p>قامت إدارة مؤسسة أطر الغد بتحديث عنوان البريد الإلكتروني المرتبط بحسابكم.</p>
+          <div dir="ltr" style="margin:22px 0;padding:18px;background:#f4fbf9;border:1px solid #d8eee9;border-radius:12px;text-align:left;">
+            <div style="color:#71827e;font-size:13px;">Ancienne adresse</div><div style="word-break:break-all;">${safePreviousEmail}</div>
+            <div style="margin-top:12px;color:#71827e;font-size:13px;">Nouvelle adresse</div><div style="word-break:break-all;font-weight:700;color:#1f5148;">${safeNewEmail}</div>
+          </div>
+          <p>يمكنكم الآن تسجيل الدخول باستعمال البريد الجديد وكلمة المرور المعتادة.</p>
+          <div style="text-align:center;margin:28px 0;"><a href="${signInUrl}" style="display:inline-block;background:#4A9B8E;color:#fff;text-decoration:none;border-radius:10px;padding:13px 28px;font-weight:800;">تسجيل الدخول</a></div>
+          <p style="color:#687a76;font-size:13px;">إذا لم تطلبوا هذا التغيير، يرجى التواصل مع الإدارة فوراً.</p>
+        </div>
+      </div>
+    </div>`;
+
+  const result = await sendMailWithRetry({
+    from: `"${AR_ORG}" <${SMTP_FROM}>`,
+    to: input.to,
+    subject: `تم تغيير البريد الإلكتروني لحسابكم - ${AR_ORG}`,
+    html,
+    attachments: logo.attachments,
+  });
+  return result.success
+    ? { success: true as const }
+    : { success: false as const, reason: "SEND_FAILED" };
+}
+
 export async function sendInterviewReminderEmail(
   to: string,
   firstName: string,

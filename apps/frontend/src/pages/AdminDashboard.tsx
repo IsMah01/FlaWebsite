@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, Navigate } from "react-router";
-import { Award, CalendarClock, Download, FileText, LogOut, Mail, MessageSquareText, QrCode, RefreshCw, ShieldCheck, Trash2, Upload, UserCheck, UserCog, Users } from "lucide-react";
+import { Award, CalendarClock, Download, FileText, LogOut, Mail, MessageSquareText, Pencil, QrCode, RefreshCw, ShieldCheck, Trash2, Upload, UserCheck, UserCog, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -352,6 +352,18 @@ export default function AdminDashboard() {
       await utils.admin.stats.invalidate();
     },
     onError: (err) => toast.error(err.message || "فشل تحديث حالة المترشح"),
+  });
+  const changeCandidateEmail = trpc.admin.changeCandidateEmail.useMutation({
+    onSuccess: async ({ email, emailSent }) => {
+      if (emailSent) toast.success(`Adresse remplacée par ${email} et notification envoyée.`);
+      else toast.warning(`Adresse remplacée par ${email}, mais la notification n’a pas pu être envoyée.`);
+      await Promise.all([
+        utils.admin.listCandidates.invalidate(),
+        utils.admin.listNewUsers.invalidate(),
+        utils.admin.listUsers.invalidate(),
+      ]);
+    },
+    onError: (err) => toast.error(err.message || "Impossible de modifier l’adresse e-mail."),
   });
   const acceptCandidatesByEmail = trpc.admin.acceptCandidatesByEmail.useMutation({
     onSuccess: async ({ acceptedCount, alreadyAcceptedCount, notFound }) => {
@@ -1400,6 +1412,24 @@ export default function AdminDashboard() {
                             >
                               {candidate.isAmbassador ? "Retirer ambassadeur" : "Nommer ambassadeur"}
                             </Button>
+                            {isSuperAdmin ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={changeCandidateEmail.isPending}
+                                onClick={() => {
+                                  const nextEmail = window.prompt(
+                                    `Nouvelle adresse e-mail de ${candidate.firstName} ${candidate.lastName} :`,
+                                    candidate.email,
+                                  )?.trim().toLowerCase();
+                                  if (!nextEmail || nextEmail === candidate.email.toLowerCase()) return;
+                                  if (!window.confirm(`Remplacer ${candidate.email} par ${nextEmail} dans toutes les fiches liées ?`)) return;
+                                  changeCandidateEmail.mutate({ candidateId: candidate.id, email: nextEmail });
+                                }}
+                              >
+                                <Pencil className="mr-2 h-4 w-4" /> Modifier l’e-mail
+                              </Button>
+                            ) : null}
                             {false && isSuperAdmin && candidate.applicationStatus === "accepted" ? (
                               <div className="mt-2 flex w-full flex-wrap gap-2 border-t pt-2">
                                 <Button
