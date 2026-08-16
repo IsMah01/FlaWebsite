@@ -122,10 +122,10 @@ export const attendanceRouter = createRouter({
     }
   }),
   sessionInfo: publicQuery.input(z.object({ token: z.string().length(48) })).query(async ({ input }) => {
-    const [rows] = await getSqlPool().query<any[]>(`SELECT id,title,dayNumber,timeLabel,isOpen,startsAt,CURRENT_TIMESTAMP serverNow FROM attendance_sessions WHERE token=? LIMIT 1`, [input.token]);
+    const [rows] = await getSqlPool().query<any[]>(`SELECT id,title,dayNumber,timeLabel,isOpen,startsAt,delayMinutes,CURRENT_TIMESTAMP serverNow FROM attendance_sessions WHERE token=? LIMIT 1`, [input.token]);
     if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "رمز الحضور غير صالح." });
     const checkInOpensAt=rows[0].startsAt?new Date(new Date(rows[0].startsAt).getTime()-15*60*1000):null; const canCheckIn=Boolean(rows[0].isOpen)&&Boolean(checkInOpensAt)&&new Date(rows[0].serverNow).getTime()>=checkInOpensAt!.getTime();
-    return { ...rows[0], id: Number(rows[0].id), dayNumber: Number(rows[0].dayNumber), isOpen: Boolean(rows[0].isOpen), canCheckIn, checkInOpensAt };
+    return { ...rows[0], id: Number(rows[0].id), dayNumber: Number(rows[0].dayNumber), delayMinutes: Number(rows[0].delayMinutes ?? 0), isOpen: Boolean(rows[0].isOpen), canCheckIn, checkInOpensAt };
   }),
   candidateScoreDashboard: publicQuery.query(async ({ ctx }) => {
     const session = requireCandidateSession(ctx.req.headers.get("cookie") || "");
