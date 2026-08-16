@@ -903,6 +903,48 @@ export const adminRouter = createRouter({
       return { success: true };
     }),
 
+  changeFinalCandidateEmail: superAdminQuery
+    .input(z.object({ id: z.number().int().positive(), email: z.string().trim().email().max(320) }))
+    .mutation(async ({ input }) => {
+      const email = input.email.toLowerCase();
+      const connection = await getSqlPool().getConnection();
+      try {
+        await connection.beginTransaction();
+        const [rows] = await connection.query<any[]>(
+          `SELECT id,newUserId,email,firstName FROM final_candidate_confirmations WHERE id=? LIMIT 1 FOR UPDATE`,
+          [input.id],
+        );
+        const finalCandidate = rows[0];
+        if (!finalCandidate) throw new TRPCError({ code: "NOT_FOUND", message: "Candidat définitif introuvable." });
+        const [finalConflicts] = await connection.query<any[]>(
+          `SELECT id FROM final_candidate_confirmations WHERE email=? AND id<>? LIMIT 1`, [email, input.id],
+        );
+        if (finalConflicts[0]) throw new TRPCError({ code: "CONFLICT", message: "Cette adresse est déjà utilisée par un autre candidat définitif." });
+
+        if (finalCandidate.newUserId) {
+          const [accountConflicts] = await connection.query<any[]>(
+            `SELECT id FROM new_users WHERE email=? AND id<>? LIMIT 1`, [email, finalCandidate.newUserId],
+          );
+          if (accountConflicts[0]) throw new TRPCError({ code: "CONFLICT", message: "Cette adresse est déjà utilisée par un autre compte." });
+          await connection.execute(`UPDATE new_users SET email=? WHERE id=?`, [email, finalCandidate.newUserId]);
+          await connection.execute(`UPDATE candidates SET email=? WHERE newUserId=?`, [email, finalCandidate.newUserId]);
+          await connection.execute(`UPDATE users SET email=? WHERE unionId=?`, [email, `newuser:${finalCandidate.newUserId}`]);
+        }
+        await connection.execute(`UPDATE final_candidate_confirmations SET email=? WHERE id=?`, [email, input.id]);
+        await connection.commit();
+        const emailResult = await sendCandidateEmailChangedEmail({
+          to: email, firstName: String(finalCandidate.firstName || ""), previousEmail: String(finalCandidate.email),
+        });
+        return { success: true, email, emailSent: emailResult.success };
+      } catch (error: any) {
+        await connection.rollback();
+        if (error?.code === "ER_DUP_ENTRY") throw new TRPCError({ code: "CONFLICT", message: "Cette adresse e-mail est déjà utilisée." });
+        throw error;
+      } finally {
+        connection.release();
+      }
+    }),
+
   listCandidates: adminQuery.query(async () => {
     const db = getDb();
     return db
@@ -930,50 +972,6 @@ export const adminRouter = createRouter({
       .from(candidates)
       .orderBy(desc(candidates.createdAt));
   }),
-
-  changeCandidateEmail: superAdminQuery
-    .input(z.object({ candidateId: z.number().int().positive(), email: z.string().trim().email().max(320) }))
-    .mutation(async ({ input }) => {
-      const email = input.email.toLowerCase();
-      const connection = await getSqlPool().getConnection();
-      try {
-        await connection.beginTransaction();
-        const [candidateRows] = await connection.query<any[]>(
-          `SELECT id,newUserId,email,firstName FROM candidates WHERE id=? LIMIT 1 FOR UPDATE`,
-          [input.candidateId],
-        );
-        const candidate = candidateRows[0];
-        if (!candidate) throw new TRPCError({ code: "NOT_FOUND", message: "Candidat introuvable." });
-
-        const [conflicts] = await connection.query<any[]>(
-          `SELECT id FROM new_users WHERE email=? AND id<>? LIMIT 1`,
-          [email, candidate.newUserId],
-        );
-        if (conflicts[0]) {
-          throw new TRPCError({ code: "CONFLICT", message: "Cette adresse e-mail est déjà utilisée par un autre compte." });
-        }
-
-        await connection.execute(`UPDATE new_users SET email=? WHERE id=?`, [email, candidate.newUserId]);
-        await connection.execute(`UPDATE candidates SET email=? WHERE newUserId=?`, [email, candidate.newUserId]);
-        await connection.execute(`UPDATE final_candidate_confirmations SET email=? WHERE newUserId=?`, [email, candidate.newUserId]);
-        await connection.execute(`UPDATE users SET email=? WHERE unionId=?`, [email, `newuser:${candidate.newUserId}`]);
-        await connection.commit();
-        const emailResult = await sendCandidateEmailChangedEmail({
-          to: email,
-          firstName: String(candidate.firstName || ""),
-          previousEmail: String(candidate.email),
-        });
-        return { success: true, email, emailSent: emailResult.success };
-      } catch (error: any) {
-        await connection.rollback();
-        if (error?.code === "ER_DUP_ENTRY") {
-          throw new TRPCError({ code: "CONFLICT", message: "Cette adresse e-mail est déjà utilisée par un autre candidat." });
-        }
-        throw error;
-      } finally {
-        connection.release();
-      }
-    }),
 
   listIncompleteQuestionnaires: adminQuery.query(async () => {
     const db = getDb();
