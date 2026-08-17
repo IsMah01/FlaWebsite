@@ -213,11 +213,13 @@ export async function ensureDatabaseSchema() {
     await connection.query(`INSERT IGNORE INTO candidate_point_entries (finalCandidateId,sourceKey,actionType,points,title,detail,awardedAt)
       SELECT r.finalCandidateId,CONCAT('attendance:',r.sessionId),'attendance',5,s.title,'نقاط الوصول في الوقت المسموح',r.checkedInAt
       FROM attendance_records r JOIN attendance_sessions s ON s.id=r.sessionId
-      WHERE s.startsAt IS NOT NULL AND r.checkedInAt BETWEEN DATE_SUB(s.startsAt,INTERVAL 20 MINUTE) AND DATE_ADD(s.startsAt,INTERVAL 10 MINUTE)`);
+      WHERE s.startsAt IS NOT NULL AND (r.checkedInAt BETWEEN DATE_SUB(s.startsAt,INTERVAL 20 MINUTE) AND DATE_ADD(s.startsAt,INTERVAL 10 MINUTE)
+        OR r.checkedInAt BETWEEN DATE_SUB(DATE_SUB(s.startsAt,INTERVAL s.delayMinutes MINUTE),INTERVAL 20 MINUTE) AND DATE_ADD(DATE_SUB(s.startsAt,INTERVAL s.delayMinutes MINUTE),INTERVAL 10 MINUTE))`);
     await connection.query(`INSERT IGNORE INTO candidate_point_entries (finalCandidateId,sourceKey,actionType,points,title,detail,awardedAt)
       SELECT r.finalCandidateId,CONCAT('punctuality:',r.sessionId),'punctuality',5,s.title,'مكافأة الوصول خلال 20 دقيقة قبل البداية',r.checkedInAt
       FROM attendance_records r JOIN attendance_sessions s ON s.id=r.sessionId
-      WHERE s.startsAt IS NOT NULL AND r.checkedInAt>=DATE_SUB(s.startsAt,INTERVAL 20 MINUTE) AND r.checkedInAt<s.startsAt`);
+      WHERE s.startsAt IS NOT NULL AND ((r.checkedInAt>=DATE_SUB(s.startsAt,INTERVAL 20 MINUTE) AND r.checkedInAt<s.startsAt)
+        OR (r.checkedInAt>=DATE_SUB(DATE_SUB(s.startsAt,INTERVAL s.delayMinutes MINUTE),INTERVAL 20 MINUTE) AND r.checkedInAt<DATE_SUB(s.startsAt,INTERVAL s.delayMinutes MINUTE)))`);
 
     await connection.query(`
       CREATE TABLE IF NOT EXISTS editions (
