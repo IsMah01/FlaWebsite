@@ -21,6 +21,7 @@ export type EventItem = {
   location: string;
   summary: string;
   cta?: string;
+  coverImage?: string;
 };
 
 export const newsItems: NewsItem[] = [
@@ -84,7 +85,7 @@ export const newsItems: NewsItem[] = [
     date: "2026-08-03",
     excerpt: "يمكنكم الآن الاطلاع على اللائحة النهائية للمشاركين المقبولين ولائحة الانتظار.",
     content: "يسر أكاديمية أطر الغد الإعلان عن النتائج النهائية للدورة الثامنة عشرة، والتي تضم اللائحة النهائية للمشاركين المقبولين ولائحة الانتظار.",
-    coverImage: "/news-media/edition-18-results/cover.png",
+    coverImage: "/news-media/registration/announcement.jpeg",
     ctaLabel: "الاطلاع على النتائج",
     ctaHref: "/resultats/edition-18",
   },
@@ -111,6 +112,7 @@ export const upcomingEvents: EventItem[] = [
         ? `تم تمديد أجل التسجيل استثنائيا إلى ${REGISTRATION_DEADLINE_AR}. إنها فرصة إضافية وأخيرة، فلا تفوتها وأكمل استمارتك الآن`
         : `آخر أجل للتسجيل هو ${REGISTRATION_DEADLINE_AR}. لا تفوت الفرصة، املأ الاستمارة وأرسل ترشحك الآن`,
     cta: "املأ الاستمارة",
+    coverImage: "/news-media/registration/announcement.jpeg",
   },
 ];
 
@@ -122,5 +124,6 @@ export const pastEvents: EventItem[] = [
     location: "مركب بسمة",
     summary:
       "نلتقي لنرتقي، بمركب بسمة ملتقى السفراء جمعنا مجدداً يومي 02 و03 ماي 2026، لنحتفي بإنجازاتنا ونخطط لمبادراتنا القادمة",
+    coverImage: "/activity-media/ambassadors-forum/logo.png",
   },
 ];

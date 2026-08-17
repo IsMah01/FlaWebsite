@@ -110,9 +110,15 @@ export default function NewsPage() {
                 whileHover={{ y: -4 }}
                 className="overflow-hidden rounded-[30px] border border-gray-100 bg-white shadow-sm transition-shadow hover:shadow-xl"
               >
-                <div className="flex aspect-[16/9] items-center justify-center bg-[linear-gradient(135deg,#143f38_0%,#4A9B8E_65%,#8ed1c3_100%)] text-white">
-                  <Newspaper className="h-16 w-16 opacity-80" />
-                </div>
+                {event.coverImage ? (
+                  <div className="flex aspect-[16/9] items-center justify-center overflow-hidden bg-white p-4">
+                    <img src={event.coverImage} alt={event.title} className="h-full w-full object-contain" />
+                  </div>
+                ) : (
+                  <div className="flex aspect-[16/9] items-center justify-center bg-[linear-gradient(135deg,#143f38_0%,#4A9B8E_65%,#8ed1c3_100%)] text-white">
+                    <Newspaper className="h-16 w-16 opacity-80" />
+                  </div>
+                )}
                 <div className="p-6 sm:p-7">
                   <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500">
                     <span className="rounded-full bg-[#4A9B8E]/10 px-3 py-1 font-bold text-[#3D7A6F]">فعالية</span>
