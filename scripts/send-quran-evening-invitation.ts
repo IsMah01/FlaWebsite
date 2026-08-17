@@ -27,7 +27,7 @@ async function main() {
       SELECT firstName, email FROM new_users WHERE email IS NOT NULL AND TRIM(email) <> ''
       UNION ALL SELECT COALESCE(NULLIF(SUBSTRING_INDEX(name, ' ', 1), ''), ''), email FROM users WHERE email IS NOT NULL AND TRIM(email) <> ''
       UNION ALL SELECT COALESCE(name, ''), email FROM newsletter_subscribers WHERE isSubscribed = TRUE AND email IS NOT NULL AND TRIM(email) <> ''
-      UNION ALL SELECT COALESCE(NULLIF(SUBSTRING_INDEX(name, ' ', 1), ''), ''), email FROM admins WHERE email IS NOT NULL AND TRIM(email) <> ''
+      UNION ALL SELECT COALESCE(NULLIF(SUBSTRING_INDEX(name, ' ', 1), ''), ''), email FROM admin_users WHERE email IS NOT NULL AND TRIM(email) <> ''
     `);
     await connection.end();
     for (const row of rows) {

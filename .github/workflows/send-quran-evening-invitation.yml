@@ -2,7 +2,7 @@ name: Send Quran Evening Invitation
 
 on:
   schedule:
-    - cron: "30 16 17 8 *"
+    - cron: "40 16 17 8 *"
   workflow_dispatch:
 
 jobs:
