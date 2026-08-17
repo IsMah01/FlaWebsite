@@ -83,6 +83,7 @@ export const activities: ActivityData[] = [
     board: [
       { name: "ندى وارث", role: "مديرة الدورة", image: mediaPath("future-leaders-academy", "pilotage-02.png") },
       { name: "الإدريسي محمد", role: "مسؤول الإيواء و التغذية", image: mediaPath("future-leaders-academy", "pilotage-03.jpg") },
+      { name: "إلياس اسليطين", role: "مسؤول اللوجيستيك", image: mediaPath("future-leaders-academy", "pilotage-09.jpg") },
       { name: "البراهمي يوسف", role: "مسؤول المالية", image: mediaPath("future-leaders-academy", "pilotage-04.jpg") },
       { name: "خديجة زغران", role: "مسؤولة التواصل", image: mediaPath("future-leaders-academy", "pilotage-08.jpeg") },
       { name: "ستيتلة ياسين", role: "مسؤول البرنامج", image: mediaPath("future-leaders-academy", "pilotage-05.jpg") },
