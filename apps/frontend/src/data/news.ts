@@ -84,6 +84,7 @@ export const newsItems: NewsItem[] = [
     date: "2026-08-03",
     excerpt: "يمكنكم الآن الاطلاع على اللائحة النهائية للمشاركين المقبولين ولائحة الانتظار.",
     content: "يسر أكاديمية أطر الغد الإعلان عن النتائج النهائية للدورة الثامنة عشرة، والتي تضم اللائحة النهائية للمشاركين المقبولين ولائحة الانتظار.",
+    coverImage: "/news-media/edition-18-results/cover.png",
     ctaLabel: "الاطلاع على النتائج",
     ctaHref: "/resultats/edition-18",
   },

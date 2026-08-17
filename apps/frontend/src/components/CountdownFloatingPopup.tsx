@@ -27,6 +27,8 @@ export default function CountdownFloatingPopup() {
     };
   }, []);
 
+  if (isClosed) return null;
+
   return (
     <>
       <AnimatePresence>
