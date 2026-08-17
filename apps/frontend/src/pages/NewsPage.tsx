@@ -111,8 +111,12 @@ export default function NewsPage() {
                 className="overflow-hidden rounded-[30px] border border-gray-100 bg-white shadow-sm transition-shadow hover:shadow-xl"
               >
                 {event.coverImage ? (
-                  <div className="flex aspect-[16/9] items-center justify-center overflow-hidden bg-white p-4">
-                    <img src={event.coverImage} alt={event.title} className="h-full w-full object-contain" />
+                  <div className={`flex aspect-[16/9] items-center justify-center overflow-hidden ${event.id === "ambassadors-forum-2026" ? "bg-[linear-gradient(135deg,#08253a_0%,#0d5261_55%,#4A9B8E_100%)] p-5" : "bg-white"}`}>
+                    <img
+                      src={event.coverImage}
+                      alt={event.title}
+                      className={`h-full w-full ${event.id === "ambassadors-forum-2026" ? "object-contain" : "object-cover"}`}
+                    />
                   </div>
                 ) : (
                   <div className="flex aspect-[16/9] items-center justify-center bg-[linear-gradient(135deg,#143f38_0%,#4A9B8E_65%,#8ed1c3_100%)] text-white">
