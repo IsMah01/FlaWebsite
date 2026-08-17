@@ -7,6 +7,7 @@ import ConfirmEmail from './pages/ConfirmEmail'
 import EditionDetail from './pages/EditionDetail'
 import ActivityDetail from './pages/ActivityDetail'
 import NewsPage from './pages/NewsPage'
+import NewsDetailPage from './pages/NewsDetailPage'
 import CandidateQuestionnaire from './pages/CandidateQuestionnaire'
 import Login from "./pages/Login"
 import NotFound from "./pages/NotFound"
@@ -69,6 +70,7 @@ export default function App() {
         <Route path="/edition/:id" element={<EditionDetail />} />
         <Route path="/activities/:slug" element={<ActivityDetail />} />
         <Route path="/news" element={<NewsPage />} />
+        <Route path="/news/:id" element={<NewsDetailPage />} />
         <Route path="/resultats/edition-18" element={<Edition18Results />} />
         <Route path="/confirmation-finale" element={<FinalCandidateConfirmation />} />
         <Route path="/espace-candidat-final" element={<FinalCandidateProgramme />} />

@@ -1,19 +1,9 @@
 import { motion } from "framer-motion";
-import { ArrowLeft, Calendar, CheckCircle2, Clock3, MapPin, Newspaper } from "lucide-react";
+import { ArrowLeft, Calendar, MapPin, Newspaper } from "lucide-react";
 import { useNavigate } from "react-router";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { Button } from "@/components/ui/button";
 import { newsItems, pastEvents, upcomingEvents } from "@/data/news";
-import ResultsAnnouncement from "@/components/ResultsAnnouncement";
-
-function getCountdownDays(targetDate: string) {
-  const target = new Date(`${targetDate}T00:00:00`);
-  const now = new Date();
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const diff = target.getTime() - startOfToday.getTime();
-  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
-}
 
 function formatDate(date: string) {
   return new Intl.DateTimeFormat("fr-FR", {
@@ -23,11 +13,25 @@ function formatDate(date: string) {
   }).format(new Date(`${date}T00:00:00`));
 }
 
+function getEventDate(date: string) {
+  return new Date(`${date}T00:00:00`).getTime();
+}
+
 export default function NewsPage() {
   const navigate = useNavigate();
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const events = [...upcomingEvents, ...pastEvents].filter(
+    (event, index, all) => all.findIndex((candidate) => candidate.id === event.id) === index,
+  );
+  const currentPastEvents = events
+    .filter(
+      (event) => event.id !== "careers-caravan-larache" && getEventDate(event.date) < startOfToday.getTime(),
+    )
+    .sort((first, second) => getEventDate(second.date) - getEventDate(first.date));
 
   return (
-    <div className="min-h-screen bg-[#F8FAF9]">
+    <div className="font-news-arabic min-h-screen bg-[#F8FAF9]">
       <Navbar />
 
       <section className="pt-20">
@@ -50,135 +54,78 @@ export default function NewsPage() {
                 الأحداث والتنبيهات
               </div>
               <h1 className="mt-5 text-4xl md:text-6xl font-bold leading-tight">صفحة الأخبار والفعاليات</h1>
-              <p className="mt-5 text-white/85 text-lg leading-8">
-                هذه الصفحة تعرض المواعيد القادمة للمؤسسة، والفعاليات التي مرت بالفعل، مع عداد
-                <span className="font-bold"> J-... </span>
-                للأحداث المنتظرة.
-              </p>
             </div>
           </div>
         </div>
       </section>
 
-      <ResultsAnnouncement />
-
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-12 space-y-14">
-        <section>
+        {newsItems.length > 0 ? <section>
           <div className="mb-8">
             <span className="inline-block px-4 py-1 bg-[#4A9B8E]/10 text-[#4A9B8E] rounded-full text-sm font-medium mb-4">
-              الفعاليات القادمة
+              آخر الأخبار
             </span>
           </div>
 
-          <div className="grid gap-5">
-            {upcomingEvents.map((event, index) => {
-              const daysLeft = getCountdownDays(event.date);
-
-              return (
-                <motion.article
-                  key={event.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: "-60px" }}
-                  transition={{ duration: 0.45, delay: index * 0.06 }}
-                  className="grid lg:grid-cols-[220px_1fr] overflow-hidden rounded-[30px] border border-[#4A9B8E]/10 bg-white shadow-sm"
-                >
-                  <div className="bg-[linear-gradient(160deg,#1f5148_0%,#4A9B8E_60%,#8ed1c3_100%)] p-6 text-white flex flex-col justify-between">
-                    <div className="text-sm text-white/75">العد التنازلي</div>
-                    <div className="text-5xl font-black tracking-tight">J-{daysLeft}</div>
-                    <div className="text-sm text-white/80">{formatDate(event.date)}</div>
-                  </div>
-
-                  <div className="p-6 md:p-8">
-                    <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500 mb-3">
-                      <span className="inline-flex items-center gap-1.5">
-                        <Calendar className="w-4 h-4 text-[#4A9B8E]" />
-                        {formatDate(event.date)}
-                      </span>
-                      <span className="inline-flex items-center gap-1.5">
-                        <MapPin className="w-4 h-4 text-[#4A9B8E]" />
-                        {event.location}
-                      </span>
+          <div className="grid gap-6 md:grid-cols-2" dir="rtl">
+              {newsItems
+                .slice()
+                .sort((first, second) => getEventDate(second.date) - getEventDate(first.date))
+                .map((item) => (
+                  <motion.article key={item.id} whileHover={{ y: -4 }} className="overflow-hidden rounded-[30px] border border-gray-100 bg-white shadow-sm transition-shadow hover:shadow-xl">
+                    <button type="button" onClick={() => navigate(`/news/${item.id}`)} className="block h-full w-full text-right">
+                    {item.coverImage ? (
+                      <img src={item.coverImage} alt={item.title} className="aspect-[16/9] w-full object-cover" />
+                    ) : (
+                      <div className="flex aspect-[16/9] items-center justify-center bg-[linear-gradient(135deg,#143f38_0%,#4A9B8E_65%,#8ed1c3_100%)] text-white">
+                        <Newspaper className="h-16 w-16 opacity-80" />
+                      </div>
+                    )}
+                    <div className="p-6 sm:p-7">
+                      <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500">
+                        <span className="rounded-full bg-[#4A9B8E]/10 px-3 py-1 font-bold text-[#3D7A6F]">{item.category}</span>
+                        <span className="inline-flex items-center gap-1.5"><Calendar className="h-4 w-4 text-[#4A9B8E]" />{formatDate(item.date)}</span>
+                      </div>
+                      <h2 className="mt-5 text-xl font-black leading-[1.7] text-gray-950 sm:text-2xl">{item.title}</h2>
+                      <p className="mt-3 line-clamp-3 leading-8 text-gray-600">{item.excerpt}</p>
+                      <span className="mt-5 inline-flex items-center font-bold text-[#3D7A6F]">اقرأ الخبر كاملًا <ArrowLeft className="mr-2 h-4 w-4" /></span>
                     </div>
-                    <h3 className="text-2xl font-bold text-gray-900 mb-3">{event.title}</h3>
-                    <p className="text-gray-600 leading-8">{event.summary}</p>
-                    {event.cta ? (
-                      <Button
-                        onClick={() => navigate("/signup")}
-                        className="mt-5 bg-[#4A9B8E] hover:bg-[#3D7A6F]"
-                      >
-                        {event.cta}
-                      </Button>
-                    ) : null}
-                  </div>
-                </motion.article>
-              );
-            })}
+                    </button>
+                  </motion.article>
+                ))}
           </div>
-        </section>
+        </section> : null}
 
-        <section>
+        {currentPastEvents.length > 0 ? <section>
           <div className="mb-8">
-            <span className="inline-block px-4 py-1 bg-[#1f5148]/10 text-[#1f5148] rounded-full text-sm font-medium mb-4">
+            <span className="inline-block rounded-full bg-[#1f5148]/10 px-4 py-1 text-sm font-medium text-[#1f5148]">
               فعاليات مرت
             </span>
           </div>
 
-          <div className="grid gap-5">
-            {pastEvents.map((event, index) => (
+          <div className="grid gap-6 md:grid-cols-2" dir="rtl">
+            {currentPastEvents.map((event) => (
               <motion.article
                 key={event.id}
-                initial={{ opacity: 0, y: 18 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-50px" }}
-                transition={{ duration: 0.4, delay: index * 0.05 }}
-                className="grid lg:grid-cols-[220px_1fr] overflow-hidden rounded-[30px] border border-gray-100 bg-white shadow-sm"
+                whileHover={{ y: -4 }}
+                className="overflow-hidden rounded-[30px] border border-gray-100 bg-white shadow-sm transition-shadow hover:shadow-xl"
               >
-                <div className="bg-[#EAF7F3] p-6 text-[#1f5148] flex flex-col justify-between">
-                  <div className="text-sm font-medium text-[#1f5148]/70">تم إنجازه</div>
-                  <div className="flex items-center gap-2 text-2xl font-bold">
-                    <CheckCircle2 className="w-6 h-6" />
-                    مرّ الحدث
-                  </div>
-                  <div className="text-sm">{formatDate(event.date)}</div>
+                <div className="flex aspect-[16/9] items-center justify-center bg-[linear-gradient(135deg,#143f38_0%,#4A9B8E_65%,#8ed1c3_100%)] text-white">
+                  <Newspaper className="h-16 w-16 opacity-80" />
                 </div>
-
-                <div className="p-6 md:p-8">
-                  <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500 mb-3">
-                    <span className="inline-flex items-center gap-1.5">
-                      <Calendar className="w-4 h-4 text-[#4A9B8E]" />
-                      {formatDate(event.date)}
-                    </span>
-                    <span className="inline-flex items-center gap-1.5">
-                      <MapPin className="w-4 h-4 text-[#4A9B8E]" />
-                      {event.location}
-                    </span>
+                <div className="p-6 sm:p-7">
+                  <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500">
+                    <span className="rounded-full bg-[#4A9B8E]/10 px-3 py-1 font-bold text-[#3D7A6F]">فعالية</span>
+                    <span className="inline-flex items-center gap-1.5"><Calendar className="h-4 w-4 text-[#4A9B8E]" />{formatDate(event.date)}</span>
+                    <span className="inline-flex items-center gap-1.5"><MapPin className="h-4 w-4 text-[#4A9B8E]" />{event.location}</span>
                   </div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-3">{event.title}</h3>
-                  <p className="text-gray-600 leading-8">{event.summary}</p>
+                  <h2 className="mt-5 text-xl font-black leading-[1.7] text-gray-950 sm:text-2xl">{event.title}</h2>
+                  <p className="mt-3 leading-8 text-gray-600">{event.summary}</p>
                 </div>
               </motion.article>
             ))}
           </div>
-        </section>
-
-        <section>
-          <div className="mb-8">
-            <span className="inline-block px-4 py-1 bg-[#4A9B8E]/10 text-[#4A9B8E] rounded-full text-sm font-medium mb-4">
-              أخبار المؤسسة
-            </span>
-          </div>
-
-          {newsItems.length === 0 ? (
-            <div className="rounded-[30px] border border-dashed border-[#4A9B8E]/25 bg-white p-10 text-center shadow-sm">
-              <Clock3 className="w-10 h-10 mx-auto text-[#4A9B8E] mb-4" />
-              <p className="text-lg font-semibold text-gray-900 mb-2">لا نملك أخبارا منشورة في الوقت الحالي</p>
-              <p className="text-gray-600 leading-8 max-w-2xl mx-auto">
-                سيتم تحديث هذه الصفحة لاحقا عند توفر مستجدات أو بلاغات أو تغطيات رسمية لأنشطة المؤسسة.
-              </p>
-            </div>
-          ) : null}
-        </section>
+        </section> : null}
       </main>
 
       <Footer />
