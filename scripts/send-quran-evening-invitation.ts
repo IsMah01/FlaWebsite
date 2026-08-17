@@ -6,6 +6,7 @@ import nodemailer from "nodemailer";
 const imagePath = process.env.QURAN_INVITATION_IMAGE_PATH || "storage/quran-evening/edition-18-quran-evening.jpeg";
 const reportPath = process.env.QURAN_INVITATION_REPORT_PATH || "storage/quran-evening/email-report.csv";
 const shouldSend = process.argv.includes("--send");
+const targetEmail = process.argv.find((argument) => argument.startsWith("--to="))?.slice(5).trim().toLowerCase();
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!);
@@ -15,20 +16,23 @@ async function main() {
   if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is missing");
   if (!existsSync(imagePath)) throw new Error(`Invitation image not found: ${imagePath}`);
 
-  const connection = await mysql.createConnection(process.env.DATABASE_URL);
-  const [rows] = await connection.query<mysql.RowDataPacket[]>(`
-    SELECT firstName, email FROM new_users WHERE email IS NOT NULL AND TRIM(email) <> ''
-    UNION ALL SELECT COALESCE(NULLIF(SUBSTRING_INDEX(name, ' ', 1), ''), ''), email FROM users WHERE email IS NOT NULL AND TRIM(email) <> ''
-    UNION ALL SELECT COALESCE(name, ''), email FROM newsletter_subscribers WHERE isSubscribed = TRUE AND email IS NOT NULL AND TRIM(email) <> ''
-    UNION ALL SELECT COALESCE(NULLIF(SUBSTRING_INDEX(name, ' ', 1), ''), ''), email FROM admins WHERE email IS NOT NULL AND TRIM(email) <> ''
-  `);
-  await connection.end();
-
   const recipients = new Map<string, { firstName: string; email: string }>();
-  for (const row of rows) {
-    const email = String(row.email).trim().toLowerCase();
-    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && !recipients.has(email)) {
-      recipients.set(email, { firstName: String(row.firstName || "").trim(), email });
+  if (targetEmail) {
+    recipients.set(targetEmail, { firstName: "Ismail", email: targetEmail });
+  } else {
+    const connection = await mysql.createConnection(process.env.DATABASE_URL);
+    const [rows] = await connection.query<mysql.RowDataPacket[]>(`
+      SELECT firstName, email FROM new_users WHERE email IS NOT NULL AND TRIM(email) <> ''
+      UNION ALL SELECT COALESCE(NULLIF(SUBSTRING_INDEX(name, ' ', 1), ''), ''), email FROM users WHERE email IS NOT NULL AND TRIM(email) <> ''
+      UNION ALL SELECT COALESCE(name, ''), email FROM newsletter_subscribers WHERE isSubscribed = TRUE AND email IS NOT NULL AND TRIM(email) <> ''
+      UNION ALL SELECT COALESCE(NULLIF(SUBSTRING_INDEX(name, ' ', 1), ''), ''), email FROM admins WHERE email IS NOT NULL AND TRIM(email) <> ''
+    `);
+    await connection.end();
+    for (const row of rows) {
+      const email = String(row.email).trim().toLowerCase();
+      if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && !recipients.has(email)) {
+        recipients.set(email, { firstName: String(row.firstName || "").trim(), email });
+      }
     }
   }
   console.log(`Unique recipients: ${recipients.size}`);
