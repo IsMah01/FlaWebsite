@@ -1,12 +1,13 @@
 name: Send Quran Evening Invitation
 
 on:
-  schedule:
-    - cron: "40 16 17 8 *"
+  push:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
   send:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[send-quran-1740]')
     runs-on: ubuntu-latest
     steps:
       - name: Send invitation from VPS
@@ -17,7 +18,12 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             set -e
-            if [ "${{ github.event_name }}" != "workflow_dispatch" ] && [ "$(date -u +%Y-%m-%d)" != "2026-08-17" ]; then exit 0; fi
+            if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+              now=$(date -u +%s)
+              target=$(date -u -d '2026-08-17 16:40:00' +%s)
+              if [ "$now" -lt "$target" ]; then sleep $((target - now)); fi
+              if [ "$(date -u +%Y-%m-%d)" != "2026-08-17" ]; then exit 0; fi
+            fi
             cd ${{ secrets.VPS_PATH }}
             git pull --ff-only origin main
             docker compose up -d --build backend
