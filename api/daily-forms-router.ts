@@ -10,8 +10,12 @@ const formUrlSchema = z.string().trim().url().max(1000).refine((value) => {
   } catch { return false; }
 }, "Le lien doit être un lien Google Forms valide.");
 
-function currentArabicDateLabel() {
-  return new Intl.DateTimeFormat("ar-MA", { timeZone: "Africa/Casablanca", weekday: "long", day: "numeric", month: "long" }).format(new Date());
+const formDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
+function arabicDateLabel(date: string) {
+  const [year, month, day] = date.split("-").map(Number);
+  return new Intl.DateTimeFormat("ar-MA", { timeZone: "Africa/Casablanca", weekday: "long", day: "numeric", month: "long" })
+    .format(new Date(Date.UTC(year, month - 1, day, 12)));
 }
 
 export const dailyFormsRouter = createRouter({
@@ -26,14 +30,20 @@ export const dailyFormsRouter = createRouter({
     return rows.map((row) => ({ ...row, id: Number(row.id), isActive: Boolean(row.isActive), submittedCount: Number(row.submittedCount), totalCandidates: Number(row.totalCandidates) }));
   }),
 
-  add: superAdminQuery.input(z.object({ formUrl: formUrlSchema })).mutation(async ({ input, ctx }) => {
+  add: superAdminQuery.input(z.object({ formUrl: formUrlSchema, formDate: formDateSchema })).mutation(async ({ input, ctx }) => {
     const formKey = `form-${crypto.randomBytes(12).toString("hex")}`;
-    const title = `استمارة يوم ${currentArabicDateLabel()}`;
+    const title = `استمارة يوم ${arabicDateLabel(input.formDate)}`;
     await getSqlPool().execute(
       `INSERT INTO candidate_daily_forms (formKey,title,formUrl,createdByAdminId) VALUES (?,?,?,?)`,
       [formKey, title, input.formUrl, ctx.adminUser.id],
     );
     return { success: true, formKey, title };
+  }),
+
+  setDate: superAdminQuery.input(z.object({ id: z.number().int().positive(), formDate: formDateSchema })).mutation(async ({ input }) => {
+    const title = `استمارة يوم ${arabicDateLabel(input.formDate)}`;
+    await getSqlPool().execute(`UPDATE candidate_daily_forms SET title=? WHERE id=?`, [title, input.id]);
+    return { success: true, title };
   }),
 
   setActive: superAdminQuery.input(z.object({ id: z.number().int().positive(), active: z.boolean() })).mutation(async ({ input }) => {
