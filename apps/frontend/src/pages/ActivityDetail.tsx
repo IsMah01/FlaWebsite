@@ -234,7 +234,7 @@ export default function ActivityDetail() {
               {activity.coverImage ? (
                 <div
                   className={isAcademy
-                    ? "hidden h-72 w-72 justify-self-center overflow-hidden rounded-full shadow-2xl lg:block"
+                    ? "hidden h-72 w-72 justify-self-center overflow-hidden rounded-full bg-[#d1d3d4] shadow-2xl lg:block"
                     : `hidden overflow-hidden rounded-3xl border border-white/20 shadow-2xl lg:block ${coverImageBackgroundClass}`}
                 >
                   <img
