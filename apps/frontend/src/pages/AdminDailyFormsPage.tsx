@@ -1,12 +1,15 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ArrowRight,
   CheckCircle2,
   ClipboardList,
   ExternalLink,
   Eye,
+  History,
   Power,
   RefreshCw,
+  Search,
+  Users,
   UserX,
 } from "lucide-react";
 import { Link, Navigate } from "react-router";
@@ -29,6 +32,16 @@ export default function AdminDailyFormsPage() {
     retry: false,
     refetchInterval: 15000,
   });
+  const overview = trpc.dailyForms.candidateOverview.useQuery(undefined, {
+    enabled: allowed,
+    retry: false,
+    refetchInterval: 15000,
+  });
+  const auditLog = trpc.dailyForms.auditLog.useQuery(undefined, {
+    enabled: allowed,
+    retry: false,
+    refetchInterval: 30000,
+  });
   const [formUrl, setFormUrl] = useState("");
   const [formDate, setFormDate] = useState(() =>
     new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Casablanca" }).format(
@@ -37,10 +50,38 @@ export default function AdminDailyFormsPage() {
   );
   const [editDates, setEditDates] = useState<Record<number, string>>({});
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [candidateSearch, setCandidateSearch] = useState("");
+  const [submissionFilter, setSubmissionFilter] = useState<"all" | "submitted" | "missing">("all");
+  const [pointsFilter, setPointsFilter] = useState<"all" | "5" | "3" | "missing">("all");
+  const [overviewSearch, setOverviewSearch] = useState("");
+  const [overviewFilter, setOverviewFilter] = useState<"all" | "complete" | "incomplete" | "anomaly">("all");
   const status = trpc.dailyForms.status.useQuery(
     { formKey: selectedKey ?? "" },
-    { enabled: allowed && Boolean(selectedKey), retry: false },
+    { enabled: allowed && Boolean(selectedKey), retry: false, refetchInterval: 15000 },
   );
+  const filteredCandidates = useMemo(() => {
+    const search = candidateSearch.trim().toLocaleLowerCase();
+    return (status.data ?? []).filter((candidate) => {
+      const matchesSearch = !search || `${candidate.firstName} ${candidate.lastName} ${candidate.email}`.toLocaleLowerCase().includes(search);
+      const matchesSubmission = submissionFilter === "all"
+        || (submissionFilter === "submitted" ? Boolean(candidate.submittedAt) : !candidate.submittedAt);
+      const matchesPoints = pointsFilter === "all"
+        || (pointsFilter === "missing" ? candidate.points == null : candidate.points === Number(pointsFilter));
+      return matchesSearch && matchesSubmission && matchesPoints;
+    });
+  }, [candidateSearch, pointsFilter, status.data, submissionFilter]);
+  const filteredOverview = useMemo(() => {
+    const search = overviewSearch.trim().toLocaleLowerCase();
+    return (overview.data ?? []).filter((candidate) => {
+      const matchesSearch = !search || `${candidate.firstName} ${candidate.lastName} ${candidate.email}`.toLocaleLowerCase().includes(search);
+      const isComplete = candidate.submittedForms === candidate.totalForms && candidate.missingPointEntries === 0;
+      const matchesFilter = overviewFilter === "all"
+        || (overviewFilter === "complete" && isComplete)
+        || (overviewFilter === "incomplete" && candidate.submittedForms < candidate.totalForms)
+        || (overviewFilter === "anomaly" && candidate.missingPointEntries > 0);
+      return matchesSearch && matchesFilter;
+    });
+  }, [overview.data, overviewFilter, overviewSearch]);
   const add = trpc.dailyForms.add.useMutation({
     onSuccess: async () => {
       toast.success("تمت إضافة الاستمارة وبدأ احتساب مدة 24 ساعة");
@@ -117,6 +158,42 @@ export default function AdminDailyFormsPage() {
             </Button>
           </div>
         </form>
+        <section className="overflow-hidden rounded-3xl border bg-white shadow-sm">
+          <div className="border-b p-5">
+            <h2 className="flex items-center gap-2 text-xl font-black"><Users className="h-5 w-5 text-indigo-700" />ملخص النقاط حسب المرشح</h2>
+            <p className="mt-1 text-sm text-slate-500">مجموع جميع الاستمارات المنشورة، مع كشف الاستمارات والنقاط الناقصة.</p>
+            <div className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_220px]">
+              <label className="relative">
+                <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Input value={overviewSearch} onChange={(event) => setOverviewSearch(event.target.value)} placeholder="البحث بالاسم أو البريد الإلكتروني" className="pr-9" />
+              </label>
+              <select value={overviewFilter} onChange={(event) => setOverviewFilter(event.target.value as typeof overviewFilter)} className="h-10 rounded-md border border-input bg-background px-3 text-sm">
+                <option value="all">كل المرشحين</option>
+                <option value="complete">أكملوا كل الاستمارات</option>
+                <option value="incomplete">لديهم استمارات ناقصة</option>
+                <option value="anomaly">لديهم نقاط ناقصة</option>
+              </select>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] text-sm">
+              <thead className="bg-slate-50 text-slate-600"><tr><th className="p-3 text-right">المرشح</th><th className="p-3">الاستمارات المرسلة</th><th className="p-3">الاستمارات الناقصة</th><th className="p-3">مجموع النقاط</th><th className="p-3">الحالة</th></tr></thead>
+              <tbody className="divide-y">
+                {filteredOverview.map((candidate) => {
+                  const missingForms = Math.max(0, candidate.totalForms - candidate.submittedForms);
+                  return <tr key={candidate.id} className="hover:bg-slate-50">
+                    <td className="p-3"><p className="font-bold">{candidate.firstName} {candidate.lastName}</p><p className="text-xs text-slate-500" dir="ltr">{candidate.email}</p></td>
+                    <td className="p-3 text-center font-bold text-emerald-700">{candidate.submittedForms} / {candidate.totalForms}</td>
+                    <td className="p-3 text-center font-bold">{missingForms}</td>
+                    <td className="p-3 text-center text-lg font-black text-indigo-700">{candidate.formPoints}</td>
+                    <td className="p-3 text-center">{candidate.missingPointEntries > 0 ? <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-bold text-red-700">{candidate.missingPointEntries} نقاط ناقصة</span> : missingForms > 0 ? <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700">غير مكتمل</span> : <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700">مكتمل</span>}</td>
+                  </tr>;
+                })}
+              </tbody>
+            </table>
+            {!overview.isLoading && filteredOverview.length === 0 ? <p className="p-8 text-center text-slate-500">لا توجد نتائج مطابقة.</p> : null}
+          </div>
+        </section>
         <section className="overflow-hidden rounded-3xl border bg-white shadow-sm">
           <div className="flex items-center justify-between border-b p-5">
             <div>
@@ -216,13 +293,48 @@ export default function AdminDailyFormsPage() {
                 </div>
                 {selectedKey === form.formKey ? (
                   <div className="mt-4 rounded-2xl border bg-slate-50 p-3">
+                    <div className="mb-3 grid gap-2 rounded-xl bg-white p-3 sm:grid-cols-[minmax(0,1fr)_180px_160px]">
+                      <label className="relative">
+                        <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <Input
+                          value={candidateSearch}
+                          onChange={(event) => setCandidateSearch(event.target.value)}
+                          placeholder="البحث بالاسم أو البريد الإلكتروني"
+                          className="pr-9"
+                        />
+                      </label>
+                      <select
+                        value={submissionFilter}
+                        onChange={(event) => setSubmissionFilter(event.target.value as typeof submissionFilter)}
+                        className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                      >
+                        <option value="all">كل حالات الإرسال</option>
+                        <option value="submitted">أرسلوا الاستمارة</option>
+                        <option value="missing">لم يرسلوا</option>
+                      </select>
+                      <select
+                        value={pointsFilter}
+                        onChange={(event) => setPointsFilter(event.target.value as typeof pointsFilter)}
+                        className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                      >
+                        <option value="all">كل النقاط</option>
+                        <option value="5">5 نقاط</option>
+                        <option value="3">3 نقاط</option>
+                        <option value="missing">نقاط ناقصة</option>
+                      </select>
+                    </div>
+                    {!status.isLoading ? (
+                      <p className="mb-3 px-1 text-sm font-bold text-slate-600">
+                        عرض {filteredCandidates.length} من أصل {status.data?.length ?? 0} مرشحاً
+                      </p>
+                    ) : null}
                     <div className="grid gap-2 sm:grid-cols-2">
                       {status.isLoading ? (
                         <p className="p-4 text-slate-500">
                           جارٍ تحميل القائمة…
                         </p>
                       ) : (
-                        status.data?.map((candidate) => (
+                        filteredCandidates.map((candidate) => (
                           <div
                             key={candidate.id}
                             className="flex items-center gap-3 rounded-xl bg-white p-3"
@@ -246,22 +358,28 @@ export default function AdminDailyFormsPage() {
                               >
                                 {candidate.email}
                               </p>
+                              {candidate.submittedAt ? <p className="mt-1 text-xs font-medium text-slate-500"><span dir="ltr">{formatMoroccoDateTime(candidate.submittedAt)}</span></p> : null}
                             </div>
                             <b
                               className={
-                                candidate.submittedAt
-                                  ? "text-emerald-700"
+                                candidate.submittedAt && candidate.points == null
+                                  ? "text-red-700"
+                                  : candidate.submittedAt
+                                    ? "text-emerald-700"
                                   : "text-slate-400"
                               }
                             >
                               {candidate.submittedAt
-                                ? `+${candidate.points}`
+                                ? candidate.points == null ? "نقاط ناقصة" : `+${candidate.points}`
                                 : "لم يرسل"}
                             </b>
                           </div>
                         ))
                       )}
                     </div>
+                    {!status.isLoading && filteredCandidates.length === 0 ? (
+                      <p className="p-6 text-center text-slate-500">لا توجد نتائج مطابقة لهذه الفلاتر.</p>
+                    ) : null}
                   </div>
                 ) : null}
               </article>
@@ -271,6 +389,17 @@ export default function AdminDailyFormsPage() {
                 لم تتم إضافة أي استمارة بعد.
               </p>
             ) : null}
+          </div>
+        </section>
+        <section className="overflow-hidden rounded-3xl border bg-white shadow-sm">
+          <div className="border-b p-5"><h2 className="flex items-center gap-2 text-xl font-black"><History className="h-5 w-5 text-violet-700" />سجل إصلاح بيانات الاستمارات</h2><p className="mt-1 text-sm text-slate-500">يسجل فقط الإصلاحات التلقائية الفعلية، ولا يتكرر عند إعادة تشغيل الخادم.</p></div>
+          <div className="divide-y">
+            {auditLog.data?.map((entry) => <div key={entry.id} className="grid gap-2 p-4 text-sm sm:grid-cols-[1fr_1fr_auto] sm:items-center">
+              <div><p className="font-bold">{entry.firstName} {entry.lastName}</p><p className="text-xs text-slate-500" dir="ltr">{entry.email}</p></div>
+              <div><p className="font-bold">{entry.title ?? entry.formKey}</p><p className="text-xs text-slate-500">{entry.actionType === "points_restored" ? `استرجاع النقاط: ${entry.newValue}` : "استرجاع تسجيل إرسال الاستمارة"}</p></div>
+              <time className="text-xs font-medium text-slate-500" dir="ltr">{formatMoroccoDateTime(entry.createdAt)}</time>
+            </div>)}
+            {!auditLog.isLoading && !auditLog.data?.length ? <p className="p-8 text-center text-slate-500">لم يتم تسجيل أي إصلاح تلقائي.</p> : null}
           </div>
         </section>
       </main>

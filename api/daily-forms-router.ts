@@ -61,4 +61,42 @@ export const dailyFormsRouter = createRouter({
       ORDER BY s.submittedAt IS NULL,s.submittedAt,c.firstName,c.lastName`, [input.formKey, input.formKey]);
     return rows.map((row) => ({ ...row, id: Number(row.id), points: row.points == null ? null : Number(row.points), submittedAt: row.submittedAt ?? null }));
   }),
+
+  candidateOverview: superAdminQuery.query(async () => {
+    const [rows] = await getSqlPool().query<any[]>(`
+      SELECT c.id,c.firstName,c.lastName,c.email,
+        (SELECT COUNT(*) FROM candidate_daily_forms) totalForms,
+        (SELECT COUNT(*) FROM candidate_daily_form_submissions s
+          WHERE s.finalCandidateId=c.id) submittedForms,
+        (SELECT COALESCE(SUM(p.points),0) FROM candidate_point_entries p
+          JOIN candidate_daily_forms f ON p.sourceKey=CONCAT('daily-form:',f.formKey)
+          WHERE p.finalCandidateId=c.id AND p.actionType='daily_form') formPoints,
+        (SELECT COUNT(*) FROM candidate_daily_form_submissions s
+          LEFT JOIN candidate_point_entries p ON p.finalCandidateId=s.finalCandidateId
+            AND p.sourceKey=CONCAT('daily-form:',s.formKey)
+          WHERE s.finalCandidateId=c.id AND p.id IS NULL) missingPointEntries
+      FROM final_candidate_confirmations c
+      WHERE c.status='confirmed'
+      ORDER BY c.firstName,c.lastName`);
+    return rows.map((row) => ({
+      ...row,
+      id: Number(row.id),
+      totalForms: Number(row.totalForms),
+      submittedForms: Number(row.submittedForms),
+      formPoints: Number(row.formPoints),
+      missingPointEntries: Number(row.missingPointEntries),
+    }));
+  }),
+
+  auditLog: superAdminQuery.query(async () => {
+    const [rows] = await getSqlPool().query<any[]>(`
+      SELECT a.id,a.formKey,a.actionType,a.previousValue,a.newValue,a.createdAt,
+        c.firstName,c.lastName,c.email,f.title
+      FROM candidate_daily_form_audit_logs a
+      JOIN final_candidate_confirmations c ON c.id=a.finalCandidateId
+      LEFT JOIN candidate_daily_forms f ON f.formKey=a.formKey
+      ORDER BY a.createdAt DESC,a.id DESC
+      LIMIT 200`);
+    return rows.map((row) => ({ ...row, id: Number(row.id) }));
+  }),
 });

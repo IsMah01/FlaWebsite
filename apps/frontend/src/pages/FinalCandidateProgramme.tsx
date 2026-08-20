@@ -176,9 +176,14 @@ function DailyTasksCard() {
 }
 
 function DailyFormsCard({ accountEmail }: { accountEmail: string }) {
-  const daily = trpc.candidateAuth.dailyTasks.useQuery(undefined, { retry: false, refetchInterval: 30000 });
-  const submitted = new Set((daily.data?.formSubmissions ?? []).map((form) => form.formKey));
-  const pendingForms = (daily.data?.dailyForms ?? []).filter((form) => !submitted.has(form.formKey));
+  const daily = trpc.candidateAuth.dailyTasks.useQuery(undefined, {
+    retry: false,
+    refetchInterval: 30000,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: "always",
+    refetchOnReconnect: "always",
+  });
+  const pendingForms = (daily.data?.dailyForms ?? []).filter((form) => !form.submittedAt);
   if (daily.isLoading || daily.isError || pendingForms.length === 0) return null;
   return <section className="mt-6 rounded-2xl border border-sky-200 bg-white p-4 shadow-sm sm:rounded-3xl sm:p-6">
     <div className="flex items-center gap-3"><div className="rounded-xl bg-sky-100 p-2.5 text-sky-700"><ListChecks className="h-6 w-6" /></div><div><h2 className="text-xl font-black text-slate-900 sm:text-2xl">استمارات الأيام</h2><p className="mt-1 text-sm leading-6 text-slate-500">يرجى تعبئة استمارة كل يوم، وستظهر الاستمارات الجديدة هنا حسب ترتيب الأيام.</p></div></div>

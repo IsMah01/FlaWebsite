@@ -203,9 +203,56 @@ export async function ensureDatabaseSchema() {
       INDEX candidate_point_awarded_index (awardedAt)
     )`);
     await addColumnIfMissing(connection, "candidate_point_entries", "awardedByAdminId", "awardedByAdminId INT NULL");
+    await connection.query(`CREATE TABLE IF NOT EXISTS candidate_daily_form_audit_logs (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      finalCandidateId INT NOT NULL,
+      formKey VARCHAR(80) NOT NULL,
+      actionType ENUM('submission_restored','points_restored') NOT NULL,
+      previousValue VARCHAR(255) NULL,
+      newValue VARCHAR(255) NOT NULL,
+      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY candidate_daily_form_audit_unique (finalCandidateId,formKey,actionType),
+      INDEX candidate_daily_form_audit_created_index (createdAt),
+      INDEX candidate_daily_form_audit_candidate_index (finalCandidateId)
+    )`);
+    // Reconcile legacy daily-form data without changing an existing award.
+    // A daily-form point entry proves that the form was accepted previously.
+    await connection.query(`INSERT IGNORE INTO candidate_daily_form_audit_logs
+      (finalCandidateId,formKey,actionType,previousValue,newValue)
+      SELECT p.finalCandidateId,f.formKey,'submission_restored','missing',
+        CONCAT('restored from point entry: ',p.points,' points')
+      FROM candidate_point_entries p
+      JOIN candidate_daily_forms f ON p.sourceKey=CONCAT('daily-form:',f.formKey)
+      LEFT JOIN candidate_daily_form_submissions s
+        ON s.finalCandidateId=p.finalCandidateId AND s.formKey=f.formKey
+      WHERE p.actionType='daily_form' AND s.id IS NULL`);
+    await connection.query(`INSERT IGNORE INTO candidate_daily_form_submissions (finalCandidateId,formKey,email,submittedAt)
+      SELECT p.finalCandidateId,f.formKey,LOWER(TRIM(c.email)),p.awardedAt
+      FROM candidate_point_entries p
+      JOIN candidate_daily_forms f ON p.sourceKey=CONCAT('daily-form:',f.formKey)
+      JOIN final_candidate_confirmations c ON c.id=p.finalCandidateId
+      WHERE p.actionType='daily_form'`);
+    // Restore only missing awards. Existing values, including manual corrections,
+    // remain untouched because both tables have idempotent unique keys.
+    await connection.query(`INSERT IGNORE INTO candidate_daily_form_audit_logs
+      (finalCandidateId,formKey,actionType,previousValue,newValue)
+      SELECT s.finalCandidateId,s.formKey,'points_restored','missing',
+        CAST(CASE WHEN s.submittedAt<=DATE_ADD(f.publishedAt,INTERVAL 24 HOUR) THEN 5 ELSE 3 END AS CHAR)
+      FROM candidate_daily_form_submissions s
+      JOIN candidate_daily_forms f ON f.formKey=s.formKey
+      LEFT JOIN candidate_point_entries p
+        ON p.finalCandidateId=s.finalCandidateId AND p.sourceKey=CONCAT('daily-form:',s.formKey)
+      WHERE p.id IS NULL`);
     await connection.query(`INSERT IGNORE INTO candidate_point_entries (finalCandidateId,sourceKey,actionType,points,title,detail,awardedAt)
-      SELECT finalCandidateId,CONCAT('daily-form:',formKey),'daily_form',5,'استمارة يوم الجمعة','إتمام وإرسال الاستمارة اليومية',submittedAt
-      FROM candidate_daily_form_submissions`);
+      SELECT s.finalCandidateId,CONCAT('daily-form:',s.formKey),'daily_form',
+        CASE WHEN s.submittedAt<=DATE_ADD(f.publishedAt,INTERVAL 24 HOUR) THEN 5 ELSE 3 END,
+        f.title,
+        CASE WHEN s.submittedAt<=DATE_ADD(f.publishedAt,INTERVAL 24 HOUR)
+          THEN 'إرسال الاستمارة خلال 24 ساعة'
+          ELSE 'إرسال الاستمارة بعد مرور 24 ساعة' END,
+        s.submittedAt
+      FROM candidate_daily_form_submissions s
+      JOIN candidate_daily_forms f ON f.formKey=s.formKey`);
     await connection.query(`DELETE p FROM candidate_point_entries p
       JOIN attendance_records r ON p.finalCandidateId=r.finalCandidateId
         AND p.sourceKey IN (CONCAT('attendance:',r.sessionId),CONCAT('punctuality:',r.sessionId))
