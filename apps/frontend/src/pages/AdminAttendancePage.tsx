@@ -225,6 +225,59 @@ export default function AdminAttendancePage() {
     });
     setQr({ sessionId, title, url, image });
   }
+  async function downloadSessionQr(
+    sessionId: number,
+    title: string,
+    token: string,
+  ) {
+    const url = `${window.location.origin}/presence/session/${token}`;
+    const image = await QRCode.toDataURL(url, {
+      width: 1200,
+      margin: 3,
+      errorCorrectionLevel: "H",
+      color: { dark: "#173f39", light: "#ffffff" },
+    });
+    const link = document.createElement("a");
+    link.href = image;
+    link.download = `qr-presence-session-${sessionId}.png`;
+    link.click();
+    toast.success(`تم تحميل QR: ${title}`);
+  }
+  async function downloadSessionQrPdf(
+    sessionId: number,
+    title: string,
+    token: string,
+  ) {
+    const template = await loadImage("/images/attendance-qr-template.png");
+    const url = `${window.location.origin}/presence/session/${token}`;
+    const qrImage = await QRCode.toDataURL(url, {
+      width: 900,
+      margin: 3,
+      errorCorrectionLevel: "H",
+      color: { dark: "#173f39", light: "#ffffff" },
+    });
+    const pdf = new jsPDF({
+      orientation: "portrait",
+      unit: "px",
+      format: [1414, 2000],
+      hotfixes: ["px_scaling"],
+      compress: true,
+    });
+    pdf.addImage(template, "PNG", 0, 0, 1414, 2000, undefined, "FAST");
+    pdf.addImage(
+      createArabicTitle(title),
+      "PNG",
+      107,
+      350,
+      1200,
+      230,
+      undefined,
+      "FAST",
+    );
+    pdf.addImage(qrImage, "PNG", 382, 590, 650, 650, undefined, "FAST");
+    pdf.save(`qr-presence-session-${sessionId}.pdf`);
+    toast.success(`تم تحميل PDF: ${title}`);
+  }
   const open = trpc.attendance.openSession.useMutation({
     onSuccess: async (data, input) => {
       await showQr(data.id, input.title, data.token);
@@ -551,6 +604,24 @@ export default function AdminAttendancePage() {
                     فتح الرابط
                   </Button>
                 </a>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const session = (sessions.data ?? []).find(
+                      (item) => item.id === qr.sessionId,
+                    );
+                    if (session) {
+                      void downloadSessionQrPdf(
+                        session.id,
+                        qr.title,
+                        session.token,
+                      );
+                    }
+                  }}
+                >
+                  <Download className="ml-2 h-4 w-4" />
+                  تحميل PDF
+                </Button>
                 <Button variant="ghost" onClick={() => setQr(null)}>
                   <X className="ml-2 h-4 w-4" />
                   إخفاء
@@ -778,6 +849,38 @@ export default function AdminAttendancePage() {
                           >
                             <QrCode className="ml-1 h-4 w-4" />
                             QR
+                          </Button>
+                        ) : null}
+                        {saved ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              void downloadSessionQr(
+                                saved.id,
+                                fullTitle,
+                                saved.token,
+                              )
+                            }
+                          >
+                            <Download className="ml-1 h-4 w-4" />
+                            تحميل
+                          </Button>
+                        ) : null}
+                        {saved ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              void downloadSessionQrPdf(
+                                saved.id,
+                                fullTitle,
+                                saved.token,
+                              )
+                            }
+                          >
+                            <Download className="ml-1 h-4 w-4" />
+                            PDF
                           </Button>
                         ) : null}
                         {saved ? (
