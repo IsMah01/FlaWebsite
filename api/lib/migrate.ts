@@ -138,6 +138,18 @@ export async function ensureDatabaseSchema() {
     `);
     await addColumnIfMissing(connection, "final_candidate_confirmations", "profileImageFile", "profileImageFile VARCHAR(255) NULL");
     await addColumnIfMissing(connection, "final_candidate_confirmations", "profileDescription", "profileDescription VARCHAR(500) NULL");
+    // Keep the platform classification aligned with final participation.
+    // Submitting an application alone does not grant the candidate status.
+    await connection.query(`UPDATE users u
+      JOIN new_users n ON u.unionId=CONCAT('newuser:',n.id)
+      LEFT JOIN final_candidate_confirmations f
+        ON f.newUserId=n.id AND f.status='confirmed'
+      SET u.status=CASE
+        WHEN n.isAmbassador=true THEN 'ambassador'
+        WHEN f.id IS NOT NULL THEN 'candidate'
+        ELSE 'user'
+      END
+      WHERE u.role='user'`);
     await connection.query(`CREATE TABLE IF NOT EXISTS candidate_daily_tasks (
       id INT AUTO_INCREMENT PRIMARY KEY, finalCandidateId INT NOT NULL,
       dayNumber INT NOT NULL, taskKey VARCHAR(40) NOT NULL,

@@ -704,7 +704,7 @@ export const adminRouter = createRouter({
 
   listNewUsers: adminQuery.query(async () => {
     const db = getDb();
-    const [rows, candidateLinks] = await Promise.all([
+    const [rows, finalCandidateRows] = await Promise.all([
       db
         .select({
           id: newUsers.id,
@@ -721,14 +721,13 @@ export const adminRouter = createRouter({
         })
         .from(newUsers)
         .orderBy(desc(newUsers.createdAt)),
-      db
-        .select({
-          newUserId: candidates.newUserId,
-        })
-        .from(candidates),
+      getSqlPool().query<any[]>(
+        `SELECT newUserId FROM final_candidate_confirmations
+         WHERE status='confirmed' AND newUserId IS NOT NULL`,
+      ).then(([finalRows]) => finalRows),
     ]);
 
-    const candidateIds = new Set(candidateLinks.map((entry) => entry.newUserId));
+    const finalCandidateIds = new Set(finalCandidateRows.map((entry) => Number(entry.newUserId)));
 
     return rows.map((account) => ({
       id: account.id,
@@ -737,10 +736,10 @@ export const adminRouter = createRouter({
       studyStatus: account.studyStatus,
       email: account.email,
       emailConfirmed: account.emailConfirmed,
-      role: candidateIds.has(account.id)
-        ? "candidate"
-        : account.isAmbassador
-          ? "ambassador"
+      role: account.isAmbassador
+        ? "ambassador"
+        : finalCandidateIds.has(account.id)
+          ? "candidate"
           : "user",
       documents: null,
       attestationUrl: account.attestationUrl,

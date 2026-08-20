@@ -853,11 +853,6 @@ export const candidateAuthRouter = createRouter({
         });
       }
 
-      const [candidateRecord] = await db
-        .select({ id: candidates.id })
-        .from(candidates)
-        .where(eq(candidates.newUserId, account.id))
-        .limit(1);
       const valid = await bcrypt.compare(input.password, account.password);
       if (!valid) {
         await securityLog("candidate_login_bad_password", {
@@ -895,7 +890,7 @@ export const candidateAuthRouter = createRouter({
         name: `${account.firstName} ${account.lastName}`.trim(),
         email: account.email,
         role: "user",
-        status: account.isAmbassador ? "ambassador" : candidateRecord ? "candidate" : "user",
+        status: account.isAmbassador ? "ambassador" : isFinalCandidate ? "candidate" : "user",
         lastSignInAt: new Date(),
         date: new Date(),
       });
