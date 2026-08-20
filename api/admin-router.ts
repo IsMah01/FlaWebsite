@@ -910,7 +910,7 @@ export const adminRouter = createRouter({
       try {
         await connection.beginTransaction();
         const [rows] = await connection.query<any[]>(
-          `SELECT id,newUserId,email,firstName FROM final_candidate_confirmations WHERE id=? LIMIT 1 FOR UPDATE`,
+          `SELECT id,newUserId,email,firstName,lastName,phoneNumber FROM final_candidate_confirmations WHERE id=? LIMIT 1 FOR UPDATE`,
           [input.id],
         );
         const finalCandidate = rows[0];
@@ -920,14 +920,42 @@ export const adminRouter = createRouter({
         );
         if (finalConflicts[0]) throw new TRPCError({ code: "CONFLICT", message: "Cette adresse est déjà utilisée par un autre candidat définitif." });
 
-        if (finalCandidate.newUserId) {
+        let linkedNewUserId = finalCandidate.newUserId ? Number(finalCandidate.newUserId) : null;
+        if (!linkedNewUserId) {
+          const [matchingAccounts] = await connection.query<any[]>(
+            `SELECT DISTINCT n.id
+             FROM new_users n
+             LEFT JOIN candidates c ON c.newUserId=n.id
+             WHERE n.email=? OR c.email=?
+                OR (LOWER(TRIM(n.firstName))=LOWER(TRIM(?))
+                    AND LOWER(TRIM(n.lastName))=LOWER(TRIM(?))
+                    AND REPLACE(REPLACE(REPLACE(n.phoneNumber,' ',''),'-',''),'.','')=
+                        REPLACE(REPLACE(REPLACE(?,' ',''),'-',''),'.',''))
+             LIMIT 2`,
+            [finalCandidate.email, finalCandidate.email, finalCandidate.firstName, finalCandidate.lastName, finalCandidate.phoneNumber],
+          );
+          if (matchingAccounts.length !== 1) {
+            throw new TRPCError({
+              code: "PRECONDITION_FAILED",
+              message: "Le compte de connexion associé est introuvable ou ambigu. L’adresse n’a pas été modifiée.",
+            });
+          }
+          linkedNewUserId = Number(matchingAccounts[0].id);
+          await connection.execute(
+            `UPDATE final_candidate_confirmations SET newUserId=? WHERE id=?`,
+            [linkedNewUserId, input.id],
+          );
+        }
+
+        if (linkedNewUserId) {
           const [accountConflicts] = await connection.query<any[]>(
-            `SELECT id FROM new_users WHERE email=? AND id<>? LIMIT 1`, [email, finalCandidate.newUserId],
+            `SELECT id FROM new_users WHERE email=? AND id<>? LIMIT 1`, [email, linkedNewUserId],
           );
           if (accountConflicts[0]) throw new TRPCError({ code: "CONFLICT", message: "Cette adresse est déjà utilisée par un autre compte." });
-          await connection.execute(`UPDATE new_users SET email=? WHERE id=?`, [email, finalCandidate.newUserId]);
-          await connection.execute(`UPDATE candidates SET email=? WHERE newUserId=?`, [email, finalCandidate.newUserId]);
-          await connection.execute(`UPDATE users SET email=? WHERE unionId=?`, [email, `newuser:${finalCandidate.newUserId}`]);
+          await connection.execute(`UPDATE new_users SET email=? WHERE id=?`, [email, linkedNewUserId]);
+          await connection.execute(`UPDATE candidates SET email=? WHERE newUserId=?`, [email, linkedNewUserId]);
+          await connection.execute(`UPDATE users SET email=? WHERE unionId=?`, [email, `newuser:${linkedNewUserId}`]);
+          await connection.execute(`UPDATE candidate_invitations SET email=? WHERE email=?`, [email, finalCandidate.email]);
         }
         await connection.execute(`UPDATE final_candidate_confirmations SET email=? WHERE id=?`, [email, input.id]);
         await connection.commit();
