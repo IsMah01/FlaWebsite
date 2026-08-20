@@ -233,13 +233,17 @@ export default function ActivityDetail() {
               </div>
               {activity.coverImage ? (
                 <div
-                  className={`hidden overflow-hidden rounded-3xl border border-white/20 shadow-2xl lg:block ${coverImageBackgroundClass}`}
+                  className={isAcademy
+                    ? "hidden h-72 w-72 justify-self-center overflow-hidden rounded-full shadow-2xl lg:block"
+                    : `hidden overflow-hidden rounded-3xl border border-white/20 shadow-2xl lg:block ${coverImageBackgroundClass}`}
                 >
                   <img
                     src={activity.coverImage}
                     alt={activity.title}
                     className={
-                      activity.coverImageFit === "contain"
+                      isAcademy
+                        ? "h-full w-full object-contain"
+                        : activity.coverImageFit === "contain"
                         ? "h-72 w-full object-contain p-5"
                         : "h-72 w-full object-cover"
                     }
