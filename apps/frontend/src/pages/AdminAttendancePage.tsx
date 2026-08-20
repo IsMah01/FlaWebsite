@@ -51,6 +51,17 @@ type CandidateRow = {
 };
 
 function stableScheduleKey(dayNumber: number, time: string) {
+  // Keep the already printed QR attached to its activity when the programme
+  // moves that activity to another day or time.
+  const movedSessionKeys: Record<string, string> = {
+    "7-14:30": `edition${PROGRAMME_EDITION_NUMBER}-day-8-slot-1600`,
+    "8-16:00": `edition${PROGRAMME_EDITION_NUMBER}-day-9-slot-1430`,
+    "9-14:30": `edition${PROGRAMME_EDITION_NUMBER}-day-7-slot-1430`,
+    "10-14:30": `edition${PROGRAMME_EDITION_NUMBER}-day-9-slot-1600`,
+    "10-16:00": `edition${PROGRAMME_EDITION_NUMBER}-day-10-slot-1430`,
+  };
+  const movedKey = movedSessionKeys[`${dayNumber}-${time.slice(0, 5)}`];
+  if (movedKey) return movedKey;
   return `edition${PROGRAMME_EDITION_NUMBER}-day-${dayNumber}-slot-${time.slice(0, 5).replace(":", "")}`;
 }
 function sessionStartIso(dayNumber: number, time: string) {
