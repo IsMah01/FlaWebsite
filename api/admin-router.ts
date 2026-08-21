@@ -981,7 +981,6 @@ export const adminRouter = createRouter({
         lastName: candidates.lastName,
         studyStatus: candidates.studyStatus,
         attestationUrl: candidates.attestationUrl,
-        idCardUrl: candidates.idCardUrl,
         phoneNumber: candidates.phoneNumber,
         email: candidates.email,
         isAmbassador: candidates.isAmbassador,

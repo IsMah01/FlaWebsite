@@ -23,6 +23,16 @@ async function addColumnIfMissing(
   }
 }
 
+async function dropColumnIfPresent(
+  connection: mysql.Connection,
+  table: string,
+  column: string,
+) {
+  if (await hasColumn(connection, table, column)) {
+    await connection.query(`ALTER TABLE ${table} DROP COLUMN ${column}`);
+  }
+}
+
 export async function ensureDatabaseSchema() {
   const connection = await mysql.createConnection(env.databaseUrl);
 
@@ -79,7 +89,6 @@ export async function ensureDatabaseSchema() {
         lastName VARCHAR(255) NOT NULL,
         studyStatus ENUM('student','graduated','master_student','phd_student','other') NOT NULL,
         attestationUrl TEXT NULL,
-        idCardUrl TEXT NULL,
         phoneNumber VARCHAR(50) NOT NULL,
         email VARCHAR(320) NOT NULL UNIQUE,
         isAmbassador BOOLEAN NOT NULL DEFAULT false,
@@ -103,7 +112,7 @@ export async function ensureDatabaseSchema() {
 
     await addColumnIfMissing(connection, "candidates", "newUserId", "newUserId INT NULL UNIQUE");
     await addColumnIfMissing(connection, "candidates", "attestationUrl", "attestationUrl TEXT NULL");
-    await addColumnIfMissing(connection, "candidates", "idCardUrl", "idCardUrl TEXT NULL");
+    await dropColumnIfPresent(connection, "candidates", "idCardUrl");
     await addColumnIfMissing(connection, "candidates", "password", "password VARCHAR(255) NULL");
     await addColumnIfMissing(connection, "candidates", "passwordResetToken", "passwordResetToken VARCHAR(64) NULL");
     await addColumnIfMissing(connection, "candidates", "passwordResetExpiresAt", "passwordResetExpiresAt TIMESTAMP NULL");

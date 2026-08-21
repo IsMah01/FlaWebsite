@@ -1040,7 +1040,6 @@ export const candidateAuthRouter = createRouter({
           lastName: account.lastName,
           studyStatus: account.studyStatus,
           attestationUrl: account.attestationUrl,
-          idCardUrl: null,
           phoneNumber: account.phoneNumber,
           email: account.email,
           isAmbassador: account.isAmbassador,

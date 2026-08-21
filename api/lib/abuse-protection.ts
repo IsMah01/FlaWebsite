@@ -132,13 +132,12 @@ export async function cleanupOrphanUploads(options?: {
       const rows = await db
         .select({
           attestationUrl: candidates.attestationUrl,
-          idCardUrl: candidates.idCardUrl,
         })
         .from(candidates);
 
       const referencedFiles = new Set<string>();
       for (const row of rows) {
-        for (const ref of [row.attestationUrl, row.idCardUrl]) {
+        for (const ref of [row.attestationUrl]) {
           if (ref?.startsWith("private://")) {
             referencedFiles.add(ref.replace("private://", ""));
           }

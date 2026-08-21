@@ -167,7 +167,7 @@ app.get("/api/private-files/:fileName", async (c) => {
   }
 
   const fileName = c.req.param("fileName");
-  if (!/^(attestation|idCard)-[a-f0-9-]+\.(pdf|jpg|jpeg|png)$/i.test(fileName)) {
+  if (!/^attestation-[a-f0-9-]+\.(pdf|jpg|jpeg|png)$/i.test(fileName)) {
     return c.json({ error: "Invalid file name" }, 400);
   }
 

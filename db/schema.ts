@@ -76,7 +76,6 @@ export const candidates = mysqlTable("candidates", {
     "other",
   ]).notNull(),
   attestationUrl: text("attestationUrl"),
-  idCardUrl: text("idCardUrl"),
   phoneNumber: varchar("phoneNumber", { length: 50 }).notNull(),
   email: varchar("email", { length: 320 }).notNull().unique(),
   isAmbassador: boolean("isAmbassador").default(false).notNull(),
