@@ -251,7 +251,7 @@ export const candidateAuthRouter = createRouter({
 
   dailyTasks: publicQuery.query(async ({ ctx }) => {
     const session = requireCandidateSession(ctx.req.headers.get("cookie") || "");
-    const [candidates] = await getSqlPool().query<any[]>(`SELECT id FROM final_candidate_confirmations WHERE newUserId=? AND email=? AND status='confirmed' LIMIT 1`, [session.newUserId, session.email.trim().toLowerCase()]);
+    const [candidates] = await getSqlPool().query<any[]>(`SELECT id FROM final_candidate_confirmations WHERE newUserId=? AND status='confirmed' LIMIT 1`, [session.newUserId]);
     if (!candidates[0]) throw new TRPCError({ code: "FORBIDDEN", message: "هذه المهام مخصصة للمشاركين المؤكدين نهائياً." });
     const [dayRows] = await getSqlPool().query<any[]>(`SELECT DATEDIFF(DATE(DATE_SUB(CONVERT_TZ(UTC_TIMESTAMP(),'+00:00','+01:00'),INTERVAL 1 HOUR)),'2026-08-14')+1 currentDay, TIME_FORMAT(TIME(CONVERT_TZ(UTC_TIMESTAMP(),'+00:00','+01:00')),'%H:%i') currentTime`);
     const currentDay = Number(dayRows[0].currentDay);
@@ -259,16 +259,15 @@ export const candidateAuthRouter = createRouter({
     const [rows] = await getSqlPool().query<any[]>(`SELECT dayNumber,taskKey,completedAt FROM candidate_daily_tasks WHERE finalCandidateId=? ORDER BY dayNumber,completedAt`, [candidates[0].id]);
     const [dailyForms] = await getSqlPool().query<any[]>(
       `SELECT f.formKey,f.title,f.formUrl,f.publishedAt,
-              DATE_ADD(f.publishedAt,INTERVAL 24 HOUR) fullPointsDeadline,
-              s.submittedAt
+              DATE_ADD(f.publishedAt,INTERVAL 24 HOUR) fullPointsDeadline
        FROM candidate_daily_forms f
        LEFT JOIN candidate_daily_form_submissions s
          ON s.formKey=f.formKey AND s.finalCandidateId=?
-       WHERE f.isActive=true
+       WHERE f.isActive=true AND s.id IS NULL
        ORDER BY f.publishedAt,f.id`,
       [candidates[0].id],
     );
-    return { currentDay, currentTime, editionActive: currentDay >= 1 && currentDay <= 10, tasks: Object.entries(DAILY_TASKS).map(([key,label]) => ({ key, label, available: key !== "fajr_prayer" || (currentTime >= "05:15" && currentTime <= "06:45") })), completions: rows.map((row) => ({ dayNumber: Number(row.dayNumber), taskKey: String(row.taskKey), completedAt: row.completedAt })), dailyForms: dailyForms.map((form) => ({ formKey: String(form.formKey), title: String(form.title), formUrl: String(form.formUrl), publishedAt: form.publishedAt, fullPointsDeadline: form.fullPointsDeadline, submittedAt: form.submittedAt ?? null })) };
+    return { currentDay, currentTime, editionActive: currentDay >= 1 && currentDay <= 10, tasks: Object.entries(DAILY_TASKS).map(([key,label]) => ({ key, label, available: key !== "fajr_prayer" || (currentTime >= "05:15" && currentTime <= "06:45") })), completions: rows.map((row) => ({ dayNumber: Number(row.dayNumber), taskKey: String(row.taskKey), completedAt: row.completedAt })), dailyForms: dailyForms.map((form) => ({ formKey: String(form.formKey), title: String(form.title), formUrl: String(form.formUrl), publishedAt: form.publishedAt, fullPointsDeadline: form.fullPointsDeadline })) };
   }),
 
   setDailyTask: publicQuery.input(z.object({ dayNumber: z.number().int().min(1).max(10), taskKey: z.enum(["fajr_prayer","morning_adhkar","quran_wird","evening_adhkar","sleep_adhkar"]), completed: z.boolean() })).mutation(async ({ input, ctx }) => {
