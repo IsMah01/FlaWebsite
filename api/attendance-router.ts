@@ -17,9 +17,17 @@ async function recordAttendance(token: string, finalCandidateId: number) {
     }
     const startsAtMs = sessions[0].startsAt ? new Date(sessions[0].startsAt).getTime() : null; const serverNowMs = new Date(sessions[0].serverNow).getTime();
     if (startsAtMs === null || serverNowMs < startsAtMs - 20 * 60 * 1000) throw new TRPCError({ code:"PRECONDITION_FAILED", message:"سيفتح رابط تسجيل الحضور قبل بداية الحصة بـ20 دقيقة." });
-    const [result] = await connection.execute<any>(`INSERT IGNORE INTO attendance_records (sessionId,finalCandidateId) VALUES (?,?)`, [sessions[0].id, finalCandidateId]);
-    const [records] = await connection.query<any[]>(`SELECT checkedInAt FROM attendance_records WHERE sessionId=? AND finalCandidateId=? LIMIT 1`, [sessions[0].id, finalCandidateId]);
-    const checkedInAt = new Date(records[0].checkedInAt).getTime(); const withinScoringWindow = checkedInAt >= startsAtMs - 20 * 60 * 1000 && checkedInAt <= startsAtMs + 10 * 60 * 1000; const punctual = checkedInAt < startsAtMs;
+    const [result] = await connection.execute<any>(
+      `INSERT INTO attendance_records (sessionId,finalCandidateId,scoringStartsAt)
+       VALUES (?,?,?)
+       ON DUPLICATE KEY UPDATE scoringStartsAt=COALESCE(scoringStartsAt,VALUES(scoringStartsAt))`,
+      [sessions[0].id, finalCandidateId, sessions[0].startsAt],
+    );
+    const [records] = await connection.query<any[]>(`SELECT checkedInAt,scoringStartsAt FROM attendance_records WHERE sessionId=? AND finalCandidateId=? LIMIT 1`, [sessions[0].id, finalCandidateId]);
+    const checkedInAt = new Date(records[0].checkedInAt).getTime();
+    const scoringStartsAtMs = new Date(records[0].scoringStartsAt).getTime();
+    const withinScoringWindow = checkedInAt >= scoringStartsAtMs - 20 * 60 * 1000 && checkedInAt <= scoringStartsAtMs + 10 * 60 * 1000;
+    const punctual = checkedInAt < scoringStartsAtMs;
     if (withinScoringWindow) await connection.execute(`INSERT INTO candidate_point_entries (finalCandidateId,sourceKey,actionType,points,title,detail,awardedAt) VALUES (?,?,'attendance',5,?,'نقاط الوصول في الوقت المسموح',?) ON DUPLICATE KEY UPDATE title=VALUES(title),detail=VALUES(detail)`, [finalCandidateId, `attendance:${sessions[0].id}`, sessions[0].title, records[0].checkedInAt]);
     if (withinScoringWindow && punctual) {
       await connection.execute(`INSERT INTO candidate_point_entries (finalCandidateId,sourceKey,actionType,points,title,detail,awardedAt) VALUES (?,?,'punctuality',5,?,'مكافأة الوصول خلال 20 دقيقة قبل البداية',?) ON DUPLICATE KEY UPDATE title=VALUES(title),detail=VALUES(detail)`, [finalCandidateId, `punctuality:${sessions[0].id}`, sessions[0].title, records[0].checkedInAt]);
@@ -35,9 +43,8 @@ async function recordAttendance(token: string, finalCandidateId: number) {
 }
 
 async function rebuildSessionAutomaticPoints(sessionId: number) {
-  await getSqlPool().execute(`DELETE p FROM candidate_point_entries p JOIN attendance_records r ON p.finalCandidateId=r.finalCandidateId AND p.sourceKey IN (CONCAT('attendance:',r.sessionId),CONCAT('punctuality:',r.sessionId)) WHERE r.sessionId=? AND p.awardedByAdminId IS NULL AND p.detail<>'حضور أضيف من طرف الإدارة'`, [sessionId]);
-  await getSqlPool().execute(`INSERT IGNORE INTO candidate_point_entries (finalCandidateId,sourceKey,actionType,points,title,detail,awardedAt) SELECT r.finalCandidateId,CONCAT('attendance:',r.sessionId),'attendance',5,s.title,'نقاط الوصول في الوقت المسموح',r.checkedInAt FROM attendance_records r JOIN attendance_sessions s ON s.id=r.sessionId WHERE r.sessionId=? AND s.startsAt IS NOT NULL AND (r.checkedInAt BETWEEN DATE_SUB(s.startsAt,INTERVAL 20 MINUTE) AND DATE_ADD(s.startsAt,INTERVAL 10 MINUTE) OR r.checkedInAt BETWEEN DATE_SUB(DATE_SUB(s.startsAt,INTERVAL s.delayMinutes MINUTE),INTERVAL 20 MINUTE) AND DATE_ADD(DATE_SUB(s.startsAt,INTERVAL s.delayMinutes MINUTE),INTERVAL 10 MINUTE))`, [sessionId]);
-  await getSqlPool().execute(`INSERT IGNORE INTO candidate_point_entries (finalCandidateId,sourceKey,actionType,points,title,detail,awardedAt) SELECT r.finalCandidateId,CONCAT('punctuality:',r.sessionId),'punctuality',5,s.title,'مكافأة الوصول خلال 20 دقيقة قبل البداية',r.checkedInAt FROM attendance_records r JOIN attendance_sessions s ON s.id=r.sessionId WHERE r.sessionId=? AND s.startsAt IS NOT NULL AND ((r.checkedInAt>=DATE_SUB(s.startsAt,INTERVAL 20 MINUTE) AND r.checkedInAt<s.startsAt) OR (r.checkedInAt>=DATE_SUB(DATE_SUB(s.startsAt,INTERVAL s.delayMinutes MINUTE),INTERVAL 20 MINUTE) AND r.checkedInAt<DATE_SUB(s.startsAt,INTERVAL s.delayMinutes MINUTE)))`, [sessionId]);
+  await getSqlPool().execute(`INSERT IGNORE INTO candidate_point_entries (finalCandidateId,sourceKey,actionType,points,title,detail,awardedAt) SELECT r.finalCandidateId,CONCAT('attendance:',r.sessionId),'attendance',5,s.title,'نقاط الوصول في الوقت المسموح',r.checkedInAt FROM attendance_records r JOIN attendance_sessions s ON s.id=r.sessionId WHERE r.sessionId=? AND r.scoringStartsAt IS NOT NULL AND r.checkedInAt BETWEEN DATE_SUB(r.scoringStartsAt,INTERVAL 20 MINUTE) AND DATE_ADD(r.scoringStartsAt,INTERVAL 10 MINUTE)`, [sessionId]);
+  await getSqlPool().execute(`INSERT IGNORE INTO candidate_point_entries (finalCandidateId,sourceKey,actionType,points,title,detail,awardedAt) SELECT r.finalCandidateId,CONCAT('punctuality:',r.sessionId),'punctuality',5,s.title,'مكافأة الوصول خلال 20 دقيقة قبل البداية',r.checkedInAt FROM attendance_records r JOIN attendance_sessions s ON s.id=r.sessionId WHERE r.sessionId=? AND r.scoringStartsAt IS NOT NULL AND r.checkedInAt>=DATE_SUB(r.scoringStartsAt,INTERVAL 20 MINUTE) AND r.checkedInAt<r.scoringStartsAt`, [sessionId]);
 }
 
 export const attendanceRouter = createRouter({

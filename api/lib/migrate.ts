@@ -195,6 +195,7 @@ export async function ensureDatabaseSchema() {
       UNIQUE KEY attendance_session_candidate_unique (sessionId, finalCandidateId),
       INDEX attendance_session_index (sessionId), INDEX attendance_candidate_index (finalCandidateId)
     )`);
+    await addColumnIfMissing(connection, "attendance_records", "scoringStartsAt", "scoringStartsAt TIMESTAMP NULL");
     await connection.query(`CREATE TABLE IF NOT EXISTS attendance_audit_logs (
       id INT AUTO_INCREMENT PRIMARY KEY, sessionId INT NOT NULL,
       finalCandidateId INT NULL, adminId INT NOT NULL,
@@ -265,20 +266,38 @@ export async function ensureDatabaseSchema() {
         s.submittedAt
       FROM candidate_daily_form_submissions s
       JOIN candidate_daily_forms f ON f.formKey=s.formKey`);
-    await connection.query(`DELETE p FROM candidate_point_entries p
-      JOIN attendance_records r ON p.finalCandidateId=r.finalCandidateId
-        AND p.sourceKey IN (CONCAT('attendance:',r.sessionId),CONCAT('punctuality:',r.sessionId))
-      WHERE p.awardedByAdminId IS NULL AND p.detail<>'حضور أضيف من طرف الإدارة'`);
+    // Freeze the schedule that applied when each legacy QR scan was accepted.
+    // The latest delay audit before the scan handles successive delays.
+    await connection.query(`UPDATE attendance_records r
+      JOIN attendance_sessions s ON s.id=r.sessionId
+      SET r.scoringStartsAt=TIMESTAMPADD(
+        MINUTE,
+        COALESCE((
+          SELECT CAST(SUBSTRING_INDEX(l.details,'->',-1) AS SIGNED)
+          FROM attendance_audit_logs l
+          WHERE l.sessionId=r.sessionId AND l.action='delay_update'
+            AND l.createdAt<=r.checkedInAt
+          ORDER BY l.createdAt DESC,l.id DESC LIMIT 1
+        ),0),
+        DATE_SUB(s.startsAt,INTERVAL s.delayMinutes MINUTE)
+      )
+      WHERE r.scoringStartsAt IS NULL AND s.startsAt IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM attendance_audit_logs m
+          WHERE m.sessionId=r.sessionId AND m.finalCandidateId=r.finalCandidateId
+            AND m.action='manual_add'
+        )`);
     await connection.query(`INSERT IGNORE INTO candidate_point_entries (finalCandidateId,sourceKey,actionType,points,title,detail,awardedAt)
       SELECT r.finalCandidateId,CONCAT('attendance:',r.sessionId),'attendance',5,s.title,'نقاط الوصول في الوقت المسموح',r.checkedInAt
       FROM attendance_records r JOIN attendance_sessions s ON s.id=r.sessionId
-      WHERE s.startsAt IS NOT NULL AND (r.checkedInAt BETWEEN DATE_SUB(s.startsAt,INTERVAL 20 MINUTE) AND DATE_ADD(s.startsAt,INTERVAL 10 MINUTE)
-        OR r.checkedInAt BETWEEN DATE_SUB(DATE_SUB(s.startsAt,INTERVAL s.delayMinutes MINUTE),INTERVAL 20 MINUTE) AND DATE_ADD(DATE_SUB(s.startsAt,INTERVAL s.delayMinutes MINUTE),INTERVAL 10 MINUTE))`);
+      WHERE r.scoringStartsAt IS NOT NULL
+        AND r.checkedInAt BETWEEN DATE_SUB(r.scoringStartsAt,INTERVAL 20 MINUTE) AND DATE_ADD(r.scoringStartsAt,INTERVAL 10 MINUTE)`);
     await connection.query(`INSERT IGNORE INTO candidate_point_entries (finalCandidateId,sourceKey,actionType,points,title,detail,awardedAt)
       SELECT r.finalCandidateId,CONCAT('punctuality:',r.sessionId),'punctuality',5,s.title,'مكافأة الوصول خلال 20 دقيقة قبل البداية',r.checkedInAt
       FROM attendance_records r JOIN attendance_sessions s ON s.id=r.sessionId
-      WHERE s.startsAt IS NOT NULL AND ((r.checkedInAt>=DATE_SUB(s.startsAt,INTERVAL 20 MINUTE) AND r.checkedInAt<s.startsAt)
-        OR (r.checkedInAt>=DATE_SUB(DATE_SUB(s.startsAt,INTERVAL s.delayMinutes MINUTE),INTERVAL 20 MINUTE) AND r.checkedInAt<DATE_SUB(s.startsAt,INTERVAL s.delayMinutes MINUTE)))`);
+      WHERE r.scoringStartsAt IS NOT NULL
+        AND r.checkedInAt>=DATE_SUB(r.scoringStartsAt,INTERVAL 20 MINUTE)
+        AND r.checkedInAt<r.scoringStartsAt`);
 
     await connection.query(`
       CREATE TABLE IF NOT EXISTS editions (
