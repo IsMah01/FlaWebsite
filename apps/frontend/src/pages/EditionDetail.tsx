@@ -79,8 +79,22 @@ export default function EditionDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const editionNumber = parseInt(id || "0");
+  const editionLogo = editionNumber === 15
+    ? "/images/edition-15-logo-transparent.png"
+    : editionNumber === 16
+      ? "/images/edition-16-logo-transparent.png"
+    : editionNumber === 17
+      ? "/images/edition-17-logo-transparent.png"
+      : editionNumber === 18
+        ? "/images/edition-18-logo-transparent.png"
+        : null;
   const [activeGalleryIndex, setActiveGalleryIndex] = useState(0);
   const [galleryDirection, setGalleryDirection] = useState(1);
+
+  const openAcademyEditions = () => {
+    window.sessionStorage.setItem("flf-scroll-to-academy-editions", "true");
+    window.location.assign("/activities/future-leaders-academy");
+  };
 
   const { data: edition, isLoading } = trpc.editions.getByNumber.useQuery(
     { editionNumber },
@@ -178,28 +192,48 @@ export default function EditionDetail() {
               <ArrowRight className="w-4 h-4" />
               العودة للرئيسية
             </button>
-            <h1 className="text-3xl md:text-5xl font-bold text-white text-shadow mb-4">
-              {edition.title}
-            </h1>
-            <div className="flex flex-wrap gap-4 md:gap-6 text-white/90 text-sm md:text-base">
-              {edition.eventDate && (
-                <span className="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-lg backdrop-blur-sm">
-                  <Calendar className="w-4 h-4" />
-                  {edition.eventDate}
-                </span>
-              )}
-              {edition.eventTime && (
-                <span className="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-lg backdrop-blur-sm">
-                  <Clock className="w-4 h-4" />
-                  {edition.eventTime}
-                </span>
-              )}
-              {edition.location && (
-                <span className="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-lg backdrop-blur-sm">
-                  <MapPin className="w-4 h-4" />
-                  {edition.location}
-                </span>
-              )}
+            <div className="grid gap-6 lg:grid-cols-[1fr_360px] lg:items-end">
+              <div>
+                {editionLogo ? (
+                  <img
+                    src={editionLogo}
+                    alt={`شعار الدورة ${editionNumber}`}
+                    className="mb-5 h-24 w-auto object-contain drop-shadow-lg lg:hidden"
+                  />
+                ) : null}
+                <h1 className="text-3xl md:text-5xl font-bold text-white text-shadow mb-4">
+                  {edition.title}
+                </h1>
+                <div className="flex flex-wrap gap-4 md:gap-6 text-white/90 text-sm md:text-base">
+                  {edition.eventDate && (
+                    <span className="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-lg backdrop-blur-sm">
+                      <Calendar className="w-4 h-4" />
+                      {edition.eventDate}
+                    </span>
+                  )}
+                  {edition.eventTime && (
+                    <span className="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-lg backdrop-blur-sm">
+                      <Clock className="w-4 h-4" />
+                      {edition.eventTime}
+                    </span>
+                  )}
+                  {edition.location && (
+                    <span className="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-lg backdrop-blur-sm">
+                      <MapPin className="w-4 h-4" />
+                      {edition.location}
+                    </span>
+                  )}
+                </div>
+              </div>
+              {editionLogo ? (
+                <div className="hidden h-56 items-center justify-center lg:flex">
+                  <img
+                    src={editionLogo}
+                    alt={`شعار الدورة ${editionNumber}`}
+                    className="h-full w-full object-contain drop-shadow-xl"
+                  />
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
@@ -419,7 +453,13 @@ export default function EditionDetail() {
                   <Button
                     variant="outline"
                     className="w-full justify-start text-[#4A9B8E] border-[#4A9B8E]/20 hover:bg-[#4A9B8E]/5"
-                    onClick={() => toast.info("سيتم إضافة هذه الميزة قريباً")}
+                    onClick={() => {
+                      if (editionNumber === 18) {
+                        window.open("/documents/edition-18/programme.pdf", "_blank", "noopener,noreferrer");
+                        return;
+                      }
+                      toast.info("سيتم إضافة هذه الميزة قريباً");
+                    }}
                   >
                     <Calendar className="w-4 h-4 mr-2" />
                     تحميل البرنامج
@@ -427,7 +467,7 @@ export default function EditionDetail() {
                   <Button
                     variant="outline"
                     className="w-full justify-start text-[#4A9B8E] border-[#4A9B8E]/20 hover:bg-[#4A9B8E]/5"
-                    onClick={() => navigate("/")}
+                    onClick={openAcademyEditions}
                   >
                     <ArrowRight className="w-4 h-4 mr-2" />
                     استكشف الدورات الأخرى

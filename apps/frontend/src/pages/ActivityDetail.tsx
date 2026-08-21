@@ -1,10 +1,9 @@
-import { useRef, useState, type ReactNode } from "react";
-import { Link, useNavigate, useParams } from "react-router";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { Link, useLocation, useNavigate, useParams } from "react-router";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
   ArrowRight,
-  CalendarRange,
   ChevronLeft,
   Newspaper,
   Play,
@@ -15,8 +14,6 @@ import {
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import EditionsGrid from "@/components/EditionsGrid";
-import CountdownCTA from "@/components/CountdownCTA";
-import CountdownFloatingPopup from "@/components/CountdownFloatingPopup";
 import { Button } from "@/components/ui/button";
 import { activities, getActivityBySlug } from "@/data/activities";
 import { useViewerSession } from "@/hooks/useViewerSession";
@@ -154,8 +151,47 @@ function LazyVideo({
 export default function ActivityDetail() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const activity = getActivityBySlug(slug);
-  const { viewer, hasAmbassadorView, isAmbassador, hasSubmittedQuestionnaire } = useViewerSession();
+  const { viewer, hasAmbassadorView } = useViewerSession();
+  const academyEditionsRef = useRef<HTMLElement>(null);
+
+  useLayoutEffect(() => {
+    const navigationState = location.state as { scrollToAcademyEditions?: boolean } | null;
+    const requestedSection = new URLSearchParams(window.location.search).get("scrollTo");
+    const sessionRequestedScroll =
+      window.sessionStorage.getItem("flf-scroll-to-academy-editions") === "true";
+    const shouldScroll =
+      sessionRequestedScroll ||
+      navigationState?.scrollToAcademyEditions ||
+      requestedSection === "editions" ||
+      window.location.hash === "#academy-editions";
+
+    if (slug !== "future-leaders-academy" || !shouldScroll) {
+      return;
+    }
+
+    window.history.scrollRestoration = "manual";
+    window.sessionStorage.removeItem("flf-scroll-to-academy-editions");
+
+    const scrollToEditions = () => {
+      const target = academyEditionsRef.current;
+      if (!target) return;
+
+      target.focus({ preventScroll: false });
+      window.scrollBy(0, -96);
+    };
+
+    scrollToEditions();
+    const timerIds = [
+      window.setTimeout(scrollToEditions, 100),
+      window.setTimeout(scrollToEditions, 500),
+      window.setTimeout(scrollToEditions, 1200),
+      window.setTimeout(scrollToEditions, 2500),
+    ];
+
+    return () => timerIds.forEach((timerId) => window.clearTimeout(timerId));
+  }, [location.hash, location.key, location.search, location.state, slug]);
 
   if (!activity) {
     return (
@@ -175,8 +211,6 @@ export default function ActivityDetail() {
   }
 
   const isAcademy = activity.slug === "future-leaders-academy";
-  const isAdmin = viewer?.kind === "site-user" && viewer.role === "admin";
-  const showAcademyReminder = isAdmin || isAmbassador || !hasSubmittedQuestionnaire;
   const showAmbassadorLayer =
     hasAmbassadorView &&
     (activity.slug === "trustees-program" || activity.slug === "ambassadors-forum") &&
@@ -232,18 +266,12 @@ export default function ActivityDetail() {
               ) : null}
               </div>
               {activity.coverImage ? (
-                <div
-                  className={isAcademy
-                    ? "hidden h-72 w-72 justify-self-center overflow-hidden rounded-full shadow-2xl lg:block"
-                    : `hidden overflow-hidden rounded-3xl border border-white/20 shadow-2xl lg:block ${coverImageBackgroundClass}`}
-                >
+                <div className={`hidden overflow-hidden rounded-3xl border border-white/20 shadow-2xl lg:block ${coverImageBackgroundClass}`}>
                   <img
                     src={activity.coverImage}
                     alt={activity.title}
                     className={
-                      isAcademy
-                        ? "h-full w-full scale-125 object-contain"
-                        : activity.coverImageFit === "contain"
+                      activity.coverImageFit === "contain"
                         ? "h-72 w-full object-contain p-5"
                         : "h-72 w-full object-cover"
                     }
@@ -314,8 +342,6 @@ export default function ActivityDetail() {
           </section>
         ) : null}
 
-        {isAcademy && showAcademyReminder ? <CountdownCTA compact /> : null}
-
         {!isAcademy &&
         activity.slug !== "ambassadors-forum" &&
         activity.slug !== "trustees-program" &&
@@ -384,7 +410,9 @@ export default function ActivityDetail() {
                 <img
                   src={member.image}
                   alt={member.name ?? member.role}
-                  className="h-64 w-full bg-[#EEF7F4] object-contain object-center p-2 sm:h-72"
+                  className={`h-64 w-full bg-[#EEF7F4] object-cover sm:h-72 ${
+                    member.imagePosition === "top" ? "object-top" : "object-center"
+                  }`}
                 />
                 <div className="p-4 sm:p-5">
                   {member.name ? (
@@ -398,16 +426,13 @@ export default function ActivityDetail() {
         ) : null}
 
         {isAcademy ? (
-          <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6 md:rounded-3xl md:p-8">
-            <div className="flex items-center gap-3 mb-6">
-              <CalendarRange className="w-6 h-6 text-[#4A9B8E]" />
-              <h2 className="text-xl md:text-2xl font-bold text-gray-900">الدورات الست عشرة</h2>
-            </div>
+          <section ref={academyEditionsRef} id="academy-editions" tabIndex={-1} className="scroll-mt-24 bg-white rounded-2xl border border-gray-100 shadow-sm outline-none p-5 sm:p-6 md:rounded-3xl md:p-8">
             <EditionsGrid
               editionNumbers={[18, 17, 16, 15]}
-              badge="أكاديمية أطر الغد"
+              badge=""
               title="الدورات السابقة لأكاديمية أطر الغد"
-              description="تم نقل جميع الدورات السابقة من الصفحة الرئيسية إلى هذه الصفحة حتى تبقى تجربة التصفح أكثر تركيزا على الأنشطة."
+              description=""
+              showDates={false}
             />
           </section>
         ) : null}
@@ -418,22 +443,46 @@ export default function ActivityDetail() {
             hint=""
             icon={<Quote className="w-6 h-6 text-[#4A9B8E]" />}
           >
-            {activity.feedback.map((item) => (
-              <div
-                key={`${item.name}-${item.role}`}
-                className="min-w-[260px] sm:min-w-[380px] lg:min-w-[520px] rounded-2xl md:rounded-3xl border border-gray-100 bg-[#FBFCFC] p-5 sm:p-6"
-              >
-                <div className="mb-4">
-                  <div className="font-bold text-gray-900">{item.name}</div>
-                  <div className="mt-1 text-sm text-[#4A9B8E]">{item.role}</div>
-                </div>
-                <p className="text-gray-600 leading-8">{item.comment}</p>
-              </div>
-            ))}
+            {activity.feedback.map((item) => {
+              const isEnglishFeedback = /[A-Za-z]/.test(item.name);
+
+              return (
+                <article
+                  key={`${item.name}-${item.role}`}
+                  className="group relative flex h-[430px] min-w-[280px] flex-col overflow-hidden rounded-[28px] border border-[#4A9B8E]/15 bg-[linear-gradient(145deg,#ffffff_0%,#f5fbf9_58%,#eaf6f2_100%)] shadow-[0_18px_45px_-30px_rgba(31,81,72,0.55)] transition-all duration-300 hover:-translate-y-1 hover:border-[#4A9B8E]/30 hover:shadow-[0_24px_55px_-28px_rgba(31,81,72,0.65)] sm:min-w-[400px] lg:min-w-[540px]"
+                >
+                  <div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#1f5148,#6bc4b2,#f3a646)]" />
+                  <Quote className="pointer-events-none absolute -left-3 top-8 h-24 w-24 rotate-180 text-[#4A9B8E]/[0.07]" />
+
+                  <header className="relative flex items-start gap-4 border-b border-[#4A9B8E]/10 p-5 sm:p-6">
+                    <div
+                      dir={isEnglishFeedback ? "ltr" : "rtl"}
+                      className={`min-w-0 flex-1 ${isEnglishFeedback ? "text-left" : "text-right"}`}
+                    >
+                      <h3 className="text-lg font-black leading-7 text-gray-900 sm:text-xl">{item.name}</h3>
+                      <p className="mt-1.5 text-sm font-semibold leading-6 text-[#3D7A6F]">{item.role}</p>
+                    </div>
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-[#4A9B8E] shadow-sm ring-1 ring-[#4A9B8E]/10">
+                      <Quote className="h-4 w-4" />
+                    </span>
+                  </header>
+
+                  <div className="relative min-h-0 flex-1 p-5 sm:p-6">
+                    <blockquote
+                      dir={isEnglishFeedback ? "ltr" : "rtl"}
+                      className={`h-full overflow-y-auto whitespace-normal pl-2 text-sm leading-8 text-gray-600 [scrollbar-color:#9ad7cb_transparent] [scrollbar-width:thin] sm:text-base ${
+                        isEnglishFeedback ? "text-left" : "text-right"
+                      }`}
+                    >
+                      {item.comment}
+                    </blockquote>
+                  </div>
+                </article>
+              );
+            })}
           </HorizontalScroller>
         ) : null}
       </main>
-      {isAcademy && showAcademyReminder ? <CountdownFloatingPopup /> : null}
       <Footer />
     </div>
   );

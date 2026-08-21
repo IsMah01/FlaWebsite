@@ -25,6 +25,7 @@ export type ActivityBoardMember = {
   name?: string;
   role: string;
   image: string;
+  imagePosition?: "center" | "top";
 };
 
 export type AmbassadorUpdate = {
@@ -76,19 +77,19 @@ export const activities: ActivityData[] = [
     color: "#4A9B8E",
     intro:
       "تضم الأكاديمية ندوات فكرية وثقافية، ومحاضرات ولقاءات تكوينية، ومسابقات مهارية وإبداعية، وبرامج للتطوير الذاتي وصناعة القيادات الشابة. الأكاديمية ليست مجرد برنامج تكويني، بل تجربة متكاملة تُعاش بكل تفاصيلها؛ عشرة أيام من التعلّم، والإبداع، والعمل الجماعي، وابتكار مشاريع تحمل أثراً حقيقياً ومستداماً.",
-    coverImage: mediaPath("future-leaders-academy", "logo-visible.png"),
-    coverImageBackground: "soft",
-    coverImageFit: "contain",
+    coverImage: mediaPath("future-leaders-academy", "logo-square-blue.png"),
+    coverImageBackground: "dark",
+    coverImageFit: "cover",
     videoUrl: "https://www.youtube.com/embed/oYjeMZ8Cd7Q",
     board: [
-      { name: "ندى وارث", role: "مديرة الدورة", image: mediaPath("future-leaders-academy", "pilotage-02.png") },
+      { name: "ندى وارث", role: "مديرة الدورة", image: mediaPath("future-leaders-academy", "pilotage-02.png"), imagePosition: "top" },
+      { name: "البراهمي يوسف", role: "نائب المدير و مسؤول المالية", image: mediaPath("future-leaders-academy", "pilotage-04.jpg"), imagePosition: "top" },
       { name: "الإدريسي محمد", role: "مسؤول الإيواء و التغذية", image: mediaPath("future-leaders-academy", "pilotage-03.jpg") },
       { name: "إلياس اسليطين", role: "مسؤول اللوجيستيك", image: mediaPath("future-leaders-academy", "pilotage-09.jpg") },
-      { name: "البراهمي يوسف", role: "مسؤول المالية", image: mediaPath("future-leaders-academy", "pilotage-04.jpg") },
       { name: "خديجة زغران", role: "مسؤولة التواصل", image: mediaPath("future-leaders-academy", "pilotage-08.jpeg") },
       { name: "ستيتلة ياسين", role: "مسؤول البرنامج", image: mediaPath("future-leaders-academy", "pilotage-05.jpg") },
       { name: "المتوكل خديجة", role: "مسؤولة المتابعة", image: mediaPath("future-leaders-academy", "pilotage-06.jpg") },
-      { name: "حجي صلاح الدين", role: "مسؤول الضيوف و البروتوكول", image: mediaPath("future-leaders-academy", "pilotage-07.jpeg") },
+      { name: "حجي صلاح الدين", role: "مسؤول الضيوف و البروتوكول", image: mediaPath("future-leaders-academy", "pilotage-07.jpeg"), imagePosition: "top" },
       { name: "الزاير أكرم", role: "مسؤول الإعلام", image: mediaPath("future-leaders-academy", "pilotage-01.png") },
     ],
     highlights: [
