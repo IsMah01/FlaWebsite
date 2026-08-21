@@ -138,20 +138,17 @@ export const attendanceRouter = createRouter({
     const session = requireCandidateSession(ctx.req.headers.get("cookie") || "");
     const [finals] = await getSqlPool().query<any[]>(`SELECT id,firstName,lastName,email FROM final_candidate_confirmations WHERE newUserId=? AND email=? AND status='confirmed' LIMIT 1`, [session.newUserId, session.email.trim().toLowerCase()]);
     if (!finals[0]) throw new TRPCError({ code: "FORBIDDEN", message: "هذا الفضاء مخصص للمشاركين المؤكدين نهائياً." });
-    const [rankingRows] = await getSqlPool().query<any[]>(`SELECT f.id,f.firstName,f.lastName,COALESCE(SUM(p.points),0) totalPoints FROM final_candidate_confirmations f LEFT JOIN candidate_point_entries p ON p.finalCandidateId=f.id WHERE f.status='confirmed' GROUP BY f.id,f.firstName,f.lastName ORDER BY totalPoints DESC,f.firstName,f.lastName`);
-    let previousPoints: number | null = null; let sharedRank = 0;
-    const ranking = rankingRows.map((row, index) => { const totalPoints = Number(row.totalPoints); if (previousPoints === null || totalPoints < previousPoints) sharedRank = index + 1; previousPoints = totalPoints; return { id: Number(row.id), firstName: row.firstName, lastName: row.lastName, totalPoints, rank: sharedRank, isCurrentCandidate: Number(row.id) === Number(finals[0].id) }; });
+    const [totalRows] = await getSqlPool().query<any[]>(`SELECT COALESCE(SUM(points),0) totalPoints FROM candidate_point_entries WHERE finalCandidateId=?`, [finals[0].id]);
+    const totalPoints = Number(totalRows[0]?.totalPoints ?? 0);
     const [detailRows] = await getSqlPool().query<any[]>(`SELECT id,actionType,points,title,detail,awardedAt FROM candidate_point_entries WHERE finalCandidateId=? ORDER BY awardedAt DESC,id DESC`, [finals[0].id]);
-    const current = ranking.find((item) => item.isCurrentCandidate)!;
     const [attendanceCountRows] = await getSqlPool().query<any[]>(`SELECT COUNT(*) total FROM attendance_records WHERE finalCandidateId=?`, [finals[0].id]); const attendedSessions=Number(attendanceCountRows[0]?.total??0);
     const [sessionCountRows] = await getSqlPool().query<any[]>(`SELECT COUNT(*) total FROM attendance_sessions`); const totalSessions = Number(sessionCountRows[0]?.total ?? 0);
     const badges = [
       ...(attendedSessions >= 1 ? [{ key: "first_presence", label: "أول حضور", description: "سجلتم حضوركم في أول حصة" }] : []),
       ...(attendedSessions >= 5 ? [{ key: "regular", label: "المواظب", description: "حضرتم خمس حصص على الأقل" }] : []),
       ...(detailRows.filter((row) => row.actionType === "punctuality").length >= 3 ? [{ key: "punctual", label: "دقيق المواعيد", description: "حققتم ثلاث مكافآت للالتزام بالوقت" }] : []),
-      ...(current.rank <= 3 && current.totalPoints > 0 ? [{ key: "top_three", label: "ضمن الثلاثة الأوائل", description: "أنتم ضمن صدارة الترتيب" }] : []),
     ];
-    return { candidate: { id: Number(finals[0].id), firstName: finals[0].firstName, lastName: finals[0].lastName, totalPoints: current.totalPoints, rank: current.rank }, ranking, details: detailRows.map((row) => ({ ...row, id: Number(row.id), points: Number(row.points) })), participantCount: ranking.length, progress: { attendedSessions, totalSessions }, badges, rules: { earlyArrivalPoints: 10, onTimePoints: 5, earlyWindowMinutes: 20, gracePeriodMinutes: 10, latePoints: 0 } };
+    return { candidate: { id: Number(finals[0].id), firstName: finals[0].firstName, lastName: finals[0].lastName, totalPoints }, details: detailRows.map((row) => ({ ...row, id: Number(row.id), points: Number(row.points) })), progress: { attendedSessions, totalSessions }, badges, rules: { earlyArrivalPoints: 10, onTimePoints: 5, earlyWindowMinutes: 20, gracePeriodMinutes: 10, latePoints: 0 } };
   }),
   adminScoreDashboard: scoresAdminQuery.query(async () => {
     const [rankingRows] = await getSqlPool().query<any[]>(`SELECT f.id,f.firstName,f.lastName,f.email,COALESCE(SUM(p.points),0) totalPoints,COUNT(p.id) entryCount FROM final_candidate_confirmations f LEFT JOIN candidate_point_entries p ON p.finalCandidateId=f.id WHERE f.status='confirmed' GROUP BY f.id,f.firstName,f.lastName,f.email ORDER BY totalPoints DESC,f.firstName,f.lastName`);
