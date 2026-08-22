@@ -8,13 +8,13 @@ import { requireCandidateSession } from "./candidate-auth-router";
 type CandidateRow = RowDataPacket & { id: number; firstName: string; lastName: string; email: string; phoneNumber: string };
 type AssignmentRow = RowDataPacket & CandidateRow & {
   isSpy: number; isIntelligencePresident: number; displayedRole: string | null;
-  spyCountry: string | null; fakeCountry: string | null; contactCandidateId: number | null; emailSentAt: Date | null; emailError: string | null;
+  spyCountry: string | null; fakeCountry: string | null; contactCandidateId: number | null; emailSentAt: Date | null; emailError: string | null; revealedAt: Date | null;
 };
 export const politicalGameRouter = createRouter({
   adminOverview: superAdminQuery.query(async () => {
     const pool = getSqlPool();
     const [candidates] = await pool.query<CandidateRow[]>(`SELECT id,firstName,lastName,email,phoneNumber FROM final_candidate_confirmations WHERE status='confirmed' ORDER BY firstName,lastName`);
-    const [assignments] = await pool.query<AssignmentRow[]>(`SELECT f.id,f.firstName,f.lastName,f.email,a.isSpy,a.isIntelligencePresident,a.displayedRole,a.spyCountry,a.fakeCountry,a.contactCandidateId,a.emailSentAt,a.emailError FROM political_game_assignments a JOIN final_candidate_confirmations f ON f.id=a.finalCandidateId ORDER BY f.firstName,f.lastName`);
+    const [assignments] = await pool.query<AssignmentRow[]>(`SELECT f.id,f.firstName,f.lastName,f.email,a.isSpy,a.isIntelligencePresident,a.displayedRole,a.spyCountry,a.fakeCountry,a.contactCandidateId,a.emailSentAt,a.emailError,a.revealedAt FROM political_game_assignments a JOIN final_candidate_confirmations f ON f.id=a.finalCandidateId ORDER BY f.firstName,f.lastName`);
     const [settings] = await pool.query<(RowDataPacket & { rolesVisible:number })[]>(`SELECT rolesVisible FROM political_game_settings WHERE id=1`);
     return { candidates, rolesVisible: !!settings[0]?.rolesVisible, assignments: assignments.map(a => ({ ...a, isSpy: !!a.isSpy, isIntelligencePresident: !!a.isIntelligencePresident })) };
   }),
@@ -93,6 +93,7 @@ export const politicalGameRouter = createRouter({
     const [rows] = await pool.query<AssignmentRow[]>(`SELECT f.id,f.firstName,f.lastName,f.email,a.isSpy,a.isIntelligencePresident,a.displayedRole,a.spyCountry,a.fakeCountry,a.contactCandidateId,a.emailSentAt,a.emailError FROM final_candidate_confirmations f JOIN political_game_assignments a ON a.finalCandidateId=f.id WHERE f.newUserId=? AND LOWER(f.email)=? AND f.status='confirmed' LIMIT 1`, [session.newUserId, session.email.trim().toLowerCase()]);
     const assignment = rows[0];
     if (!assignment) return null;
+    await pool.execute(`UPDATE political_game_assignments SET revealedAt=COALESCE(revealedAt,NOW()) WHERE finalCandidateId=?`, [assignment.id]);
     let contact: { firstName: string; lastName: string; email: string; phoneNumber: string | null } | null = null;
     if (assignment.isSpy && assignment.contactCandidateId) {
       const [contacts] = await pool.query<CandidateRow[]>(`SELECT id,firstName,lastName,email,phoneNumber FROM final_candidate_confirmations WHERE id=? LIMIT 1`, [assignment.contactCandidateId]);
