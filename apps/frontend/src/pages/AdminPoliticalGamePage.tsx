@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate } from "react-router";
-import { ArrowLeft, Mail, Search, Shield } from "lucide-react";
+import { ArrowLeft, Eye, Mail, Search, Shield, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,10 +9,10 @@ import { trpc } from "@/providers/trpc";
 
 type Draft = { candidateId: number; isSpy: boolean; isIntelligencePresident: boolean; displayedRole: string; spyCountry: string; fakeCountry: string; contactCandidateId: number | null };
 
-const countryOptions = ["الولايات المتحدة الأمريكية", "روسيا", "الصين", "تركيا", "العراق", "إيران", "الاتحاد الأوروبي"];
+const countryOptions = ["الولايات المتحدة الأمريكية", "روسيا", "الصين", "تركيا", "الخليج", "إيران", "الاتحاد الأوروبي"];
 const roleOptions = [
   "وزير/وزيرة الاقتصاد", "وزير/وزيرة الإعلام", "وزير/وزيرة المالية",
-  "وزير/وزيرة الطاقة النووية", "وزير/وزيرة الفلاحة", "وزير/وزيرة الخارجية",
+  "وزير/وزيرة الطاقة النووية", "وزير/وزيرة الفلاحة", "وزير/وزيرة الخارجية", "وزير/وزيرة الداخلية",
   "مستشار/مستشارة الأمن القومي", "مستشار/مستشارة رئاسة الاستخبارات الصحية",
 ];
 const personLabel = (person: { firstName:string; lastName:string; email:string; phoneNumber?:string }) => `${person.firstName} ${person.lastName} — ${person.email}${person.phoneNumber ? ` — ${person.phoneNumber}` : ""}`;
@@ -24,6 +24,7 @@ export default function AdminPoliticalGamePage() {
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [contactSearch, setContactSearch] = useState<Record<number,string>>({});
   const [search, setSearch] = useState("");
+  const [presidentPreviewId, setPresidentPreviewId] = useState<number | null>(null);
   useEffect(() => {
     if (!overview.data) return;
     const saved = new Map(overview.data.assignments.map(a => [a.id, a]));
@@ -39,6 +40,8 @@ export default function AdminPoliticalGamePage() {
     onError: e => toast.error(e.message),
   });
   const people = overview.data?.candidates ?? [];
+  const presidentPreview = presidentPreviewId ? people.find(person=>person.id===presidentPreviewId) : null;
+  const presidentSpies = presidentPreviewId ? drafts.filter(draft=>draft.isSpy&&draft.contactCandidateId===presidentPreviewId).map(draft=>({draft,person:people.find(person=>person.id===draft.candidateId)})).filter(item=>item.person) : [];
   const filtered = useMemo(() => people.filter(p => `${p.firstName} ${p.lastName} ${p.email}`.toLowerCase().includes(search.toLowerCase())), [people, search]);
   const update = (id: number, patch: Partial<Draft>) => setDrafts(current => current.map(d => d.candidateId === id ? { ...d, ...patch } : d));
   if (isLoading) return <div className="p-20 text-center">Chargement…</div>;
@@ -61,9 +64,10 @@ export default function AdminPoliticalGamePage() {
             <select disabled={!d.isSpy} className="h-10 rounded-md border bg-white px-3 text-sm disabled:opacity-50" value={d.fakeCountry} onChange={e=>update(person.id,{fakeCountry:e.target.value})}><option value="">Faux pays…</option>{countryOptions.filter(country=>country!==d.spyCountry).map(country=><option key={country} value={country}>{country}</option>)}</select>
             <div><Input disabled={!d.isSpy} list={`contacts-${person.id}`} value={contactSearch[person.id] ?? ""} onChange={e=>{const value=e.target.value;setContactSearch(current=>({...current,[person.id]:value}));const needle=value.trim().toLowerCase();const match=people.find(p=>p.id!==person.id&&(personLabel(p).toLowerCase()===needle||p.email.toLowerCase()===needle||p.phoneNumber?.toLowerCase()===needle));update(person.id,{contactCandidateId:match?.id??null});}} placeholder="Écrire un nom, e-mail ou téléphone…"/><datalist id={`contacts-${person.id}`}>{people.filter(p=>p.id!==person.id).map(p=><option key={p.id} value={personLabel(p)}/>)}</datalist></div>
           </div>
-          <div className="mt-4 flex justify-end"><Button variant="outline" disabled={saveOne.isPending} onClick={() => saveOne.mutate({candidateId:d.candidateId,isSpy:d.isSpy,displayedRole:d.displayedRole,spyCountry:d.spyCountry,fakeCountry:d.fakeCountry,contactCandidateId:d.contactCandidateId})}>{saveOne.isPending && saveOne.variables?.candidateId === d.candidateId ? "Publication…" : "Publier uniquement ce candidat"}</Button></div>
+          <div className="mt-4 flex flex-wrap justify-end gap-2">{drafts.some(spy=>spy.isSpy&&spy.contactCandidateId===person.id)?<Button variant="outline" className="border-violet-300 text-violet-800" onClick={()=>setPresidentPreviewId(person.id)}><Eye className="mr-2 h-4 w-4"/>Voir comme président</Button>:null}<Button variant="outline" disabled={saveOne.isPending} onClick={() => saveOne.mutate({candidateId:d.candidateId,isSpy:d.isSpy,displayedRole:d.displayedRole,spyCountry:d.spyCountry,fakeCountry:d.fakeCountry,contactCandidateId:d.contactCandidateId})}>{saveOne.isPending && saveOne.variables?.candidateId === d.candidateId ? "Publication…" : "Publier uniquement ce candidat"}</Button></div>
         </article>; })}
       </section>
+      {presidentPreview ? <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4" onClick={()=>setPresidentPreviewId(null)}><section className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl" onClick={event=>event.stopPropagation()}><div className="flex items-start justify-between gap-4"><div><p className="text-sm font-bold text-violet-700">Aperçu du compte</p><h2 className="mt-1 flex items-center gap-2 text-2xl font-black"><UserRound className="h-6 w-6"/>رئاسة الاستخبارات</h2><p className="mt-2 text-slate-600">{presidentPreview.firstName} {presidentPreview.lastName} verra uniquement les Spies ci-dessous.</p></div><Button size="icon" variant="ghost" onClick={()=>setPresidentPreviewId(null)}><X className="h-5 w-5"/></Button></div><div className="mt-6 space-y-3">{presidentSpies.map(({draft,person})=><article key={draft.candidateId} className="rounded-2xl border border-violet-200 bg-violet-50 p-4"><p className="font-black">{person!.firstName} {person!.lastName}</p><p className="mt-2 text-sm text-slate-700">Faux rôle : <strong>{draft.displayedRole||"Non renseigné"}</strong><br/>Pays réel : <strong>{draft.spyCountry||"Non renseigné"}</strong><br/>Faux pays : <strong>{draft.fakeCountry||"Non renseigné"}</strong></p></article>)}</div></section></div>:null}
       {!overview.isLoading && !people.length ? <div className="rounded-2xl border bg-white p-10 text-center">Aucun participant confirmé.</div> : null}
     </main>
   </div>;
