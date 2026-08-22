@@ -35,6 +35,8 @@ import FinalCandidateScores from "./pages/FinalCandidateScores";
 import AdminScoresPage from "./pages/AdminScoresPage";
 import MiniAdminProfilePage from "./pages/MiniAdminProfilePage";
 import AdminDailyFormsPage from "./pages/AdminDailyFormsPage";
+import AdminPoliticalGamePage from "./pages/AdminPoliticalGamePage";
+import PoliticalGameRevealPage from "./pages/PoliticalGameRevealPage";
 import ScrollManager from "./components/ScrollManager";
 import { useViewerSession } from "./hooks/useViewerSession";
 
@@ -77,6 +79,7 @@ export default function App() {
         <Route path="/espace-candidat-final/profil" element={<FinalCandidateProfile />} />
         <Route path="/espace-candidat-final/points" element={<FinalCandidateScores />} />
         <Route path="/presence/session/:token" element={<AttendanceCheckIn />} />
+        <Route path="/jeu-politique/revelation" element={<PoliticalGameRevealPage />} />
         <Route path="/candidate-questionnaire" element={<CandidateQuestionnaire />} />
         <Route path="/interview" element={<InterviewBooking />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
@@ -92,6 +95,7 @@ export default function App() {
         <Route path="/admin/attendance" element={<AdminAttendancePage />} />
         <Route path="/admin/scores" element={<AdminScoresPage />} />
         <Route path="/admin/daily-forms" element={<AdminDailyFormsPage />} />
+        <Route path="/admin/jeu-politique" element={<AdminPoliticalGamePage />} />
         <Route path="/admin/profile" element={<MiniAdminProfilePage />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/admin/forgot-password" element={<ForgotPassword accountType="admin" />} />
