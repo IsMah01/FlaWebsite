@@ -4,8 +4,9 @@ import { join } from "node:path";
 
 const SEND_AT = Date.UTC(2026, 7, 22, 7, 0, 0); // 08:00 in Morocco (UTC+1).
 const PRIVATE_STORAGE = join(process.cwd(), "storage", "private", "uploads");
-const SENT_MARKER = join(PRIVATE_STORAGE, ".closing-ceremony-invitation-sent");
-const REPORT_PATH = join(PRIVATE_STORAGE, "closing-ceremony-email-report.csv");
+const CAMPAIGN_VERSION = "v2-malaki";
+const SENT_MARKER = join(PRIVATE_STORAGE, `.closing-ceremony-invitation-${CAMPAIGN_VERSION}-sent`);
+const REPORT_PATH = join(PRIVATE_STORAGE, `closing-ceremony-email-report-${CAMPAIGN_VERSION}.csv`);
 
 function runCampaign() {
   if (existsSync(SENT_MARKER)) {
