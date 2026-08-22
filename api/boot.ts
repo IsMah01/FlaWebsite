@@ -16,6 +16,7 @@ import { getDb, getSqlPool } from "./queries/connection";
 import { adminUsers } from "@db/schema";
 import { eq } from "drizzle-orm";
 import { ensureDatabaseSchema } from "./lib/migrate";
+import { startClosingInvitationScheduler } from "./lib/closing-invitation-scheduler";
 import { startCandidateQuestionnaireReminderScheduler } from "./lib/candidate-reminders";
 import { startInterviewReminderScheduler } from "./lib/interview-reminders";
 import crypto from "node:crypto";
@@ -377,6 +378,7 @@ if (env.isProduction) {
   await ensureDatabaseSchema();
   startCandidateQuestionnaireReminderScheduler();
   startInterviewReminderScheduler();
+  startClosingInvitationScheduler();
 
   const { serve } = await import("@hono/node-server");
 
@@ -385,4 +387,3 @@ if (env.isProduction) {
     console.log(`Server running on http://localhost:${port}/`);
   });
 }
-

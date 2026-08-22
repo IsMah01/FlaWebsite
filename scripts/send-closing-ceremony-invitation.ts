@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { appendFileSync, existsSync } from "node:fs";
+import { appendFileSync, existsSync, writeFileSync } from "node:fs";
 import mysql from "mysql2/promise";
 import nodemailer from "nodemailer";
 
@@ -8,6 +8,8 @@ const imagePath = process.env.CLOSING_INVITATION_IMAGE_PATH
 const logoPath = process.env.EMAIL_LOGO_PATH || "public/images/logo.png";
 const reportPath = process.env.CLOSING_INVITATION_REPORT_PATH
   || "storage/closing-ceremony-email-report.csv";
+const sentMarkerPath = process.env.CLOSING_INVITATION_SENT_MARKER
+  || "storage/.closing-ceremony-invitation-sent";
 const testArgument = process.argv.find((argument) => argument.startsWith("--test-email="));
 const testEmail = testArgument?.slice("--test-email=".length).trim().toLowerCase();
 const sendAll = process.argv.includes("--send-all");
@@ -16,6 +18,10 @@ if (!testEmail && !sendAll) {
   throw new Error("Safe mode: use --test-email=address@example.com or --send-all");
 }
 if (testEmail && sendAll) throw new Error("Choose either test mode or bulk mode, not both");
+if (sendAll && existsSync(sentMarkerPath)) {
+  console.log(`Campaign already completed: ${sentMarkerPath}`);
+  process.exit(0);
+}
 if (!existsSync(imagePath)) throw new Error(`Invitation image not found: ${imagePath}`);
 if (!existsSync(logoPath)) throw new Error(`Email logo not found: ${logoPath}`);
 
@@ -28,12 +34,24 @@ if (!smtpHost || !smtpUser || !smtpPass) throw new Error("SMTP configuration is 
 
 type Recipient = { firstName: string; email: string };
 const recipients: Recipient[] = [];
+let db: mysql.Connection | null = null;
 
 if (testEmail) {
   recipients.push({ firstName: "Ismail", email: testEmail });
 } else {
   if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is missing");
-  const db = await mysql.createConnection(process.env.DATABASE_URL);
+  db = await mysql.createConnection(process.env.DATABASE_URL);
+  await db.query(`CREATE TABLE IF NOT EXISTS email_campaign_deliveries (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    campaignKey VARCHAR(100) NOT NULL,
+    email VARCHAR(320) NOT NULL,
+    status ENUM('sending','sent','failed') NOT NULL DEFAULT 'sending',
+    error TEXT NULL,
+    sentAt TIMESTAMP NULL,
+    createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY email_campaign_delivery_unique (campaignKey, email)
+  )`);
   const [rows] = await db.query<mysql.RowDataPacket[]>(`
     SELECT firstName, email FROM (
       SELECT firstName, email, createdAt FROM new_users
@@ -43,7 +61,6 @@ if (testEmail) {
       FROM users WHERE email IS NOT NULL AND LENGTH(TRIM(email)) > 0
     ) all_accounts ORDER BY createdAt
   `);
-  await db.end();
   const unique = new Map<string, Recipient>();
   for (const row of rows) {
     const email = String(row.email).trim().toLowerCase();
@@ -64,9 +81,23 @@ const transporter = nodemailer.createTransport({
 });
 
 const subject = "دعوة لحضور الحفل الختامي لأكاديمية أطر الغد – دورة الأثر";
+const campaignKey = "closing-ceremony-2026-08-23";
 appendFileSync(reportPath, `\nstarted_at,mode,total\n${new Date().toISOString()},${testEmail ? "test" : "bulk"},${recipients.length}\nemail,status,detail\n`, "utf8");
 
 for (const recipient of recipients) {
+  if (db) {
+    const [claim] = await db.execute<mysql.ResultSetHeader>(
+      `INSERT INTO email_campaign_deliveries (campaignKey,email,status) VALUES (?,?,'sending')
+       ON DUPLICATE KEY UPDATE
+         status=IF(status='failed','sending',status),
+         error=IF(status='failed',NULL,error)`,
+      [campaignKey, recipient.email],
+    );
+    if (claim.affectedRows === 0) {
+      console.log(`${recipient.email}: skipped (already processed)`);
+      continue;
+    }
+  }
   const safeName = recipient.firstName.replace(/[&<>"']/g, (value) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   })[value]!);
@@ -91,9 +122,25 @@ for (const recipient of recipients) {
     status = "failed";
     detail = error instanceof Error ? error.message : "SEND_FAILED";
   }
+  if (db) {
+    await db.execute(
+      "UPDATE email_campaign_deliveries SET status=?,error=?,sentAt=? WHERE campaignKey=? AND email=?",
+      [status, detail || null, status === "sent" ? new Date() : null, campaignKey, recipient.email],
+    );
+  }
   appendFileSync(reportPath, `${recipient.email},${status},${JSON.stringify(detail)}\n`, "utf8");
   console.log(`${recipient.email}: ${status}`);
 }
 
 transporter.close();
+if (db) {
+  const [remainingRows] = await db.execute<mysql.RowDataPacket[]>(
+    "SELECT COUNT(*) remaining FROM email_campaign_deliveries WHERE campaignKey=? AND status<>'sent'",
+    [campaignKey],
+  );
+  const remaining = Number(remainingRows[0]?.remaining ?? 0);
+  await db.end();
+  if (remaining === 0) writeFileSync(sentMarkerPath, `${new Date().toISOString()}\n`, "utf8");
+  else console.error(`Campaign incomplete: ${remaining} delivery failure(s) remain.`);
+}
 console.log(`Completed. Report: ${reportPath}`);
