@@ -28,9 +28,9 @@ export const politicalGameRouter = createRouter({
     const candidateIds = new Set(input.assignments.map(a => a.candidateId));
     const contactIds = new Set(input.assignments.filter(a => a.isSpy && a.contactCandidateId).map(a => a.contactCandidateId!));
     for (const item of input.assignments) {
-      if (item.isSpy && (!item.displayedRole || !item.spyCountry || !item.fakeCountry || !item.contactCandidateId)) throw new TRPCError({ code: "BAD_REQUEST", message: "Chaque spy doit avoir un faux rôle, un pays, un faux pays et un responsable des Istikhbarat." });
-      if (item.isSpy && item.spyCountry === item.fakeCountry) throw new TRPCError({ code: "BAD_REQUEST", message: "Le faux pays doit être différent du pays réel." });
-      if (item.isSpy && !candidateIds.has(item.contactCandidateId!)) throw new TRPCError({ code: "BAD_REQUEST", message: "La personne à contacter doit appartenir à la liste des participants." });
+      if (item.isSpy && (!item.displayedRole || !item.spyCountry || !item.fakeCountry || !item.contactCandidateId)) throw new TRPCError({ code: "BAD_REQUEST", message: "يجب تحديد الدور المزيف والبلد الحقيقي وبلد التغطية والشخص الذي سيتواصل معه كل جاسوس." });
+      if (item.isSpy && item.spyCountry === item.fakeCountry) throw new TRPCError({ code: "BAD_REQUEST", message: "يجب أن يختلف بلد التغطية عن البلد الحقيقي." });
+      if (item.isSpy && !candidateIds.has(item.contactCandidateId!)) throw new TRPCError({ code: "BAD_REQUEST", message: "يجب أن يكون الشخص المختار للتواصل ضمن قائمة المشاركين." });
     }
     const pool = getSqlPool();
     const [people] = await pool.query<CandidateRow[]>(`SELECT id,firstName,lastName,email FROM final_candidate_confirmations WHERE status='confirmed'`);
@@ -46,22 +46,22 @@ export const politicalGameRouter = createRouter({
   }),
 
   saveOne: superAdminQuery.input(z.object({
-    candidateId: z.number().int().positive(), isSpy: z.boolean(),
+    candidateId: z.number().int().positive(), isSpy: z.boolean(), isIntelligencePresident: z.boolean().optional().default(false),
     displayedRole: z.string().trim().max(255).optional().default(""),
     spyCountry: z.string().trim().max(255).optional().default(""),
     fakeCountry: z.string().trim().max(255).optional().default(""),
     contactCandidateId: z.number().int().positive().nullable().optional().default(null),
   })).mutation(async ({ input, ctx }) => {
-    if (input.isSpy && (!input.displayedRole || !input.spyCountry || !input.fakeCountry || !input.contactCandidateId)) throw new TRPCError({ code: "BAD_REQUEST", message: "Renseignez le faux rôle, le pays, le faux pays et la personne à contacter." });
-    if (input.isSpy && input.spyCountry === input.fakeCountry) throw new TRPCError({ code: "BAD_REQUEST", message: "Le faux pays doit être différent du pays réel." });
-    if (input.isSpy && input.contactCandidateId === input.candidateId) throw new TRPCError({ code: "BAD_REQUEST", message: "Un Spy ne peut pas être sa propre personne de contact." });
+    if (input.isSpy && (!input.displayedRole || !input.spyCountry || !input.fakeCountry || !input.contactCandidateId)) throw new TRPCError({ code: "BAD_REQUEST", message: "حدد الدور المزيف والبلد الحقيقي وبلد التغطية والشخص الذي يجب التواصل معه." });
+    if (input.isSpy && input.spyCountry === input.fakeCountry) throw new TRPCError({ code: "BAD_REQUEST", message: "يجب أن يختلف بلد التغطية عن البلد الحقيقي." });
+    if (input.isSpy && input.contactCandidateId === input.candidateId) throw new TRPCError({ code: "BAD_REQUEST", message: "لا يمكن للجاسوس أن يكون هو نفسه الشخص الذي يجب التواصل معه." });
     const pool = getSqlPool();
     const ids = [input.candidateId, ...(input.contactCandidateId ? [input.contactCandidateId] : [])];
     const [people] = await pool.query<CandidateRow[]>(`SELECT id,firstName,lastName,email FROM final_candidate_confirmations WHERE status='confirmed' AND id IN (${ids.map(() => "?").join(",")})`, ids);
     if (people.length !== ids.length) throw new TRPCError({ code: "BAD_REQUEST", message: "Le candidat ou la personne à contacter est invalide." });
     const token = crypto.randomBytes(32).toString("hex");
     const [presidentRows] = await pool.query<(RowDataPacket & { total:number })[]>(`SELECT COUNT(*) total FROM political_game_assignments WHERE isSpy=true AND contactCandidateId=?`, [input.candidateId]);
-    const isPresident = Number(presidentRows[0]?.total || 0) > 0;
+    const isPresident = input.isIntelligencePresident || Number(presidentRows[0]?.total || 0) > 0;
     await pool.execute(`INSERT INTO political_game_assignments (finalCandidateId,revealTokenHash,isSpy,isIntelligencePresident,displayedRole,spyCountry,fakeCountry,contactCandidateId,configuredByAdminId,emailSentAt,emailError,revealedAt) VALUES (?,?,?,?,?,?,?,?,?,NULL,NULL,NULL) ON DUPLICATE KEY UPDATE revealTokenHash=VALUES(revealTokenHash),isSpy=VALUES(isSpy),isIntelligencePresident=VALUES(isIntelligencePresident),displayedRole=VALUES(displayedRole),spyCountry=VALUES(spyCountry),fakeCountry=VALUES(fakeCountry),contactCandidateId=VALUES(contactCandidateId),configuredByAdminId=VALUES(configuredByAdminId),emailSentAt=NULL,emailError=NULL,revealedAt=NULL`, [input.candidateId,hashToken(token),input.isSpy,isPresident,input.displayedRole || null,input.spyCountry || null,input.fakeCountry || null,input.isSpy ? input.contactCandidateId : null,ctx.adminUser.id]);
     return { candidateId: input.candidateId };
   }),
