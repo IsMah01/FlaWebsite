@@ -85,21 +85,6 @@ function escapeEmailHtml(value: string) {
   })[character]!);
 }
 
-export async function sendPoliticalGameRevealEmail(input: { to: string; firstName: string; token: string }) {
-  const { src, attachments } = getEmailLogo();
-  const revealUrl = `${PUBLIC_APP_URL}/jeu-politique/revelation?token=${encodeURIComponent(input.token)}`;
-  const name = escapeEmailHtml(input.firstName);
-  const url = escapeEmailHtml(revealUrl);
-  return sendMailWithRetry({
-    from: SMTP_FROM,
-    to: input.to,
-    subject: "Jeu politique — Votre rôle confidentiel",
-    attachments,
-    text: `Bonjour ${input.firstName}, votre rôle pour le jeu politique est prêt. Découvrez-le ici : ${revealUrl}. Ce lien est personnel et confidentiel.`,
-    html: `<div dir="rtl" style="font-family:Arial,sans-serif;background:#f3f7f6;padding:32px"><div style="max-width:600px;margin:auto;background:white;border-radius:20px;padding:32px;text-align:center"><img src="${src}" alt="FLF" style="max-height:75px"><h1 style="color:#173f39">دورك في اللعبة السياسية جاهز</h1><p style="font-size:17px;color:#475569">مرحباً ${name}، اضغط على الزر لمعرفة دورك بسرية.</p><a href="${url}" style="display:inline-block;margin:18px;padding:14px 26px;border-radius:12px;background:#4A9B8E;color:white;text-decoration:none;font-weight:bold">اكتشف دوري</a><p style="color:#b45309;font-weight:bold">هذا الرابط شخصي وسري. لا تشاركه مع أي شخص.</p></div></div>`,
-  });
-}
-
 async function sendMailWithRetry(
   options: Parameters<typeof transporter.sendMail>[0],
   maxAttempts = 3,

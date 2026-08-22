@@ -150,7 +150,7 @@ export async function ensureDatabaseSchema() {
     await connection.query(`CREATE TABLE IF NOT EXISTS political_game_assignments (
       id INT AUTO_INCREMENT PRIMARY KEY,
       finalCandidateId INT NOT NULL UNIQUE,
-      revealTokenHash VARCHAR(64) NOT NULL UNIQUE,
+      revealTokenHash VARCHAR(64) NULL UNIQUE,
       isSpy BOOLEAN NOT NULL DEFAULT false,
       isIntelligencePresident BOOLEAN NOT NULL DEFAULT false,
       displayedRole VARCHAR(255) NULL,
@@ -166,6 +166,14 @@ export async function ensureDatabaseSchema() {
     )`);
     await addColumnIfMissing(connection, "political_game_assignments", "spyCountry", "spyCountry VARCHAR(255) NULL");
     await addColumnIfMissing(connection, "political_game_assignments", "fakeCountry", "fakeCountry VARCHAR(255) NULL");
+    await connection.query(`ALTER TABLE political_game_assignments MODIFY revealTokenHash VARCHAR(64) NULL`);
+    await connection.query(`CREATE TABLE IF NOT EXISTS political_game_settings (
+      id TINYINT PRIMARY KEY,
+      rolesVisible BOOLEAN NOT NULL DEFAULT false,
+      updatedByAdminId INT NULL,
+      updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )`);
+    await connection.execute(`INSERT IGNORE INTO political_game_settings (id,rolesVisible) VALUES (1,false)`);
     // Keep the platform classification aligned with final participation.
     // Submitting an application alone does not grant the candidate status.
     await connection.query(`UPDATE users u
