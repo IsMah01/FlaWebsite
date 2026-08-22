@@ -9,16 +9,26 @@ import { trpc } from "@/providers/trpc";
 
 type Draft = { candidateId: number; isSpy: boolean; isIntelligencePresident: boolean; displayedRole: string; spyCountry: string; fakeCountry: string; contactCandidateId: number | null };
 
+const countryOptions = ["الولايات المتحدة الأمريكية", "روسيا", "الصين", "تركيا", "العراق", "إيران", "الاتحاد الأوروبي"];
+const roleOptions = [
+  "وزير/وزيرة الاقتصاد", "وزير/وزيرة الإعلام", "وزير/وزيرة المالية",
+  "وزير/وزيرة الطاقة النووية", "وزير/وزيرة الفلاحة", "وزير/وزيرة الخارجية",
+  "مستشار/مستشارة الأمن القومي", "مستشار/مستشارة رئاسة الاستخبارات الصحية",
+];
+const personLabel = (person: { firstName:string; lastName:string; email:string; phoneNumber?:string }) => `${person.firstName} ${person.lastName} — ${person.email}${person.phoneNumber ? ` — ${person.phoneNumber}` : ""}`;
+
 export default function AdminPoliticalGamePage() {
   const { user, isLoading } = useAuth({ redirectOnUnauthenticated: true, redirectPath: "/admin/login" });
   const allowed = user?.role === "admin" && user.adminRole === "super_admin";
   const overview = trpc.politicalGame.adminOverview.useQuery(undefined, { enabled: allowed });
   const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [contactSearch, setContactSearch] = useState<Record<number,string>>({});
   const [search, setSearch] = useState("");
   useEffect(() => {
     if (!overview.data) return;
     const saved = new Map(overview.data.assignments.map(a => [a.id, a]));
     setDrafts(overview.data.candidates.map(c => { const a = saved.get(c.id); return { candidateId: c.id, isSpy: a?.isSpy ?? false, isIntelligencePresident: a?.isIntelligencePresident ?? false, displayedRole: a?.displayedRole ?? "", spyCountry: a?.spyCountry ?? "", fakeCountry: a?.fakeCountry ?? "", contactCandidateId: a?.contactCandidateId ?? null }; }));
+    setContactSearch(Object.fromEntries(overview.data.assignments.map(a => { const contact=overview.data.candidates.find(c=>c.id===a.contactCandidateId); return [a.id,contact?personLabel(contact):""]; })));
   }, [overview.data]);
   const mutation = trpc.politicalGame.saveAndSend.useMutation({
     onSuccess: async r => { toast.success(`${r.saved} attribution(s) enregistrée(s) dans les comptes candidats.`); await overview.refetch(); },
@@ -45,11 +55,11 @@ export default function AdminPoliticalGamePage() {
         {filtered.map(person => { const d = drafts.find(x => x.candidateId === person.id); if (!d) return null; return <article key={person.id} className={`rounded-2xl border bg-white p-5 shadow-sm ${d.isSpy ? "border-red-300" : d.isIntelligencePresident ? "border-violet-300" : ""}`}>
           <div className="grid gap-4 lg:grid-cols-[1.2fr_auto_1fr_1fr_1fr_1fr] lg:items-center">
             <div><p className="font-black text-slate-900">{person.firstName} {person.lastName}</p><p className="text-sm text-slate-500">{person.email}</p></div>
-            <label className="flex cursor-pointer items-center gap-2 font-bold text-red-700"><input type="checkbox" checked={d.isSpy} onChange={e => update(person.id,{isSpy:e.target.checked, displayedRole:e.target.checked ? d.displayedRole : "", spyCountry:e.target.checked ? d.spyCountry : "", fakeCountry:e.target.checked ? d.fakeCountry : "", contactCandidateId:e.target.checked ? d.contactCandidateId : null})}/><Shield className="h-4 w-4"/>Spy</label>
-            <Input disabled={!d.isSpy} value={d.displayedRole} onChange={e => update(person.id,{displayedRole:e.target.value})} placeholder="Faux rôle du spy"/>
-            <Input disabled={!d.isSpy} value={d.spyCountry} onChange={e => update(person.id,{spyCountry:e.target.value})} placeholder="Pays du spy"/>
-            <Input disabled={!d.isSpy} value={d.fakeCountry} onChange={e => update(person.id,{fakeCountry:e.target.value})} placeholder="Faux pays / couverture"/>
-            <select disabled={!d.isSpy} className="h-10 rounded-md border bg-white px-3 text-sm disabled:opacity-50" value={d.contactCandidateId ?? ""} onChange={e => update(person.id,{contactCandidateId:e.target.value ? Number(e.target.value) : null})}><option value="">Personne à contacter…</option>{people.filter(p => p.id !== person.id).map(p => <option key={p.id} value={p.id}>{p.firstName} {p.lastName}</option>)}</select>
+            <label className="flex cursor-pointer items-center gap-2 font-bold text-red-700"><input type="checkbox" checked={d.isSpy} onChange={e => {if(!e.target.checked)setContactSearch(current=>({...current,[person.id]:""}));update(person.id,{isSpy:e.target.checked, displayedRole:e.target.checked ? d.displayedRole : "", spyCountry:e.target.checked ? d.spyCountry : "", fakeCountry:e.target.checked ? d.fakeCountry : "", contactCandidateId:e.target.checked ? d.contactCandidateId : null});}}/><Shield className="h-4 w-4"/>Spy</label>
+            <select disabled={!d.isSpy} className="h-10 rounded-md border bg-white px-3 text-sm disabled:opacity-50" value={d.displayedRole} onChange={e=>update(person.id,{displayedRole:e.target.value})}><option value="">Faux rôle…</option>{roleOptions.map(role=><option key={role} value={role}>{role}</option>)}</select>
+            <select disabled={!d.isSpy} className="h-10 rounded-md border bg-white px-3 text-sm disabled:opacity-50" value={d.spyCountry} onChange={e=>update(person.id,{spyCountry:e.target.value})}><option value="">Pays réel…</option>{countryOptions.map(country=><option key={country} value={country}>{country}</option>)}</select>
+            <select disabled={!d.isSpy} className="h-10 rounded-md border bg-white px-3 text-sm disabled:opacity-50" value={d.fakeCountry} onChange={e=>update(person.id,{fakeCountry:e.target.value})}><option value="">Faux pays…</option>{countryOptions.filter(country=>country!==d.spyCountry).map(country=><option key={country} value={country}>{country}</option>)}</select>
+            <div><Input disabled={!d.isSpy} list={`contacts-${person.id}`} value={contactSearch[person.id] ?? ""} onChange={e=>{const value=e.target.value;setContactSearch(current=>({...current,[person.id]:value}));const needle=value.trim().toLowerCase();const match=people.find(p=>p.id!==person.id&&(personLabel(p).toLowerCase()===needle||p.email.toLowerCase()===needle||p.phoneNumber?.toLowerCase()===needle));update(person.id,{contactCandidateId:match?.id??null});}} placeholder="Écrire un nom, e-mail ou téléphone…"/><datalist id={`contacts-${person.id}`}>{people.filter(p=>p.id!==person.id).map(p=><option key={p.id} value={personLabel(p)}/>)}</datalist></div>
           </div>
           <div className="mt-4 flex justify-end"><Button variant="outline" disabled={saveOne.isPending} onClick={() => saveOne.mutate({candidateId:d.candidateId,isSpy:d.isSpy,displayedRole:d.displayedRole,spyCountry:d.spyCountry,fakeCountry:d.fakeCountry,contactCandidateId:d.contactCandidateId})}>{saveOne.isPending && saveOne.variables?.candidateId === d.candidateId ? "Publication…" : "Publier uniquement ce candidat"}</Button></div>
         </article>; })}

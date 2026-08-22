@@ -6,7 +6,7 @@ import { createRouter, publicQuery, superAdminQuery } from "./middleware";
 import { getSqlPool } from "./queries/connection";
 import { requireCandidateSession } from "./candidate-auth-router";
 
-type CandidateRow = RowDataPacket & { id: number; firstName: string; lastName: string; email: string };
+type CandidateRow = RowDataPacket & { id: number; firstName: string; lastName: string; email: string; phoneNumber: string };
 type AssignmentRow = RowDataPacket & CandidateRow & {
   isSpy: number; isIntelligencePresident: number; displayedRole: string | null;
   spyCountry: string | null; fakeCountry: string | null; contactCandidateId: number | null; emailSentAt: Date | null; emailError: string | null;
@@ -16,7 +16,7 @@ const hashToken = (token: string) => crypto.createHash("sha256").update(token).d
 export const politicalGameRouter = createRouter({
   adminOverview: superAdminQuery.query(async () => {
     const pool = getSqlPool();
-    const [candidates] = await pool.query<CandidateRow[]>(`SELECT id,firstName,lastName,email FROM final_candidate_confirmations WHERE status='confirmed' ORDER BY firstName,lastName`);
+    const [candidates] = await pool.query<CandidateRow[]>(`SELECT id,firstName,lastName,email,phoneNumber FROM final_candidate_confirmations WHERE status='confirmed' ORDER BY firstName,lastName`);
     const [assignments] = await pool.query<AssignmentRow[]>(`SELECT f.id,f.firstName,f.lastName,f.email,a.isSpy,a.isIntelligencePresident,a.displayedRole,a.spyCountry,a.fakeCountry,a.contactCandidateId,a.emailSentAt,a.emailError FROM political_game_assignments a JOIN final_candidate_confirmations f ON f.id=a.finalCandidateId ORDER BY f.firstName,f.lastName`);
     return { candidates, assignments: assignments.map(a => ({ ...a, isSpy: !!a.isSpy, isIntelligencePresident: !!a.isIntelligencePresident })) };
   }),
@@ -29,6 +29,7 @@ export const politicalGameRouter = createRouter({
     const contactIds = new Set(input.assignments.filter(a => a.isSpy && a.contactCandidateId).map(a => a.contactCandidateId!));
     for (const item of input.assignments) {
       if (item.isSpy && (!item.displayedRole || !item.spyCountry || !item.fakeCountry || !item.contactCandidateId)) throw new TRPCError({ code: "BAD_REQUEST", message: "Chaque spy doit avoir un faux rôle, un pays, un faux pays et un responsable des Istikhbarat." });
+      if (item.isSpy && item.spyCountry === item.fakeCountry) throw new TRPCError({ code: "BAD_REQUEST", message: "Le faux pays doit être différent du pays réel." });
       if (item.isSpy && !candidateIds.has(item.contactCandidateId!)) throw new TRPCError({ code: "BAD_REQUEST", message: "La personne à contacter doit appartenir à la liste des participants." });
     }
     const pool = getSqlPool();
@@ -52,6 +53,7 @@ export const politicalGameRouter = createRouter({
     contactCandidateId: z.number().int().positive().nullable().optional().default(null),
   })).mutation(async ({ input, ctx }) => {
     if (input.isSpy && (!input.displayedRole || !input.spyCountry || !input.fakeCountry || !input.contactCandidateId)) throw new TRPCError({ code: "BAD_REQUEST", message: "Renseignez le faux rôle, le pays, le faux pays et la personne à contacter." });
+    if (input.isSpy && input.spyCountry === input.fakeCountry) throw new TRPCError({ code: "BAD_REQUEST", message: "Le faux pays doit être différent du pays réel." });
     if (input.isSpy && input.contactCandidateId === input.candidateId) throw new TRPCError({ code: "BAD_REQUEST", message: "Un Spy ne peut pas être sa propre personne de contact." });
     const pool = getSqlPool();
     const ids = [input.candidateId, ...(input.contactCandidateId ? [input.contactCandidateId] : [])];
@@ -70,10 +72,10 @@ export const politicalGameRouter = createRouter({
     const [rows] = await pool.query<AssignmentRow[]>(`SELECT f.id,f.firstName,f.lastName,f.email,a.isSpy,a.isIntelligencePresident,a.displayedRole,a.spyCountry,a.fakeCountry,a.contactCandidateId,a.emailSentAt,a.emailError FROM final_candidate_confirmations f JOIN political_game_assignments a ON a.finalCandidateId=f.id WHERE f.newUserId=? AND LOWER(f.email)=? AND f.status='confirmed' LIMIT 1`, [session.newUserId, session.email.trim().toLowerCase()]);
     const assignment = rows[0];
     if (!assignment) return null;
-    let contact: { firstName: string; lastName: string; email: string } | null = null;
+    let contact: { firstName: string; lastName: string; email: string; phoneNumber: string | null } | null = null;
     if (assignment.isSpy && assignment.contactCandidateId) {
-      const [contacts] = await pool.query<CandidateRow[]>(`SELECT id,firstName,lastName,email FROM final_candidate_confirmations WHERE id=? LIMIT 1`, [assignment.contactCandidateId]);
-      if (contacts[0]) contact = { firstName: contacts[0].firstName, lastName: contacts[0].lastName, email: contacts[0].email };
+      const [contacts] = await pool.query<CandidateRow[]>(`SELECT id,firstName,lastName,email,phoneNumber FROM final_candidate_confirmations WHERE id=? LIMIT 1`, [assignment.contactCandidateId]);
+      if (contacts[0]) contact = { firstName: contacts[0].firstName, lastName: contacts[0].lastName, email: contacts[0].email, phoneNumber: contacts[0].phoneNumber || null };
     }
     let spies: Array<{ firstName:string; lastName:string; email:string; displayedRole:string|null; spyCountry:string|null; fakeCountry:string|null }> = [];
     if (assignment.isIntelligencePresident) {
@@ -89,10 +91,10 @@ export const politicalGameRouter = createRouter({
     const assignment = rows[0];
     if (!assignment) throw new TRPCError({ code: "NOT_FOUND", message: "Ce lien est invalide ou a été remplacé." });
     await pool.execute(`UPDATE political_game_assignments SET revealedAt=COALESCE(revealedAt,NOW()) WHERE finalCandidateId=?`, [assignment.id]);
-    let contact: { firstName: string; lastName: string; email: string } | null = null;
+    let contact: { firstName: string; lastName: string; email: string; phoneNumber: string | null } | null = null;
     if (assignment.isSpy && assignment.contactCandidateId) {
-      const [contacts] = await pool.query<CandidateRow[]>(`SELECT id,firstName,lastName,email FROM final_candidate_confirmations WHERE id=? LIMIT 1`, [assignment.contactCandidateId]);
-      if (contacts[0]) contact = { firstName: contacts[0].firstName, lastName: contacts[0].lastName, email: contacts[0].email };
+      const [contacts] = await pool.query<CandidateRow[]>(`SELECT id,firstName,lastName,email,phoneNumber FROM final_candidate_confirmations WHERE id=? LIMIT 1`, [assignment.contactCandidateId]);
+      if (contacts[0]) contact = { firstName: contacts[0].firstName, lastName: contacts[0].lastName, email: contacts[0].email, phoneNumber: contacts[0].phoneNumber || null };
     }
     let spies: Array<{ firstName: string; lastName: string; email: string; displayedRole: string | null; spyCountry: string | null; fakeCountry: string | null }> = [];
     if (assignment.isIntelligencePresident) {
