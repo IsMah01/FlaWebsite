@@ -1,4 +1,4 @@
-import { AlertTriangle, Award, Check, CheckCircle2, Download, ExternalLink, ListChecks, LockKeyhole, Moon, Sparkles, Sun, Sunset, UserRound } from "lucide-react";
+import { AlertTriangle, Award, Check, CheckCircle2, Download, ExternalLink, ListChecks, LockKeyhole, Moon, ShieldAlert, Sparkles, Sun, Sunset, UserRound } from "lucide-react";
 import { Link } from "react-router";
 import { toast } from "sonner";
 import Navbar from "@/components/Navbar";
@@ -134,6 +134,7 @@ export default function FinalCandidateProgramme() {
         </div>
       </header>
 
+      <Link to="/espace-candidat-final/jeu-politique" className="mt-6 flex items-center justify-between gap-4 rounded-2xl border-2 border-violet-200 bg-violet-50 p-5 text-violet-950 shadow-sm transition hover:bg-violet-100"><div className="flex items-center gap-3"><ShieldAlert className="h-8 w-8"/><div><h2 className="text-xl font-black">اللعبة السياسية</h2><p className="mt-1 text-sm">اضغط هنا لمعرفة دورك السري ومعلومات مهمتك.</p></div></div><span className="rounded-xl bg-violet-700 px-4 py-2 font-bold text-white">كشف الدور</span></Link>
       <DailyTasksCard />
       <DailyFormsCard accountEmail={access.data?.email ?? ""} />
       <section className="mt-6 rounded-3xl border bg-white p-4 shadow-sm sm:p-6">

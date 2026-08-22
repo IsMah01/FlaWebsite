@@ -37,6 +37,7 @@ import MiniAdminProfilePage from "./pages/MiniAdminProfilePage";
 import AdminDailyFormsPage from "./pages/AdminDailyFormsPage";
 import AdminPoliticalGamePage from "./pages/AdminPoliticalGamePage";
 import PoliticalGameRevealPage from "./pages/PoliticalGameRevealPage";
+import CandidatePoliticalGamePage from "./pages/CandidatePoliticalGamePage";
 import ScrollManager from "./components/ScrollManager";
 import { useViewerSession } from "./hooks/useViewerSession";
 
@@ -78,6 +79,7 @@ export default function App() {
         <Route path="/espace-candidat-final" element={<FinalCandidateProgramme />} />
         <Route path="/espace-candidat-final/profil" element={<FinalCandidateProfile />} />
         <Route path="/espace-candidat-final/points" element={<FinalCandidateScores />} />
+        <Route path="/espace-candidat-final/jeu-politique" element={<CandidatePoliticalGamePage />} />
         <Route path="/presence/session/:token" element={<AttendanceCheckIn />} />
         <Route path="/jeu-politique/revelation" element={<PoliticalGameRevealPage />} />
         <Route path="/candidate-questionnaire" element={<CandidateQuestionnaire />} />

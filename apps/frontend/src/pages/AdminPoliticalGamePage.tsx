@@ -21,7 +21,11 @@ export default function AdminPoliticalGamePage() {
     setDrafts(overview.data.candidates.map(c => { const a = saved.get(c.id); return { candidateId: c.id, isSpy: a?.isSpy ?? false, isIntelligencePresident: a?.isIntelligencePresident ?? false, displayedRole: a?.displayedRole ?? "", spyCountry: a?.spyCountry ?? "", fakeCountry: a?.fakeCountry ?? "", contactCandidateId: a?.contactCandidateId ?? null }; }));
   }, [overview.data]);
   const mutation = trpc.politicalGame.saveAndSend.useMutation({
-    onSuccess: async r => { toast.success(`${r.sent} e-mail(s) envoyé(s)${r.failed ? `, ${r.failed} échec(s)` : ""}.`); await overview.refetch(); },
+    onSuccess: async r => { toast.success(`${r.saved} attribution(s) enregistrée(s) dans les comptes candidats.`); await overview.refetch(); },
+    onError: e => toast.error(e.message),
+  });
+  const saveOne = trpc.politicalGame.saveOne.useMutation({
+    onSuccess: async () => { toast.success("Un seul compte candidat a été publié. Aucun autre compte n’a été modifié."); await overview.refetch(); },
     onError: e => toast.error(e.message),
   });
   const people = overview.data?.candidates ?? [];
@@ -33,7 +37,7 @@ export default function AdminPoliticalGamePage() {
     <main className="mx-auto max-w-7xl space-y-6">
       <header className="rounded-3xl bg-[linear-gradient(125deg,#102f2b,#4A9B8E)] p-6 text-white shadow-xl md:p-8">
         <Link to="/admin" className="inline-flex items-center gap-2 rounded-xl bg-white/15 px-4 py-2 font-bold"><ArrowLeft className="h-4 w-4"/>Tableau de bord</Link>
-        <div className="mt-6 flex flex-wrap items-end justify-between gap-4"><div><p className="font-bold text-emerald-100">Configuration confidentielle</p><h1 className="mt-1 text-3xl font-black">Jeu politique</h1><p className="mt-2 text-white/75">Choisissez chaque Spy, son pays, sa couverture, son faux rôle et son contact.</p></div><Button className="bg-amber-400 text-slate-950 hover:bg-amber-300" disabled={mutation.isPending || !drafts.length} onClick={() => mutation.mutate({ assignments: drafts })}><Mail className="mr-2 h-4 w-4"/>{mutation.isPending ? "Envoi en cours…" : "Enregistrer et envoyer à tous"}</Button></div>
+        <div className="mt-6 flex flex-wrap items-end justify-between gap-4"><div><p className="font-bold text-emerald-100">Configuration confidentielle</p><h1 className="mt-1 text-3xl font-black">Jeu politique</h1><p className="mt-2 text-white/75">Choisissez chaque Spy, son pays, sa couverture, son faux rôle et son contact.</p></div><Button className="bg-amber-400 text-slate-950 hover:bg-amber-300" disabled={mutation.isPending || !drafts.length} onClick={() => mutation.mutate({ assignments: drafts })}><Mail className="mr-2 h-4 w-4"/>{mutation.isPending ? "Enregistrement…" : "Publier dans les comptes"}</Button></div>
       </header>
       <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950"><strong>Parcours simple :</strong> cochez Spy, remplissez les quatre informations demandées, puis envoyez. La personne choisie comme contact verra automatiquement ce Spy dans son message secret.</section>
       <div className="relative"><Search className="absolute left-3 top-3 h-4 w-4 text-slate-400"/><Input className="bg-white pl-9" value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher un participant…"/></div>
@@ -47,6 +51,7 @@ export default function AdminPoliticalGamePage() {
             <Input disabled={!d.isSpy} value={d.fakeCountry} onChange={e => update(person.id,{fakeCountry:e.target.value})} placeholder="Faux pays / couverture"/>
             <select disabled={!d.isSpy} className="h-10 rounded-md border bg-white px-3 text-sm disabled:opacity-50" value={d.contactCandidateId ?? ""} onChange={e => update(person.id,{contactCandidateId:e.target.value ? Number(e.target.value) : null})}><option value="">Personne à contacter…</option>{people.filter(p => p.id !== person.id).map(p => <option key={p.id} value={p.id}>{p.firstName} {p.lastName}</option>)}</select>
           </div>
+          <div className="mt-4 flex justify-end"><Button variant="outline" disabled={saveOne.isPending} onClick={() => saveOne.mutate({candidateId:d.candidateId,isSpy:d.isSpy,displayedRole:d.displayedRole,spyCountry:d.spyCountry,fakeCountry:d.fakeCountry,contactCandidateId:d.contactCandidateId})}>{saveOne.isPending && saveOne.variables?.candidateId === d.candidateId ? "Publication…" : "Publier uniquement ce candidat"}</Button></div>
         </article>; })}
       </section>
       {!overview.isLoading && !people.length ? <div className="rounded-2xl border bg-white p-10 text-center">Aucun participant confirmé.</div> : null}
