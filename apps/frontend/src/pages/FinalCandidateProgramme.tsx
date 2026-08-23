@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { trpc } from "@/providers/trpc";
 
 const programmeUrl = "/api/final-candidate/programme";
+const permanentCandidateFormUrl = "https://docs.google.com/forms/d/e/1FAIpQLSdC8hIi48fwJIJJ8yMi0FA1oyI3Wo4KLo-xe85QUjFI6D3gYQ/viewform?usp=publish-editor";
 export const PROGRAMME_EDITION_NUMBER = 18;
 export const PROGRAMME_START_DATE = "2026-08-14";
 export const PROGRAMME_TIMEZONE_OFFSET = "+01:00";
@@ -133,6 +134,8 @@ export default function FinalCandidateProgramme() {
           <div className="mx-auto w-full max-w-[280px]"><div className="relative mx-auto h-40 w-40 overflow-hidden rounded-full border-4 border-white/80 bg-white shadow-2xl">{access.data?.profileImageUrl ? <img src={access.data.profileImageUrl} alt="الصورة الشخصية" className="h-full w-full object-cover" /> : <UserRound className="h-full w-full p-9 text-[#4A9B8E]/50" />}</div><div className="relative -mt-5 rounded-2xl border border-white/20 bg-white/10 p-5 pt-8 text-center backdrop-blur-xl"><p className="text-xl font-black">{access.data?.firstName} {access.data?.lastName}</p><p className="mt-1 truncate text-sm text-white/65" dir="ltr">{access.data?.email}</p><div className="mt-4 inline-flex items-center gap-2 rounded-full bg-emerald-400/20 px-3 py-1.5 text-xs font-bold text-emerald-100"><CheckCircle2 className="h-4 w-4" />تم تأكيد المشاركة</div></div></div>
         </div>
       </header>
+
+      <a href={permanentCandidateFormUrl} target="_blank" rel="noreferrer" className="mt-6 flex items-center justify-between gap-4 rounded-2xl border-2 border-sky-200 bg-sky-50 p-5 text-sky-950 shadow-sm transition hover:bg-sky-100"><div className="flex items-center gap-3"><ListChecks className="h-8 w-8"/><div><h2 className="text-xl font-black">الاستمارة</h2><p className="mt-1 text-sm">اضغط هنا لفتح الاستمارة وتعبئتها.</p></div></div><span className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-sky-700 px-4 py-2 font-bold text-white">فتح الاستمارة<ExternalLink className="h-4 w-4"/></span></a>
 
       <Link to="/espace-candidat-final/jeu-politique" className="mt-6 flex items-center justify-between gap-4 rounded-2xl border-2 border-violet-200 bg-violet-50 p-5 text-violet-950 shadow-sm transition hover:bg-violet-100"><div className="flex items-center gap-3"><ShieldAlert className="h-8 w-8"/><div><h2 className="text-xl font-black">اللعبة السياسية</h2><p className="mt-1 text-sm">اضغط هنا لمعرفة دورك السري ومعلومات مهمتك.</p></div></div><span className="rounded-xl bg-violet-700 px-4 py-2 font-bold text-white">كشف الدور</span></Link>
       <DailyTasksCard />
