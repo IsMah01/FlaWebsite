@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { trpc } from "@/providers/trpc";
 
 const programmeUrl = "/api/final-candidate/programme";
-const permanentCandidateFormUrl = "https://docs.google.com/forms/d/e/1FAIpQLSdC8hIi48fwJIJJ8yMi0FA1oyI3Wo4KLo-xe85QUjFI6D3gYQ/viewform?usp=publish-editor";
+const permanentCandidateFormUrl = "https://docs.google.com/forms/d/e/1FAIpQLSe4oT1DczdFLEXv1RpDkXCPVt_DHQEpZDAwK_PctuiVJSOr2A/viewform?usp=header";
 export const PROGRAMME_EDITION_NUMBER = 18;
 export const PROGRAMME_START_DATE = "2026-08-14";
 export const PROGRAMME_TIMEZONE_OFFSET = "+01:00";
@@ -135,7 +135,7 @@ export default function FinalCandidateProgramme() {
         </div>
       </header>
 
-      <a href={permanentCandidateFormUrl} target="_blank" rel="noreferrer" className="mt-6 flex items-center justify-between gap-4 rounded-2xl border-2 border-sky-200 bg-sky-50 p-5 text-sky-950 shadow-sm transition hover:bg-sky-100"><div className="flex items-center gap-3"><ListChecks className="h-8 w-8"/><div><h2 className="text-xl font-black">محور المشاريع</h2><p className="mt-1 text-sm">اضغط هنا لفتح الاستمارة وتعبئتها.</p></div></div><span className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-sky-700 px-4 py-2 font-bold text-white">فتح الاستمارة<ExternalLink className="h-4 w-4"/></span></a>
+      <a href={permanentCandidateFormUrl} target="_blank" rel="noreferrer" className="mt-6 flex items-center justify-between gap-4 rounded-2xl border-2 border-sky-200 bg-sky-50 p-5 text-sky-950 shadow-sm transition hover:bg-sky-100"><div className="flex items-center gap-3"><ListChecks className="h-8 w-8"/><div><h2 className="text-xl font-black">استمارة طلب تعويض مصاريف التنقل</h2><p className="mt-1 text-sm">اضغط هنا لفتح الاستمارة وتعبئتها.</p></div></div><span className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-sky-700 px-4 py-2 font-bold text-white">فتح الاستمارة<ExternalLink className="h-4 w-4"/></span></a>
 
       <Link to="/espace-candidat-final/jeu-politique" className="mt-6 flex items-center justify-between gap-4 rounded-2xl border-2 border-violet-200 bg-violet-50 p-5 text-violet-950 shadow-sm transition hover:bg-violet-100"><div className="flex items-center gap-3"><ShieldAlert className="h-8 w-8"/><div><h2 className="text-xl font-black">اللعبة السياسية</h2><p className="mt-1 text-sm">اضغط هنا لمعرفة دورك السري ومعلومات مهمتك.</p></div></div><span className="rounded-xl bg-violet-700 px-4 py-2 font-bold text-white">كشف الدور</span></Link>
       <DailyTasksCard />
