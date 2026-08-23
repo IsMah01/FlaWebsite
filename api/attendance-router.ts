@@ -43,8 +43,19 @@ async function recordAttendance(token: string, finalCandidateId: number) {
 }
 
 async function rebuildSessionAutomaticPoints(sessionId: number) {
-  await getSqlPool().execute(`INSERT IGNORE INTO candidate_point_entries (finalCandidateId,sourceKey,actionType,points,title,detail,awardedAt) SELECT r.finalCandidateId,CONCAT('attendance:',r.sessionId),'attendance',5,s.title,'نقاط الوصول في الوقت المسموح',r.checkedInAt FROM attendance_records r JOIN attendance_sessions s ON s.id=r.sessionId WHERE r.sessionId=? AND r.scoringStartsAt IS NOT NULL AND r.checkedInAt BETWEEN DATE_SUB(r.scoringStartsAt,INTERVAL 20 MINUTE) AND DATE_ADD(r.scoringStartsAt,INTERVAL 10 MINUTE)`, [sessionId]);
-  await getSqlPool().execute(`INSERT IGNORE INTO candidate_point_entries (finalCandidateId,sourceKey,actionType,points,title,detail,awardedAt) SELECT r.finalCandidateId,CONCAT('punctuality:',r.sessionId),'punctuality',5,s.title,'مكافأة الوصول خلال 20 دقيقة قبل البداية',r.checkedInAt FROM attendance_records r JOIN attendance_sessions s ON s.id=r.sessionId WHERE r.sessionId=? AND r.scoringStartsAt IS NOT NULL AND r.checkedInAt>=DATE_SUB(r.scoringStartsAt,INTERVAL 20 MINUTE) AND r.checkedInAt<r.scoringStartsAt`, [sessionId]);
+  const connection = await getSqlPool().getConnection();
+  try {
+    await connection.beginTransaction();
+    await connection.execute(`DELETE p FROM candidate_point_entries p JOIN attendance_records r ON r.finalCandidateId=p.finalCandidateId AND r.sessionId=? AND r.scoringStartsAt IS NOT NULL WHERE p.sourceKey IN (CONCAT('attendance:',r.sessionId),CONCAT('punctuality:',r.sessionId))`, [sessionId]);
+    await connection.execute(`INSERT IGNORE INTO candidate_point_entries (finalCandidateId,sourceKey,actionType,points,title,detail,awardedAt) SELECT r.finalCandidateId,CONCAT('attendance:',r.sessionId),'attendance',5,s.title,'نقاط الوصول في الوقت المسموح',r.checkedInAt FROM attendance_records r JOIN attendance_sessions s ON s.id=r.sessionId WHERE r.sessionId=? AND r.scoringStartsAt IS NOT NULL AND r.checkedInAt BETWEEN DATE_SUB(r.scoringStartsAt,INTERVAL 20 MINUTE) AND DATE_ADD(r.scoringStartsAt,INTERVAL 10 MINUTE)`, [sessionId]);
+    await connection.execute(`INSERT IGNORE INTO candidate_point_entries (finalCandidateId,sourceKey,actionType,points,title,detail,awardedAt) SELECT r.finalCandidateId,CONCAT('punctuality:',r.sessionId),'punctuality',5,s.title,'مكافأة الوصول خلال 20 دقيقة قبل البداية',r.checkedInAt FROM attendance_records r JOIN attendance_sessions s ON s.id=r.sessionId WHERE r.sessionId=? AND r.scoringStartsAt IS NOT NULL AND r.checkedInAt>=DATE_SUB(r.scoringStartsAt,INTERVAL 20 MINUTE) AND r.checkedInAt<r.scoringStartsAt`, [sessionId]);
+    await connection.commit();
+  } catch (error) {
+    try { await connection.rollback(); } catch { /* connection may already be closed */ }
+    throw error;
+  } finally {
+    connection.release();
+  }
 }
 
 export const attendanceRouter = createRouter({
@@ -87,6 +98,7 @@ export const attendanceRouter = createRouter({
       const previousDelay = Number(rows[0].delayMinutes ?? 0);
       const difference = input.delayMinutes - previousDelay;
       await connection.execute(`UPDATE attendance_sessions SET startsAt=DATE_ADD(startsAt,INTERVAL ? MINUTE),delayMinutes=? WHERE id=?`, [difference, input.delayMinutes, input.id]);
+      await connection.execute(`UPDATE attendance_records r JOIN attendance_sessions s ON s.id=r.sessionId SET r.scoringStartsAt=s.startsAt WHERE r.sessionId=? AND r.scoringStartsAt IS NOT NULL`, [input.id]);
       await connection.execute(`INSERT INTO attendance_audit_logs (sessionId,adminId,action,details) VALUES (?,?,'delay_update',?)`, [input.id, ctx.adminUser!.id, `delay:${previousDelay}->${input.delayMinutes}`]);
       await connection.commit();
       await rebuildSessionAutomaticPoints(input.id);
