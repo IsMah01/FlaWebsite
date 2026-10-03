@@ -1,0 +1,22 @@
+name: Send Edition 18 Final Evaluation Reminder
+
+on:
+  workflow_dispatch:
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send reminder from VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            cd ${{ secrets.VPS_PATH }}
+            git pull --ff-only origin main
+            docker compose up -d --build backend
+            docker compose exec -T backend node dist/send-final-evaluation-reminder.js
+            docker compose exec -T backend node dist/send-final-evaluation-reminder.js --send-all

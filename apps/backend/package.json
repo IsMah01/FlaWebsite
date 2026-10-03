@@ -16,7 +16,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:seed": "tsx db/seed.ts",
-    "admin:create": "tsx scripts/create-admin.ts"
+    "admin:create": "tsx scripts/create-admin.ts",
+    "email:final-evaluation-reminder": "tsx scripts/send-final-evaluation-reminder.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.965.0",

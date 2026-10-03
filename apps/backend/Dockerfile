@@ -11,7 +11,8 @@ COPY apps/backend/tsconfig.json ./tsconfig.json
 COPY scripts/send-opening-ceremony-invitation.ts ./scripts/send-opening-ceremony-invitation.ts
 COPY scripts/send-quran-evening-invitation.ts ./scripts/send-quran-evening-invitation.ts
 COPY scripts/send-closing-ceremony-invitation.ts ./scripts/send-closing-ceremony-invitation.ts
-RUN npm run build && npx esbuild scripts/send-opening-ceremony-invitation.ts --platform=node --bundle --format=esm --outfile=dist/send-opening-ceremony-invitation.js --external:mysql2 --external:nodemailer --external:dotenv && npx esbuild scripts/send-quran-evening-invitation.ts --platform=node --bundle --format=esm --outfile=dist/send-quran-evening-invitation.js --external:mysql2 --external:nodemailer --external:dotenv && npx esbuild scripts/send-closing-ceremony-invitation.ts --platform=node --bundle --format=esm --outfile=dist/send-closing-ceremony-invitation.js --external:mysql2 --external:nodemailer --external:dotenv
+COPY scripts/send-final-evaluation-reminder.ts ./scripts/send-final-evaluation-reminder.ts
+RUN npm run build && npx esbuild scripts/send-opening-ceremony-invitation.ts --platform=node --bundle --format=esm --outfile=dist/send-opening-ceremony-invitation.js --external:mysql2 --external:nodemailer --external:dotenv && npx esbuild scripts/send-quran-evening-invitation.ts --platform=node --bundle --format=esm --outfile=dist/send-quran-evening-invitation.js --external:mysql2 --external:nodemailer --external:dotenv && npx esbuild scripts/send-closing-ceremony-invitation.ts --platform=node --bundle --format=esm --outfile=dist/send-closing-ceremony-invitation.js --external:mysql2 --external:nodemailer --external:dotenv && npx esbuild scripts/send-final-evaluation-reminder.ts --platform=node --bundle --format=esm --outfile=dist/send-final-evaluation-reminder.js --external:mysql2 --external:nodemailer --external:dotenv
 
 FROM node:20-alpine AS production
 WORKDIR /app
@@ -20,6 +21,7 @@ COPY apps/backend/package*.json ./
 RUN npm ci --omit=dev
 COPY --from=build /app/dist ./dist
 COPY apps/frontend/public/images/logo.png ./public/images/logo.png
+COPY apps/frontend/public/images/edition-18-logo-color.png ./public/images/edition-18-logo-color.png
 COPY storage/final-admission/edition-18-final-acceptance.pdf ./storage/final-admission/edition-18-final-acceptance.pdf
 COPY storage/opening-ceremony/edition-18-invitation.jpeg ./storage/opening-ceremony/edition-18-invitation.jpeg
 COPY storage/quran-evening/edition-18-quran-evening.jpeg ./storage/quran-evening/edition-18-quran-evening.jpeg
